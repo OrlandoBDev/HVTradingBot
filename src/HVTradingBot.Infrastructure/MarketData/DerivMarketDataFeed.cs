@@ -71,18 +71,36 @@ public sealed class DerivMarketDataFeed(
         {
             // Closed markets (e.g. stock indices outside trading hours) send no ticks; don't wait long for them.
             var spread = await CurrentSpreadAsync(instrument, waitForTick: true, cancellationToken);
-            var bars = await FetchClosedCandlesAsync(socket, instrument, from, spread, cancellationToken);
+
+            // Reuse candles already stored by earlier runs and download only the bars since the last one, so a restart
+            // (e.g. after changing the market selection) takes seconds instead of re-downloading weeks of history.
+            var stored = await StoredCandlesAsync(instrument, from, cancellationToken);
+            List<Candle> bars;
+            string source;
+            if (stored.Count > 0 && stored[0].OpenTimeUtc <= from.AddDays(2))
+            {
+                var gap = await FetchClosedCandlesAsync(socket, instrument, stored[^1].OpenTimeUtc.AddSeconds(1), spread, cancellationToken);
+                await PersistAsync(instrument, gap, cancellationToken);
+                bars = stored.Concat(gap.Where(g => g.OpenTimeUtc > stored[^1].OpenTimeUtc)).ToList();
+                source = $"{stored.Count} stored + {gap.Count} new";
+            }
+            else
+            {
+                bars = await FetchClosedCandlesAsync(socket, instrument, from, spread, cancellationToken);
+                await PersistAsync(instrument, bars, cancellationToken);
+                source = "downloaded";
+            }
+
             if (bars.Count == 0)
             {
                 logger.LogWarning("Deriv returned no 5m candles for {Instrument}; it will join once data arrives", instrument.Symbol);
                 continue;
             }
 
-            await PersistAsync(instrument, bars, cancellationToken);
             _lastBarOpen[instrument] = bars[^1].OpenTimeUtc;
             history[instrument] = bars;
-            logger.LogInformation("Loaded {Count} Deriv 5m candles for {Instrument} ({From:u} to {To:u}), spread {Spread}",
-                bars.Count, instrument.Symbol, bars[0].OpenTimeUtc, bars[^1].OpenTimeUtc, spread);
+            logger.LogInformation("Loaded {Count} 5m candles for {Instrument} ({Source}; {From:u} to {To:u}), spread {Spread}",
+                bars.Count, instrument.Symbol, source, bars[0].OpenTimeUtc, bars[^1].OpenTimeUtc, spread);
         }
 
         if (history.Count == 0)
@@ -271,8 +289,24 @@ public sealed class DerivMarketDataFeed(
         return collected.OrderBy(kv => kv.Key).Select(kv => kv.Value).ToList();
     }
 
+    private async Task<List<Candle>> StoredCandlesAsync(Instrument instrument, DateTime fromUtc, CancellationToken cancellationToken)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var symbol = instrument.Symbol;
+        var rows = await db.Candles.AsNoTracking()
+            .Where(c => c.Instrument == symbol && c.TimeFrame == nameof(TimeFrame.M5) && c.OpenTimeUtc >= fromUtc)
+            .OrderBy(c => c.OpenTimeUtc)
+            .ToListAsync(cancellationToken);
+        return rows.Select(SimulatedMarketDataFeed.ToCandle).ToList();
+    }
+
     private async Task PersistAsync(Instrument instrument, IReadOnlyList<Candle> bars, CancellationToken cancellationToken)
     {
+        if (bars.Count == 0)
+        {
+            return;
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var from = bars[0].OpenTimeUtc;
         var existing = (await db.Candles.AsNoTracking()

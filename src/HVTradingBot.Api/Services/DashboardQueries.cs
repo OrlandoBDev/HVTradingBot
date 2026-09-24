@@ -101,15 +101,26 @@ public sealed class DashboardQueries(
         }).ToList();
 
         var forexOpen = markets.Any(m => m.IsOpen && m.Instrument?.IsCurrencyPair == true);
-        return markets.Select(m =>
+        var result = markets.Select(m =>
         {
             var s = m.Row;
             var i = m.Instrument;
             var paused = selection.DerivedOnlyWhenForexClosed && forexOpen && i?.AssetClass == AssetClass.SyntheticIndex;
             return new MarketDto(s.Instrument, i?.DisplayName ?? s.Instrument, i?.AssetClass.ToString() ?? "Forex", i?.IsTradable ?? true,
-                i?.PriceDecimals ?? 5, m.IsOpen, paused, s.MarketTimeUtc, s.Bid, s.Ask, s.SpreadPips, s.Regime, s.LastDecision,
+                i?.PriceDecimals ?? 5, m.IsOpen, paused, false, s.MarketTimeUtc, s.Bid, s.Ask, s.SpreadPips, s.Regime, s.LastDecision,
                 s.LastDecisionTimeUtc, s.Indicators is null ? null : JsonDocument.Parse(s.Indicators).RootElement.Clone());
         }).ToList();
+
+        // Newly selected markets have no data until the worker has loaded their history: show them as loading.
+        var known = rows.Select(r => r.Instrument).ToHashSet();
+        foreach (var symbol in selected.Where(s => !known.Contains(s)))
+        {
+            var found = Instruments.TryGet(symbol, out var i);
+            result.Add(new MarketDto(symbol, found ? i.DisplayName : symbol, found ? i.AssetClass.ToString() : "Forex", !found || i.IsTradable,
+                found ? i.PriceDecimals : 5, true, false, true, now, 0, 0, 0, null, null, null, null));
+        }
+
+        return result;
     }
 
     public async Task<IReadOnlyList<DecisionDto>> GetDecisionsAsync(string? state, string? instrument, int limit, CancellationToken cancellationToken)

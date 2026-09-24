@@ -1,4 +1,4 @@
-import type { Market } from "../types";
+import type { Market, MarketSettings } from "../types";
 import type { PageId } from "../pages";
 import { num, price, time } from "../format";
 import { useData } from "../useData";
@@ -8,6 +8,9 @@ type Navigate = (page: PageId, section?: string) => void;
 
 export function Markets({ refreshKey, navigate, compact = false }: { refreshKey: unknown; navigate: Navigate; compact?: boolean }) {
   const { data: all, error } = useData<Market[]>("/api/markets", refreshKey);
+  const { data: selection } = useData<MarketSettings>("/api/settings/markets", refreshKey);
+  const applying = !!selection && selection.version > 0 && selection.version !== selection.appliedVersion;
+  const loading = all?.some((m) => m.isLoading) ?? false;
   // Closed markets (no prices for 10+ minutes) are hidden until they trade again.
   const data = all?.filter((m) => m.isOpen);
   const closed = all?.filter((m) => !m.isOpen) ?? [];
@@ -21,6 +24,13 @@ export function Markets({ refreshKey, navigate, compact = false }: { refreshKey:
       }
     >
       <ErrorNote error={error} />
+      {(applying || loading) && (
+        <p className="notice">
+          {applying
+            ? "Applying your new market selection — the worker is restarting and loading history. New markets appear here within a minute or two."
+            : "Loading history for newly added markets…"}
+        </p>
+      )}
       {all && all.length === 0 && (
         <Empty>
           No market data yet. The worker publishes prices once it has loaded history.{" "}
@@ -52,10 +62,10 @@ export function Markets({ refreshKey, navigate, compact = false }: { refreshKey:
                     {m.displayName !== m.instrument && <span className="muted small"> {m.instrument}</span>}
                     {!m.isTradable && <> <Badge tone="neutral">analysis only</Badge></>}
                   </td>
-                  <td className="num mono">{price(m.bid, m.instrument, m.priceDecimals)}</td>
-                  {!compact && <td className="num mono">{price(m.ask, m.instrument, m.priceDecimals)}</td>}
-                  <td className="num">{num(m.spreadPips, 1)}</td>
-                  <td><RegimeBadge regime={m.regime} /></td>
+                  <td className="num mono">{m.isLoading ? "—" : price(m.bid, m.instrument, m.priceDecimals)}</td>
+                  {!compact && <td className="num mono">{m.isLoading ? "—" : price(m.ask, m.instrument, m.priceDecimals)}</td>}
+                  <td className="num">{m.isLoading ? "—" : num(m.spreadPips, 1)}</td>
+                  <td>{m.isLoading ? <span className="muted">loading history…</span> : <RegimeBadge regime={m.regime} />}</td>
                   {!compact && <td className="num">{num(m.indicators?.rsi, 1)}</td>}
                   {!compact && <td className="num">{num(m.indicators?.adx, 1)}</td>}
                   <td>
@@ -67,7 +77,7 @@ export function Markets({ refreshKey, navigate, compact = false }: { refreshKey:
                       <span className="muted">—</span>
                     )}
                   </td>
-                  {!compact && <td className="mono muted">{time(m.marketTimeUtc)}</td>}
+                  {!compact && <td className="mono muted">{m.isLoading ? "—" : time(m.marketTimeUtc)}</td>}
                 </tr>
               ))}
             </tbody>

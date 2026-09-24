@@ -35,6 +35,7 @@ public sealed record MarketDto(
     int PriceDecimals,
     bool IsOpen,
     bool IsPaused,
+    bool IsLoading,
     DateTime MarketTimeUtc,
     decimal Bid,
     decimal Ask,

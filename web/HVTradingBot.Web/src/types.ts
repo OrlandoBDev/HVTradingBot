@@ -50,6 +50,7 @@ export interface Market {
   priceDecimals: number;
   isOpen: boolean;
   isPaused: boolean;
+  isLoading: boolean;
   marketTimeUtc: string;
   bid: number;
   ask: number;

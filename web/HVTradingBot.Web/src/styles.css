@@ -277,3 +277,5 @@ textarea { background: var(--panel-2); color: var(--text); border: 1px solid var
 .risk-help { font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 6px; padding-top: 2px; }
 .risk-example { color: var(--text); background: var(--panel-2); border-left: 3px solid var(--accent); padding: 6px 10px; border-radius: 4px; }
 @media (max-width: 900px) { .risk-field { grid-template-columns: minmax(0, 1fr); gap: 8px; } }
+
+.notice { margin: 0 0 10px; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: color-mix(in srgb, var(--info) 12%, var(--panel)); border: 1px solid color-mix(in srgb, var(--info) 40%, transparent); }
