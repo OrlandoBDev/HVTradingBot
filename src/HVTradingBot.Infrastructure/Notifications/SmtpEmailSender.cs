@@ -1,3 +1,5 @@
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
 using HVTradingBot.Application.Abstractions;
 using HVTradingBot.Application.Notifications;
 using MailKit.Net.Smtp;
@@ -35,11 +37,44 @@ public sealed class SmtpEmailSender : IEmailSender
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(Timeout);
-        using var client = new SmtpClient { Timeout = (int)Timeout.TotalMilliseconds };
+        using var client = new SmtpClient
+        {
+            Timeout = (int)Timeout.TotalMilliseconds,
+            ServerCertificateValidationCallback = (_, _, chain, errors) => IsAcceptable(chain, errors)
+        };
         var socketOptions = settings.SmtpPort == 465 ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTls;
         await client.ConnectAsync(settings.SmtpHost, settings.SmtpPort, socketOptions, timeout.Token);
         await client.AuthenticateAsync(username, password, timeout.Token);
         await client.SendAsync(mime, timeout.Token);
         await client.DisconnectAsync(quit: true, timeout.Token);
+    }
+
+    private static readonly X509ChainStatusFlags RevocationUnknown =
+        X509ChainStatusFlags.RevocationStatusUnknown | X509ChainStatusFlags.OfflineRevocation;
+
+    /// <summary>
+    /// Full TLS validation, with one exception: if the chain and host name are valid and the only problem is that the
+    /// revocation status could not be determined (common on macOS when OCSP/CRL servers do not answer), the certificate
+    /// is accepted. Untrusted, expired, mismatched or revoked certificates are always rejected.
+    /// </summary>
+    public static bool IsAcceptable(X509Chain? chain, SslPolicyErrors errors)
+    {
+        if (errors == SslPolicyErrors.None)
+        {
+            return true;
+        }
+
+        if (errors != SslPolicyErrors.RemoteCertificateChainErrors || chain is null)
+        {
+            return false; // name mismatch or missing certificate
+        }
+
+        return IsOnlyRevocationUnknown(chain.ChainStatus.Select(s => s.Status));
+    }
+
+    public static bool IsOnlyRevocationUnknown(IEnumerable<X509ChainStatusFlags> statuses)
+    {
+        var flags = statuses.Aggregate(X509ChainStatusFlags.NoError, (all, s) => all | s);
+        return flags != X509ChainStatusFlags.NoError && (flags & ~RevocationUnknown) == X509ChainStatusFlags.NoError;
     }
 }

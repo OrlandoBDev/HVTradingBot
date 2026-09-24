@@ -1,3 +1,4 @@
+using System.Security.Cryptography.X509Certificates;
 using HVTradingBot.Application.Abstractions;
 using HVTradingBot.Application.Notifications;
 using HVTradingBot.Domain.Common;
@@ -138,6 +139,18 @@ public sealed class TradeDecisionNotificationTests
 
         Assert.Single(services, d => d.ServiceType == typeof(EmailSettingsStore));
         Assert.Contains(services, d => d.ServiceType == typeof(Application.Abstractions.ITradeDecisionNotifier) && d.ImplementationType == typeof(QueuedTradeDecisionNotifier));
+    }
+
+    [Fact]
+    public void Tls_accepts_only_an_unknown_revocation_status_as_an_exception()
+    {
+        Assert.True(SmtpEmailSender.IsOnlyRevocationUnknown([X509ChainStatusFlags.RevocationStatusUnknown]));
+        Assert.True(SmtpEmailSender.IsOnlyRevocationUnknown([X509ChainStatusFlags.RevocationStatusUnknown, X509ChainStatusFlags.OfflineRevocation]));
+        Assert.False(SmtpEmailSender.IsOnlyRevocationUnknown([X509ChainStatusFlags.Revoked]));
+        Assert.False(SmtpEmailSender.IsOnlyRevocationUnknown([X509ChainStatusFlags.UntrustedRoot]));
+        Assert.False(SmtpEmailSender.IsOnlyRevocationUnknown([X509ChainStatusFlags.RevocationStatusUnknown, X509ChainStatusFlags.NotTimeValid]));
+        Assert.False(SmtpEmailSender.IsOnlyRevocationUnknown([]));
+        Assert.False(SmtpEmailSender.IsAcceptable(null, System.Net.Security.SslPolicyErrors.RemoteCertificateNameMismatch));
     }
 
     [Theory]
