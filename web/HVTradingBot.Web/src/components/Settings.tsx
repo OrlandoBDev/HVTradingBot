@@ -4,6 +4,7 @@ import { api } from "../api";
 import { time } from "../format";
 import { Badge, Card, ErrorNote } from "./Ui";
 import { MarketSettings } from "./MarketSettings";
+import { RiskSettings } from "./RiskSettings";
 
 const connectionTone = (s: DerivSettings["connection"]) =>
   !s || !s.isCurrent ? "warn" : s.state === "Connected" ? "good" : s.state === "Failed" ? "bad" : "neutral";
@@ -140,6 +141,8 @@ export function Settings() {
           {settings?.updatedAtUtc && ` Last changed ${time(settings.updatedAtUtc)} by ${settings.updatedBy}.`}
         </p>
       </Card>
+
+      <RiskSettings />
 
       <MarketSettings />
 

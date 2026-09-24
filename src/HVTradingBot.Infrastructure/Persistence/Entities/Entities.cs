@@ -246,3 +246,13 @@ public sealed class SetupOutcomeEntity
     public decimal? ExitPrice { get; set; }
     public DateTime? ClosedAtUtc { get; set; }
 }
+
+/// <summary>Risk limits changed on the Settings page (JSON of <c>RiskLimits</c>), applied over the configured defaults.</summary>
+public sealed class RiskSettingsEntity
+{
+    public int Id { get; set; }
+    public required string Limits { get; set; }
+    public int Version { get; set; }
+    public DateTime UpdatedAtUtc { get; set; }
+    public string? UpdatedBy { get; set; }
+}

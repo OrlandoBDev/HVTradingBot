@@ -6,6 +6,7 @@ using HVTradingBot.Application.Trading;
 using HVTradingBot.Domain.Common;
 using HVTradingBot.Domain.Execution;
 using HVTradingBot.Domain.MarketData;
+using HVTradingBot.Domain.Risk;
 using HVTradingBot.Infrastructure.Persistence;
 using HVTradingBot.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +25,7 @@ public sealed class DerivBroker(
     IDbContextFactory<TradingDbContext> dbFactory,
     DerivOptions options,
     TradingEngineOptions engineOptions,
+    IRiskOptionsSource risk,
     IClock clock,
     ILogger<DerivBroker> logger) : IExecutionBroker
 {
@@ -137,7 +139,7 @@ public sealed class DerivBroker(
             var quoted = await ProposeAsync(socket, order, estimate, withLimits: false, cancellationToken);
             var commission = quoted.TryGetProperty("commission", out var cm) ? cm.GetDecimal() : estimate.Notional * options.CommissionRate;
             var (priced, pricedRejection) = DerivContractMath.WithQuotedCommission(estimate, entry, order.StopLoss, order.TakeProfit, commission,
-                options.MaxCommissionShareOfRisk);
+                risk.Current.MaxCommissionShareOfRisk);
             if (priced is null)
             {
                 return await RejectAsync(entity, pricedRejection!, cancellationToken);

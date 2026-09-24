@@ -79,6 +79,8 @@ broker. Each signal bar can produce at most one executed order (idempotency key)
 
 Status: Accepted
 
-Broker credentials and market selection are entered on the dashboard and stored in PostgreSQL. The token is encrypted
+Broker credentials, market selection and risk limits are entered on the dashboard and stored in PostgreSQL.
+Risk limits are validated against ranges narrower than the configuration allows (they can be tuned, not disabled)
+and are applied as an immutable snapshot per decision. The token is encrypted
 with ASP.NET Core Data Protection; keys live outside the database. The API only stores settings; the worker is the
 only process that connects to the broker.

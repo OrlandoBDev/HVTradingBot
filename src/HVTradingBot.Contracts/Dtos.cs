@@ -152,3 +152,24 @@ public sealed record MarketSettingsDto(
     IReadOnlyList<MarketCatalogItemDto> Catalog);
 
 public sealed record MarketSelectionRequest(IReadOnlyList<string> Instruments);
+
+public sealed record RiskLimitsDto(
+    decimal MaxRiskPerTradePercent,
+    decimal MaxDailyLossPercent,
+    decimal MaxWeeklyLossPercent,
+    int MaxOpenPositions,
+    decimal MinRewardToRisk,
+    int MaxConsecutiveLosses,
+    int CooldownMinutes,
+    int MaxCurrencyExposure,
+    decimal MaxCommissionShareOfRisk);
+
+public sealed record RiskSettingsDto(
+    RiskLimitsDto Effective,
+    RiskLimitsDto Defaults,
+    bool IsCustomized,
+    int Version,
+    DateTime? UpdatedAtUtc,
+    string? UpdatedBy,
+    decimal Balance,
+    string Currency);

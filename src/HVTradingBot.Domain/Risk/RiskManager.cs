@@ -5,9 +5,19 @@ namespace HVTradingBot.Domain.Risk;
 
 /// <summary>
 /// Deterministic risk engine with final authority. Every rule is evaluated (not short-circuited) so the journal
-/// records all reasons a proposal was rejected.
+/// records all reasons a proposal was rejected. Limits are read from one snapshot per evaluation.
 /// </summary>
-public sealed class RiskManager(RiskOptions options, ExecutionCostOptions costs) : IRiskManager
+public sealed class RiskManager(IRiskOptionsSource source, ExecutionCostOptions costs) : IRiskManager
+{
+    public RiskManager(RiskOptions options, ExecutionCostOptions costs) : this(new FixedRiskOptions(options), costs)
+    {
+    }
+
+    public Task<RiskDecision> EvaluateAsync(TradeProposal proposal, PortfolioState portfolio, CancellationToken cancellationToken) =>
+        new RiskRules(source.Current, costs).EvaluateAsync(proposal, portfolio, cancellationToken);
+}
+
+internal sealed class RiskRules(RiskOptions options, ExecutionCostOptions costs)
 {
     public Task<RiskDecision> EvaluateAsync(TradeProposal proposal, PortfolioState portfolio, CancellationToken cancellationToken)
     {

@@ -3,6 +3,7 @@ using HVTradingBot.Application.Trading;
 using HVTradingBot.Infrastructure.Brokers.Deriv;
 using HVTradingBot.Infrastructure.MarketData;
 using HVTradingBot.Infrastructure.Markets;
+using HVTradingBot.Infrastructure.Settings;
 
 namespace HVTradingBot.Worker;
 
@@ -21,6 +22,7 @@ public sealed class BrokerSettingsWatcher(
     MarketDataOptions marketDataOptions,
     IDecisionJournal journal,
     IMarketSnapshotSink snapshots,
+    RiskOptionsSource riskSource,
     IHostApplicationLifetime lifetime,
     ILogger<BrokerSettingsWatcher> logger) : BackgroundService
 {
@@ -63,6 +65,15 @@ public sealed class BrokerSettingsWatcher(
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogWarning(ex, "Heartbeat update failed");
+            }
+
+            try
+            {
+                await riskSource.RefreshAsync(stoppingToken); // applies risk limits changed on the Settings page
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Risk settings refresh failed");
             }
 
             if (await SelectionChangedAsync(stoppingToken))

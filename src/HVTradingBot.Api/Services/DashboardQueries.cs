@@ -11,6 +11,7 @@ using HVTradingBot.Domain.Risk;
 using HVTradingBot.Infrastructure.Markets;
 using HVTradingBot.Infrastructure.Persistence;
 using HVTradingBot.Infrastructure.Persistence.Entities;
+using HVTradingBot.Infrastructure.Settings;
 using Microsoft.EntityFrameworkCore;
 
 namespace HVTradingBot.Api.Services;
@@ -20,7 +21,7 @@ public sealed class DashboardQueries(
     IDbContextFactory<TradingDbContext> dbFactory,
     ITradingStateStore stateStore,
     IClock clock,
-    RiskOptions risk,
+    RiskOptionsSource riskSource,
     TradingEngineOptions engineOptions,
     MarketCatalogStore catalog)
 {
@@ -64,7 +65,7 @@ public sealed class DashboardQueries(
             state.WorkerHeartbeatUtc,
             state.WorkerHeartbeatUtc is { } hb && now - hb <= WorkerHealthCheck.HeartbeatTimeout,
             new MarketDataStatusDto(state.LastBarTimeUtc, state.LastDataReceivedUtc,
-                new MarketDataStatus(state.LastBarTimeUtc, state.LastDataReceivedUtc).IsStale(now, TimeSpan.FromSeconds(risk.MaxMarketDataAgeSeconds))),
+                new MarketDataStatus(state.LastBarTimeUtc, state.LastDataReceivedUtc).IsStale(now, TimeSpan.FromSeconds(riskSource.Current.MaxMarketDataAgeSeconds))),
             new AccountDto(account.Currency, balance, account.StartingBalance, balance + unrealized, unrealized),
             positions.Count,
             state.DailyRealizedPnl,
@@ -136,6 +137,8 @@ public sealed class DashboardQueries(
 
     public async Task<RiskStatusDto> GetRiskStatusAsync(CancellationToken cancellationToken)
     {
+        await riskSource.RefreshAsync(cancellationToken);
+        var risk = riskSource.Current;
         var status = await GetStatusAsync(cancellationToken);
         var positions = await GetOpenPositionsAsync(cancellationToken);
         var balance = status.Account.Balance;
@@ -163,6 +166,7 @@ public sealed class DashboardQueries(
             new("Max currency exposure", exposure.Count == 0 ? "0" : $"{exposure.Values.Max(Math.Abs)}", $"{risk.MaxCurrencyExposure}",
                 exposure.Values.Any(v => Math.Abs(v) > risk.MaxCurrencyExposure)),
             new("Min reward:risk", "-", $"{risk.MinRewardToRisk}:1", false),
+            new("Max fee share of risk", "-", $"{risk.MaxCommissionShareOfRisk:P0}", false),
             new("Max spread", "-", $"{risk.MaxSpreadPips} pips", false),
             new("Market data age", status.MarketData.IsStale ? "stale" : "fresh", $"{risk.MaxMarketDataAgeSeconds}s", status.MarketData.IsStale)
         };

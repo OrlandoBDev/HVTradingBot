@@ -7,6 +7,7 @@ using HVTradingBot.Infrastructure.MarketData;
 using HVTradingBot.Infrastructure.Markets;
 using HVTradingBot.Infrastructure.Observability;
 using HVTradingBot.Infrastructure.Persistence;
+using HVTradingBot.Infrastructure.Settings;
 using Microsoft.EntityFrameworkCore;
 using Serilog.Context;
 
@@ -29,6 +30,7 @@ public sealed class TradingWorker(
     DerivMarketDiscovery discovery,
     TradingUniverse universe,
     TradingEngineOptions engineOptions,
+    RiskOptionsSource riskSource,
     IHostApplicationLifetime lifetime,
     ILogger<TradingWorker> logger) : BackgroundService
 {
@@ -40,6 +42,7 @@ public sealed class TradingWorker(
         {
             await services.MigrateDatabaseAsync(stoppingToken);
             await EnsureSingleMarketDataSourceAsync(stoppingToken);
+            await riskSource.RefreshAsync(stoppingToken);
             var selectionVersion = await ConfigureUniverseAsync(stoppingToken);
             var history = await feed.LoadHistoryAsync(stoppingToken);
             await stateStore.UpdateAsync(s => s with { MarketDataSource = marketDataOptions.Provider.ToString() }, stoppingToken);

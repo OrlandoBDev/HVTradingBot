@@ -44,8 +44,5 @@ public sealed class DerivOptions
     /// <summary>The broker's stop-loss price must lie within this fraction of the strategy's stop distance, or the order is not sent.</summary>
     [Range(0.01, 1)] public decimal StopPriceTolerance { get; set; } = 0.25m;
 
-    /// <summary>Orders are not sent when the quoted commission exceeds this share of the amount at risk.</summary>
-    [Range(0.01, 1)] public decimal MaxCommissionShareOfRisk { get; set; } = 0.25m;
-
     [Range(2, 120)] public int RequestTimeoutSeconds { get; set; } = 15;
 }

@@ -13,6 +13,7 @@ public sealed class TradingDbContext(DbContextOptions<TradingDbContext> options)
     public DbSet<BrokerAccountEntity> BrokerAccounts => Set<BrokerAccountEntity>();
     public DbSet<BrokerSettingsEntity> BrokerSettings => Set<BrokerSettingsEntity>();
     public DbSet<MarketEntity> Markets => Set<MarketEntity>();
+    public DbSet<RiskSettingsEntity> RiskSettings => Set<RiskSettingsEntity>();
     public DbSet<SetupOutcomeEntity> SetupOutcomes => Set<SetupOutcomeEntity>();
     public DbSet<MarketSelectionEntity> MarketSelection => Set<MarketSelectionEntity>();
     public DbSet<BrokerConnectionStatusEntity> BrokerConnectionStatus => Set<BrokerConnectionStatusEntity>();
@@ -85,6 +86,13 @@ public sealed class TradingDbContext(DbContextOptions<TradingDbContext> options)
             e.HasIndex(x => x.SetupId).IsUnique();
             e.HasIndex(x => new { x.Instrument, x.Status });
             e.HasIndex(x => x.ClosedAtUtc);
+        });
+
+        modelBuilder.Entity<RiskSettingsEntity>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.Limits).HasColumnType("jsonb");
         });
 
         modelBuilder.Entity<MarketEntity>(e =>

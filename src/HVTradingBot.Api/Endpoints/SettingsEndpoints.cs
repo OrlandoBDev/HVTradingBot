@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using HVTradingBot.Api.Infrastructure;
+using HVTradingBot.Api.Services;
 using HVTradingBot.Application.Abstractions;
 using HVTradingBot.Contracts;
 using HVTradingBot.Application.Trading;
@@ -67,6 +68,37 @@ public static partial class SettingsEndpoints
             return Results.NoContent();
         });
 
+        var risk = app.MapGroup("/api/settings/risk");
+
+        risk.MapGet("", async (RiskOptionsSource source, DashboardQueries queries, CancellationToken ct) =>
+            await RiskDtoAsync(source, queries, ct));
+
+        risk.MapPut("", async (RiskLimitsDto request, RiskOptionsSource source, RiskSettingsStore store, DashboardQueries queries,
+            IDecisionJournal journal, HttpContext http, CancellationToken ct) =>
+        {
+            var limits = new RiskLimits(request.MaxRiskPerTradePercent, request.MaxDailyLossPercent, request.MaxWeeklyLossPercent,
+                request.MaxOpenPositions, request.MinRewardToRisk, request.MaxConsecutiveLosses, request.CooldownMinutes,
+                request.MaxCurrencyExposure, request.MaxCommissionShareOfRisk);
+            var errors = limits.Validate();
+            if (errors.Count > 0)
+            {
+                return Results.ValidationProblem(errors.ToDictionary(e => char.ToLowerInvariant(e.Key[0]) + e.Key[1..], e => new[] { e.Value }));
+            }
+
+            var before = (await source.RefreshAsync(ct)).Effective;
+            await store.SaveAsync(limits, Actor(http), ct);
+            await journal.RecordAuditAsync(Actor(http), "RiskLimitsUpdated", $"{before} -> {limits}", http.CorrelationId(), ct);
+            return Results.Ok(await RiskDtoAsync(source, queries, ct));
+        });
+
+        risk.MapDelete("", async (RiskOptionsSource source, RiskSettingsStore store, DashboardQueries queries, IDecisionJournal journal,
+            HttpContext http, CancellationToken ct) =>
+        {
+            await store.SaveAsync(null, Actor(http), ct);
+            await journal.RecordAuditAsync(Actor(http), "RiskLimitsReset", "Risk limits reset to configured defaults.", http.CorrelationId(), ct);
+            return Results.Ok(await RiskDtoAsync(source, queries, ct));
+        });
+
         var markets = app.MapGroup("/api/settings/markets");
 
         markets.MapGet("", async (MarketCatalogStore catalog, TradingEngineOptions engineOptions, CancellationToken ct) =>
@@ -92,6 +124,17 @@ public static partial class SettingsEndpoints
 
         return app;
     }
+
+    private static async Task<RiskSettingsDto> RiskDtoAsync(RiskOptionsSource source, DashboardQueries queries, CancellationToken ct)
+    {
+        var view = await source.RefreshAsync(ct);
+        var status = await queries.GetStatusAsync(ct);
+        return new RiskSettingsDto(ToDto(view.Effective), ToDto(view.Defaults), view.IsCustomized, view.Version, view.UpdatedAtUtc, view.UpdatedBy,
+            status.Account.Balance, status.Account.Currency);
+    }
+
+    private static RiskLimitsDto ToDto(RiskLimits l) => new(l.MaxRiskPerTradePercent, l.MaxDailyLossPercent, l.MaxWeeklyLossPercent,
+        l.MaxOpenPositions, l.MinRewardToRisk, l.MaxConsecutiveLosses, l.CooldownMinutes, l.MaxCurrencyExposure, l.MaxCommissionShareOfRisk);
 
     private static async Task<MarketSettingsDto> MarketsDtoAsync(MarketCatalogStore catalog, TradingEngineOptions engineOptions, CancellationToken ct)
     {

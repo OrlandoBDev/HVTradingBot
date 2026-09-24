@@ -174,3 +174,6 @@ a { color: var(--accent); }
 .form-actions button:not(.primary):not(.danger) {
   background: transparent; border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 7px 14px; cursor: pointer;
 }
+
+.input-unit { display: flex; align-items: center; gap: 6px; }
+.input-unit input { flex: 1; min-width: 0; }

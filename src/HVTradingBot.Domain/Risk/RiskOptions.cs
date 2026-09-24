@@ -5,6 +5,8 @@ namespace HVTradingBot.Domain.Risk;
 /// <summary>Risk limits. Defaults are the placeholders from docs/RISK_MANAGEMENT.md and must be configured deliberately.</summary>
 public sealed class RiskOptions
 {
+    public RiskOptions Clone() => (RiskOptions)MemberwiseClone();
+
     [Range(0.01, 5)] public decimal MaxRiskPerTradePercent { get; set; } = 0.5m;
     [Range(0.1, 20)] public decimal MaxDailyLossPercent { get; set; } = 2m;
     [Range(0.1, 50)] public decimal MaxWeeklyLossPercent { get; set; } = 5m;
@@ -24,6 +26,22 @@ public sealed class RiskOptions
     /// <summary>Positions are rounded down to a multiple of this size (1,000 = micro lot; 1 for brokers that size by stake).</summary>
     [Range(1, 100_000)] public decimal UnitStep { get; set; } = 1_000m;
     [Range(1_000, 100_000_000)] public decimal MaxUnits { get; set; } = 1_000_000m;
+    /// <summary>Orders are not sent when the broker's quoted commission exceeds this share of the amount at risk.</summary>
+    [Range(0.01, 1)] public decimal MaxCommissionShareOfRisk { get; set; } = 0.25m;
     public bool KillSwitchOnDailyLossBreach { get; set; } = true;
     public bool KillSwitchOnStaleData { get; set; }
+}
+
+/// <summary>
+/// The risk limits in force. Limits can change at runtime (Settings page); every evaluation reads one complete,
+/// immutable snapshot so a single decision never mixes old and new values.
+/// </summary>
+public interface IRiskOptionsSource
+{
+    RiskOptions Current { get; }
+}
+
+public sealed class FixedRiskOptions(RiskOptions options) : IRiskOptionsSource
+{
+    public RiskOptions Current { get; } = options;
 }

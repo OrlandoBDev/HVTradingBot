@@ -72,7 +72,7 @@ public sealed class BacktestEngine(
             learning,
             TradingUniverse.From(bars.Keys, options.AccountCurrency),
             options,
-            riskOptions,
+            new FixedRiskOptions(riskOptions),
             regimeOptions,
             NullLogger<TradingEngine>.Instance);
 

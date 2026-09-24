@@ -43,7 +43,7 @@ public sealed class TradingEngine
     private readonly LearningService _learning;
     private readonly TradingUniverse _universe;
     private readonly TradingEngineOptions _options;
-    private readonly RiskOptions _riskOptions;
+    private readonly IRiskOptionsSource _risk;
     private readonly RegimeOptions _regimeOptions;
     private readonly ILogger<TradingEngine> _logger;
 
@@ -59,7 +59,7 @@ public sealed class TradingEngine
         LearningService learning,
         TradingUniverse universe,
         TradingEngineOptions options,
-        RiskOptions riskOptions,
+        IRiskOptionsSource risk,
         RegimeOptions regimeOptions,
         ILogger<TradingEngine> logger)
     {
@@ -74,7 +74,7 @@ public sealed class TradingEngine
         _learning = learning;
         _universe = universe;
         _options = options;
-        _riskOptions = riskOptions;
+        _risk = risk;
         _regimeOptions = regimeOptions;
         _logger = logger;
     }
@@ -217,7 +217,7 @@ public sealed class TradingEngine
 
         state = await ApplyAutomaticKillSwitchAsync(state, dataStatus, correlationId, cancellationToken);
 
-        var isStale = dataStatus.IsStale(_clock.UtcNow, TimeSpan.FromSeconds(_riskOptions.MaxMarketDataAgeSeconds));
+        var isStale = dataStatus.IsStale(_clock.UtcNow, TimeSpan.FromSeconds(_risk.Current.MaxMarketDataAgeSeconds));
         foreach (var instrument in closedPrimary)
         {
             await EvaluateInstrumentAsync(instrument, isStale, dataStatus, correlationId, cancellationToken);
@@ -246,7 +246,7 @@ public sealed class TradingEngine
                     "Position {ClientOrderId} {Instrument} closed by {Reason} at {ExitPrice}: P&L {Pnl} ({R}R)",
                     closed.Position.ClientOrderId, instrument.Symbol, closed.Reason, closed.ExitPrice, closed.RealizedPnl, closed.RMultiple);
 
-                await _state.UpdateAsync(s => s.WithClosedTrade(closed.RealizedPnl, marketTime, _riskOptions), cancellationToken);
+                await _state.UpdateAsync(s => s.WithClosedTrade(closed.RealizedPnl, marketTime, _risk.Current), cancellationToken);
                 await _journal.RecordAuditAsync(SystemActor, "PositionClosed",
                     $"{closed.Position.ClientOrderId} {closed.Reason} exit {closed.ExitPrice} P&L {closed.RealizedPnl:F2} R {closed.RMultiple}",
                     correlationId, cancellationToken);
@@ -267,13 +267,13 @@ public sealed class TradingEngine
 
         string? reason = null;
         var account = await _broker.GetAccountAsync(cancellationToken);
-        if (_riskOptions.KillSwitchOnDailyLossBreach
-            && -state.DailyRealizedPnl >= account.Balance * _riskOptions.MaxDailyLossPercent / 100m)
+        if (_risk.Current.KillSwitchOnDailyLossBreach
+            && -state.DailyRealizedPnl >= account.Balance * _risk.Current.MaxDailyLossPercent / 100m)
         {
             reason = $"Daily loss limit breached ({state.DailyRealizedPnl:F2}).";
         }
-        else if (_riskOptions.KillSwitchOnStaleData
-                 && dataStatus.IsStale(_clock.UtcNow, TimeSpan.FromSeconds(_riskOptions.MaxMarketDataAgeSeconds)))
+        else if (_risk.Current.KillSwitchOnStaleData
+                 && dataStatus.IsStale(_clock.UtcNow, TimeSpan.FromSeconds(_risk.Current.MaxMarketDataAgeSeconds)))
         {
             reason = "Market data is stale.";
         }

@@ -41,6 +41,8 @@ Set `BROKER_PROVIDER=Paper` in `.env` to trade on real Deriv prices with local s
 - **Adaptive learning:** every setup is tracked as a virtual trade; bounded score adjustments and disabling of
   persistently losing strategy/regime/asset-class combinations (never changes size or risk limits).
 - **Risk engine:** all rules in `docs/RISK_MANAGEMENT.md`, checked at proposal and again before execution, kill switch.
+  Defaults are a small-account profile (1% per trade, 3% daily, 8% weekly, 2 positions, broker fee ≤ 30% of risk);
+  limits are editable under **Settings → Risk limits** within safe ranges and apply without a restart.
 - **Execution:** Deriv demo account (multiplier contracts with broker-side stop loss / take profit, idempotent
   submission, unknown-state reconciliation) or local paper broker.
 - **Journal:** every decision incl. NO_TRADE, orders, positions (R, MAE, MFE), audit log.

@@ -4,6 +4,7 @@ using HVTradingBot.Application.Trading;
 using HVTradingBot.Domain.Common;
 using HVTradingBot.Domain.Execution;
 using HVTradingBot.Domain.MarketData;
+using HVTradingBot.Domain.Risk;
 using HVTradingBot.Infrastructure.Brokers.Deriv;
 using HVTradingBot.Infrastructure.Settings;
 using Microsoft.EntityFrameworkCore;
@@ -31,7 +32,7 @@ public class DerivBrokerTests(PostgresFixture fixture) : IAsyncLifetime
         var session = new DerivSession(options, new DerivRestClient(new HttpClient(_rest), options), _socket, settings, settings,
             new FixedClock(), NullLogger<DerivSession>.Instance);
         return new DerivBroker(session, fixture.DbFactory, options, new TradingEngineOptions { Instruments = ["EUR/USD"] },
-            new FixedClock(), NullLogger<DerivBroker>.Instance);
+            new FixedRiskOptions(new RiskOptions()), new FixedClock(), NullLogger<DerivBroker>.Instance);
     }
 
     private static Candle Bar(DateTime open, decimal low = 1.0995m, decimal high = 1.1005m, decimal close = 1.1m) =>
