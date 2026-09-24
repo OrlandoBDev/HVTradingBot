@@ -3,4 +3,7 @@
     <ProjectReference Include="..\HVTradingBot.Application\HVTradingBot.Application.csproj" />
     <ProjectReference Include="..\HVTradingBot.Infrastructure\HVTradingBot.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+  </ItemGroup>
 </Project>
