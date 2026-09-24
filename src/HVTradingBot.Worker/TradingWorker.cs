@@ -147,8 +147,9 @@ public sealed class TradingWorker(
             selected.AddRange(Instruments.Defaults);
         }
 
-        universe.Configure(selected, engineOptions.AccountCurrency);
-        logger.LogInformation("Markets: trading {Traded}; conversion only {Conversion}",
+        universe.Configure(selected, engineOptions.AccountCurrency, selection.DerivedOnlyWhenForexClosed);
+        logger.LogInformation("Markets: Derived {DerivedMode}; trading {Traded}; conversion only {Conversion}",
+            selection.DerivedOnlyWhenForexClosed ? "only while Forex is closed" : "always",
             string.Join(", ", universe.Traded.Select(i => i.DisplayName)),
             string.Join(", ", universe.Data.Except(universe.Traded).Select(i => i.Symbol)));
         return selection.Version;

@@ -20,6 +20,7 @@ export function MarketSettings() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState("");
   const [tradableOnly, setTradableOnly] = useState(false);
+  const [derivedOnlyWhenForexClosed, setDerivedOnlyWhenForexClosed] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -27,7 +28,10 @@ export function MarketSettings() {
     try {
       const d = await api.get<MarketSettingsData>("/api/settings/markets");
       setData(d);
-      if (resetSelection) setSelected(new Set(d.selected));
+      if (resetSelection) {
+        setSelected(new Set(d.selected));
+        setDerivedOnlyWhenForexClosed(d.derivedOnlyWhenForexClosed);
+      }
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -48,8 +52,12 @@ export function MarketSettings() {
   const dirty = useMemo(() => {
     if (!data) return false;
     const current = new Set(data.selected);
-    return current.size !== selected.size || [...selected].some((s) => !current.has(s));
-  }, [data, selected]);
+    return (
+      current.size !== selected.size ||
+      [...selected].some((s) => !current.has(s)) ||
+      derivedOnlyWhenForexClosed !== data.derivedOnlyWhenForexClosed
+    );
+  }, [data, selected, derivedOnlyWhenForexClosed]);
 
   const toggle = (symbol: string) =>
     setSelected((prev) => {
@@ -63,9 +71,10 @@ export function MarketSettings() {
     setSaving(true);
     setError(null);
     try {
-      const d = await api.put<MarketSettingsData>("/api/settings/markets", { instruments: [...selected] });
+      const d = await api.put<MarketSettingsData>("/api/settings/markets", { instruments: [...selected], derivedOnlyWhenForexClosed });
       setData(d);
       setSelected(new Set(d.selected));
+      setDerivedOnlyWhenForexClosed(d.derivedOnlyWhenForexClosed);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -97,11 +106,31 @@ export function MarketSettings() {
             ))}
           </div>
         )}
+        <label className="event-option" style={{ marginTop: 14 }}>
+          <input type="checkbox" checked={derivedOnlyWhenForexClosed} onChange={(e) => setDerivedOnlyWhenForexClosed(e.target.checked)} />
+          <span>
+            <span className="strong">Trade Derived markets only while Forex is closed</span>
+            <span className="muted small">
+              {" "}— while Forex trades, evaluations and position slots go to Forex; on weekends and during the daily break the selected Derived
+              markets take over.
+            </span>
+          </span>
+        </label>
         <div className="form-actions" style={{ marginTop: 12 }}>
           <button className="primary" onClick={save} disabled={saving || !dirty || selected.size === 0}>
             {saving ? "Saving…" : "Save selection"}
           </button>
-          {dirty && <button onClick={() => data && setSelected(new Set(data.selected))}>Discard changes</button>}
+          {dirty && (
+            <button
+              onClick={() => {
+                if (!data) return;
+                setSelected(new Set(data.selected));
+                setDerivedOnlyWhenForexClosed(data.derivedOnlyWhenForexClosed);
+              }}
+            >
+              Discard changes
+            </button>
+          )}
           {pending ? (
             <Badge tone="warn">restarting worker to apply…</Badge>
           ) : (

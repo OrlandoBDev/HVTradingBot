@@ -7,7 +7,10 @@ import { Badge, Card, Empty, ErrorNote, RegimeBadge, stateTone } from "./Ui";
 type Navigate = (page: PageId, section?: string) => void;
 
 export function Markets({ refreshKey, navigate, compact = false }: { refreshKey: unknown; navigate: Navigate; compact?: boolean }) {
-  const { data, error } = useData<Market[]>("/api/markets", refreshKey);
+  const { data: all, error } = useData<Market[]>("/api/markets", refreshKey);
+  // Closed markets (no prices for 10+ minutes) are hidden until they trade again.
+  const data = all?.filter((m) => m.isOpen);
+  const closed = all?.filter((m) => !m.isOpen) ?? [];
   return (
     <Card
       title={compact ? "Markets" : undefined}
@@ -18,12 +21,13 @@ export function Markets({ refreshKey, navigate, compact = false }: { refreshKey:
       }
     >
       <ErrorNote error={error} />
-      {data && data.length === 0 && (
+      {all && all.length === 0 && (
         <Empty>
           No market data yet. The worker publishes prices once it has loaded history.{" "}
           <button className="link" onClick={() => navigate("settings", "markets")}>Choose markets</button>
         </Empty>
       )}
+      {all && all.length > 0 && data && data.length === 0 && <Empty>All selected markets are closed right now.</Empty>}
       {data && data.length > 0 && (
         <div className="table-wrap">
           <table>
@@ -54,13 +58,26 @@ export function Markets({ refreshKey, navigate, compact = false }: { refreshKey:
                   <td><RegimeBadge regime={m.regime} /></td>
                   {!compact && <td className="num">{num(m.indicators?.rsi, 1)}</td>}
                   {!compact && <td className="num">{num(m.indicators?.adx, 1)}</td>}
-                  <td>{m.lastDecision ? <Badge tone={stateTone(m.lastDecision)}>{m.lastDecision}</Badge> : <span className="muted">—</span>}</td>
+                  <td>
+                    {m.isPaused ? (
+                      <span title="Derived markets trade only while Forex is closed (Settings › Markets)"><Badge tone="neutral">waiting · Forex open</Badge></span>
+                    ) : m.lastDecision ? (
+                      <Badge tone={stateTone(m.lastDecision)}>{m.lastDecision}</Badge>
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                  </td>
                   {!compact && <td className="mono muted">{time(m.marketTimeUtc)}</td>}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+      {closed.length > 0 && (
+        <p className="muted small closed-note">
+          Closed now, shown again when trading resumes: {closed.map((m) => m.displayName).join(", ")}.
+        </p>
       )}
     </Card>
   );

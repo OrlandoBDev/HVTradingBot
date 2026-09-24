@@ -265,3 +265,5 @@ textarea { background: var(--panel-2); color: var(--text); border: 1px solid var
 .switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: white; transition: transform 0.15s; }
 .switch input:checked { background: var(--good); }
 .switch input:checked::after { transform: translateX(16px); }
+
+.closed-note { margin: 10px 0 0; }

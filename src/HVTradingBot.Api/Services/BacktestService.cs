@@ -31,10 +31,10 @@ public sealed class BacktestService(
 
         var source = request.Source.ToLowerInvariant();
         IReadOnlyList<Instrument> instruments;
+        var selection = await catalog.GetSelectionAsync(cancellationToken);
         try
         {
             // Default: the markets selected on the Settings page (or the configured defaults).
-            var selection = await catalog.GetSelectionAsync(cancellationToken);
             var symbols = request.Instruments is { Count: > 0 } requested ? requested : selection.Instruments ?? engineOptions.Instruments;
             instruments = symbols.Select(Instruments.Get).Distinct().ToList();
         }
@@ -79,13 +79,14 @@ public sealed class BacktestService(
                 return (null, "Source must be 'simulated' or 'stored'.");
         }
 
-        var result = await Task.Run(() => engine.RunAsync(bars, cancellationToken), cancellationToken);
+        var result = await Task.Run(() => engine.RunAsync(bars, cancellationToken, selection.DerivedOnlyWhenForexClosed), cancellationToken);
 
         var parameters = JsonSerializer.Serialize(new
         {
             Source = source,
             request.Days,
             Seed = source == "simulated" ? seed : (int?)null,
+            DerivedOnlyWhenForexClosed = selection.DerivedOnlyWhenForexClosed,
             EndDate = source == "simulated" ? endDate : (DateOnly?)null,
             Instruments = instruments.Select(i => i.Symbol)
         }, JsonDefaults.Options);

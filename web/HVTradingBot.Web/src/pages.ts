@@ -32,6 +32,8 @@ export const PAGES: PageInfo[] = [
     details: [
       "Prices update every few seconds from Deriv; analysis runs at every 5-minute close.",
       "Regime: ▲ trending bullish, ▼ trending bearish, ◆ ranging, ⚡ high volatility, ? uncertain — strategies only trade in regimes they suit.",
+      "Closed markets (no prices for 10+ minutes) are hidden and listed below the table until they trade again.",
+      "With “Derived only while Forex is closed”, synthetic markets show “waiting” while Forex trades.",
       "Choose which markets appear here under Settings › Markets.",
     ],
   },

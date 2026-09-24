@@ -7,7 +7,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HVTradingBot.Infrastructure.Markets;
 
-public sealed record MarketSelection(IReadOnlyList<string>? Instruments, int Version, int AppliedVersion, DateTime? UpdatedAtUtc, string? UpdatedBy);
+public sealed record MarketSelection(
+    IReadOnlyList<string>? Instruments,
+    int Version,
+    int AppliedVersion,
+    DateTime? UpdatedAtUtc,
+    string? UpdatedBy,
+    bool DerivedOnlyWhenForexClosed = true);
 
 /// <summary>
 /// The broker's market catalog and the user's market selection, both in PostgreSQL. Every process calls
@@ -73,10 +79,12 @@ public sealed class MarketCatalogStore(IDbContextFactory<TradingDbContext> dbFac
         var row = await db.MarketSelection.AsNoTracking().SingleOrDefaultAsync(s => s.Id == SelectionId, cancellationToken);
         return row is null
             ? new MarketSelection(null, 0, 0, null, null)
-            : new MarketSelection(JsonSerializer.Deserialize<List<string>>(row.Instruments), row.Version, row.AppliedVersion, row.UpdatedAtUtc, row.UpdatedBy);
+            : new MarketSelection(JsonSerializer.Deserialize<List<string>>(row.Instruments), row.Version, row.AppliedVersion, row.UpdatedAtUtc,
+                row.UpdatedBy, row.DerivedOnlyWhenForexClosed);
     }
 
-    public async Task<MarketSelection> SaveSelectionAsync(IReadOnlyList<string> symbols, string actor, CancellationToken cancellationToken)
+    public async Task<MarketSelection> SaveSelectionAsync(IReadOnlyList<string> symbols, string actor, CancellationToken cancellationToken,
+        bool derivedOnlyWhenForexClosed = true)
     {
         var distinct = symbols.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (distinct.Count == 0 || distinct.Count > MaxSelectedInstruments)
@@ -100,6 +108,7 @@ public sealed class MarketCatalogStore(IDbContextFactory<TradingDbContext> dbFac
         }
 
         row.Instruments = JsonSerializer.Serialize(canonical);
+        row.DerivedOnlyWhenForexClosed = derivedOnlyWhenForexClosed;
         row.Version++;
         row.UpdatedAtUtc = clock.UtcNow;
         row.UpdatedBy = actor;

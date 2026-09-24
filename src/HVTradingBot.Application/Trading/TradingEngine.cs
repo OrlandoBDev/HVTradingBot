@@ -87,6 +87,13 @@ public sealed class TradingEngine
 
     public bool IsReady { get; private set; }
 
+    /// <summary>True while at least one Forex market is producing bars (not the weekend or daily break).</summary>
+    public bool ForexOpen { get; private set; }
+
+    /// <summary>Forex counts as open if any Forex market produced a bar within the last 15 minutes of market time.</summary>
+    private bool IsForexOpen(DateTime marketTimeUtc) =>
+        _series.Values.Any(s => s.Instrument.IsCurrencyPair && s.LastBar is { } bar && marketTimeUtc - bar.CloseTimeUtc <= TimeSpan.FromMinutes(15));
+
     /// <summary>
     /// Warms up indicators from history, then reconciles with broker state (which is authoritative)
     /// before any new trade is allowed.
@@ -199,6 +206,13 @@ public sealed class TradingEngine
 
         var marketTime = bars.Max(b => b.Bar.CloseTimeUtc);
         var converter = Converter();
+
+        ForexOpen = IsForexOpen(marketTime);
+        if (_universe.DerivedOnlyWhenForexClosed && ForexOpen)
+        {
+            // Forex is trading: Derived markets wait so that position slots go to Forex.
+            closedPrimary.RemoveAll(i => i.AssetClass == AssetClass.SyntheticIndex);
+        }
 
         await MonitorPositionsAsync(bars, converter, marketTime, correlationId, cancellationToken);
 

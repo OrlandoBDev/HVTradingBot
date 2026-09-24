@@ -41,7 +41,8 @@ public sealed class BacktestEngine(
 {
     public async Task<BacktestResult> RunAsync(
         IReadOnlyDictionary<Instrument, IReadOnlyList<Candle>> bars,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool derivedOnlyWhenForexClosed = false)
     {
         var options = new TradingEngineOptions
         {
@@ -57,7 +58,12 @@ public sealed class BacktestEngine(
         var broker = new InMemorySimulatedBroker(options.AccountCurrency, options.StartingBalance, costs);
         var journal = new InMemoryJournal();
         var clock = new ReplayClock();
-        var riskManager = new RiskManager(riskOptions, costs);
+        // The automatic kill switch waits for a person to reset it, which never happens in a replay; after a daily-loss
+        // breach the daily-loss rule alone blocks the rest of that day, and trading resumes the next market day.
+        var replayRisk = riskOptions.Clone();
+        replayRisk.KillSwitchOnDailyLossBreach = false;
+        replayRisk.KillSwitchOnStaleData = false;
+        var riskManager = new RiskManager(replayRisk, costs);
         // Learning runs inside the replay from a blank slate, so results stay reproducible and free of look-ahead.
         var learning = new LearningService(new InMemoryVirtualTradeStore(), learningOptions, costs, NullLogger<LearningService>.Instance);
         var engine = new TradingEngine(
@@ -70,9 +76,9 @@ public sealed class BacktestEngine(
             journal,
             clock,
             learning,
-            TradingUniverse.From(bars.Keys, options.AccountCurrency),
+            TradingUniverse.From(bars.Keys, options.AccountCurrency, derivedOnlyWhenForexClosed),
             options,
-            new FixedRiskOptions(riskOptions),
+            new FixedRiskOptions(replayRisk),
             regimeOptions,
             NullLogger<TradingEngine>.Instance);
 

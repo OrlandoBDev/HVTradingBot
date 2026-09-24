@@ -48,6 +48,8 @@ export interface Market {
   assetClass: string;
   isTradable: boolean;
   priceDecimals: number;
+  isOpen: boolean;
+  isPaused: boolean;
   marketTimeUtc: string;
   bid: number;
   ask: number;
@@ -200,6 +202,7 @@ export interface MarketCatalogItem {
 
 export interface MarketSettings {
   selected: string[];
+  derivedOnlyWhenForexClosed: boolean;
   isDefaultSelection: boolean;
   version: number;
   appliedVersion: number;

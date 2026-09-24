@@ -15,7 +15,13 @@ public sealed class TradingUniverse
 
     public bool IsConfigured => Traded.Count > 0;
 
-    public void Configure(IEnumerable<Instrument> traded, string accountCurrency)
+    /// <summary>
+    /// When true, Derived (synthetic) markets are only evaluated while Forex is closed (weekends, daily break), so the
+    /// engine's position slots go to Forex whenever Forex trades.
+    /// </summary>
+    public bool DerivedOnlyWhenForexClosed { get; private set; }
+
+    public void Configure(IEnumerable<Instrument> traded, string accountCurrency, bool derivedOnlyWhenForexClosed = false)
     {
         var tradedList = traded.Distinct().ToList();
         if (tradedList.Count == 0)
@@ -24,13 +30,14 @@ public sealed class TradingUniverse
         }
 
         Traded = tradedList;
+        DerivedOnlyWhenForexClosed = derivedOnlyWhenForexClosed;
         Data = tradedList.Concat(Instruments.ConversionPairs(tradedList, accountCurrency)).Distinct().ToList();
     }
 
-    public static TradingUniverse From(IEnumerable<Instrument> traded, string accountCurrency)
+    public static TradingUniverse From(IEnumerable<Instrument> traded, string accountCurrency, bool derivedOnlyWhenForexClosed = false)
     {
         var universe = new TradingUniverse();
-        universe.Configure(traded, accountCurrency);
+        universe.Configure(traded, accountCurrency, derivedOnlyWhenForexClosed);
         return universe;
     }
 }

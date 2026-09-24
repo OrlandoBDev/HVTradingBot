@@ -25,12 +25,16 @@ public sealed record SystemStatusDto(
     DateTime? CooldownUntilUtc,
     DateTime ServerTimeUtc);
 
+/// <param name="IsOpen">False when no price has arrived for 10+ minutes (weekend, daily break, exchange hours).</param>
+/// <param name="IsPaused">Derived market waiting because Forex is open ("Derived only while Forex is closed").</param>
 public sealed record MarketDto(
     string Instrument,
     string DisplayName,
     string AssetClass,
     bool IsTradable,
     int PriceDecimals,
+    bool IsOpen,
+    bool IsPaused,
     DateTime MarketTimeUtc,
     decimal Bid,
     decimal Ask,
@@ -143,6 +147,7 @@ public sealed record MarketCatalogItemDto(
 
 public sealed record MarketSettingsDto(
     IReadOnlyList<string> Selected,
+    bool DerivedOnlyWhenForexClosed,
     bool IsDefaultSelection,
     int Version,
     int AppliedVersion,
@@ -151,7 +156,7 @@ public sealed record MarketSettingsDto(
     int MaxSelected,
     IReadOnlyList<MarketCatalogItemDto> Catalog);
 
-public sealed record MarketSelectionRequest(IReadOnlyList<string> Instruments);
+public sealed record MarketSelectionRequest(IReadOnlyList<string> Instruments, bool DerivedOnlyWhenForexClosed = true);
 
 public sealed record RiskLimitsDto(
     decimal MaxRiskPerTradePercent,

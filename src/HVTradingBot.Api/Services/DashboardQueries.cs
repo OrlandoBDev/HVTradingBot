@@ -80,20 +80,35 @@ public sealed class DashboardQueries(
             now);
     }
 
+    /// <summary>A market with no price for this long is treated as closed and hidden from the market tables.</summary>
+    public static readonly TimeSpan ClosedAfter = TimeSpan.FromMinutes(10);
+
     public async Task<IReadOnlyList<MarketDto>> GetMarketsAsync(CancellationToken cancellationToken)
     {
         // Only the markets currently selected on the Settings page (deselected ones keep old snapshot rows).
-        var selected = (await catalog.GetSelectionAsync(cancellationToken)).Instruments ?? engineOptions.Instruments;
+        var selection = await catalog.GetSelectionAsync(cancellationToken);
+        var selected = selection.Instruments ?? engineOptions.Instruments;
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var rows = await db.MarketSnapshots.AsNoTracking().Where(s => selected.Contains(s.Instrument)).ToListAsync(cancellationToken);
         var order = selected.Select((symbol, index) => (symbol, index)).ToDictionary(x => x.symbol, x => x.index);
-        rows = rows.OrderBy(r => order.GetValueOrDefault(r.Instrument, int.MaxValue)).ToList();
-        return rows.Select(s =>
+        var now = clock.UtcNow;
+
+        var markets = rows.OrderBy(r => order.GetValueOrDefault(r.Instrument, int.MaxValue)).Select(s =>
         {
             var known = Instruments.TryGet(s.Instrument, out var instrument);
-            return new MarketDto(s.Instrument, known ? instrument.DisplayName : s.Instrument, known ? instrument.AssetClass.ToString() : "Forex",
-                !known || instrument.IsTradable, known ? instrument.PriceDecimals : 5, s.MarketTimeUtc, s.Bid, s.Ask, s.SpreadPips, s.Regime, s.LastDecision,
-            s.LastDecisionTimeUtc, s.Indicators is null ? null : JsonDocument.Parse(s.Indicators).RootElement.Clone());
+            var isOpen = now - s.MarketTimeUtc <= ClosedAfter;
+            return (Row: s, Instrument: known ? instrument : null, IsOpen: isOpen);
+        }).ToList();
+
+        var forexOpen = markets.Any(m => m.IsOpen && m.Instrument?.IsCurrencyPair == true);
+        return markets.Select(m =>
+        {
+            var s = m.Row;
+            var i = m.Instrument;
+            var paused = selection.DerivedOnlyWhenForexClosed && forexOpen && i?.AssetClass == AssetClass.SyntheticIndex;
+            return new MarketDto(s.Instrument, i?.DisplayName ?? s.Instrument, i?.AssetClass.ToString() ?? "Forex", i?.IsTradable ?? true,
+                i?.PriceDecimals ?? 5, m.IsOpen, paused, s.MarketTimeUtc, s.Bid, s.Ask, s.SpreadPips, s.Regime, s.LastDecision,
+                s.LastDecisionTimeUtc, s.Indicators is null ? null : JsonDocument.Parse(s.Indicators).RootElement.Clone());
         }).ToList();
     }
 

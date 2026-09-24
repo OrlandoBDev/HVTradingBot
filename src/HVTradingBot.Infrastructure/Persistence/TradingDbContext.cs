@@ -122,6 +122,7 @@ public sealed class TradingDbContext(DbContextOptions<TradingDbContext> options)
             e.HasKey(x => x.Id);
             e.Property(x => x.Id).ValueGeneratedNever();
             e.Property(x => x.Instruments).HasColumnType("jsonb");
+            e.Property(x => x.DerivedOnlyWhenForexClosed).HasDefaultValue(true);
         });
 
         modelBuilder.Entity<BrokerSettingsEntity>(e =>

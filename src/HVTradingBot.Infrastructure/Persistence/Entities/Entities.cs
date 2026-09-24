@@ -218,6 +218,7 @@ public sealed class MarketSelectionEntity
 {
     public int Id { get; set; }
     public required string Instruments { get; set; }
+    public bool DerivedOnlyWhenForexClosed { get; set; } = true;
     public int Version { get; set; }
     public int AppliedVersion { get; set; }
     public DateTime UpdatedAtUtc { get; set; }

@@ -166,9 +166,10 @@ public static partial class SettingsEndpoints
             await catalog.LoadAndRegisterAsync(ct);
             try
             {
-                var saved = await catalog.SaveSelectionAsync(request.Instruments ?? [], Actor(http), ct);
+                var saved = await catalog.SaveSelectionAsync(request.Instruments ?? [], Actor(http), ct, request.DerivedOnlyWhenForexClosed);
                 await journal.RecordAuditAsync(Actor(http), "MarketSelectionUpdated",
-                    $"Version {saved.Version}: {string.Join(", ", saved.Instruments ?? [])}", http.CorrelationId(), ct);
+                    $"Version {saved.Version}: {string.Join(", ", saved.Instruments ?? [])}; Derived " +
+                    (saved.DerivedOnlyWhenForexClosed ? "only while Forex is closed" : "always"), http.CorrelationId(), ct);
             }
             catch (ArgumentException ex)
             {
@@ -204,6 +205,7 @@ public static partial class SettingsEndpoints
         var selection = await catalog.GetSelectionAsync(ct);
         return new MarketSettingsDto(
             selection.Instruments ?? engineOptions.Instruments,
+            selection.DerivedOnlyWhenForexClosed,
             selection.Instruments is null,
             selection.Version,
             selection.AppliedVersion,
