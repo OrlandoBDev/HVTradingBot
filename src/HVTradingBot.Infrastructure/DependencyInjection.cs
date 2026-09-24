@@ -68,6 +68,7 @@ public static class DependencyInjection
         services.AddSingleton<IDerivStatusSink>(sp => sp.GetRequiredService<DerivSettingsStore>());
 
         services.AddSingleton<MarketCatalogStore>();
+        services.AddSingleton<TestTrades.TestTradeStore>();
         services.AddSingleton<TradingUniverse>();
 
         services.AddValidatedOptions<LearningOptions>(configuration, LearningOptions.SectionName);

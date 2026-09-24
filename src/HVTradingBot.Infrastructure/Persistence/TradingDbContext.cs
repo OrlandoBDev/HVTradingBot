@@ -15,6 +15,7 @@ public sealed class TradingDbContext(DbContextOptions<TradingDbContext> options)
     public DbSet<MarketEntity> Markets => Set<MarketEntity>();
     public DbSet<RiskSettingsEntity> RiskSettings => Set<RiskSettingsEntity>();
     public DbSet<NotificationSettingsEntity> NotificationSettings => Set<NotificationSettingsEntity>();
+    public DbSet<TestTradeEntity> TestTrades => Set<TestTradeEntity>();
     public DbSet<SetupOutcomeEntity> SetupOutcomes => Set<SetupOutcomeEntity>();
     public DbSet<MarketSelectionEntity> MarketSelection => Set<MarketSelectionEntity>();
     public DbSet<BrokerConnectionStatusEntity> BrokerConnectionStatus => Set<BrokerConnectionStatusEntity>();
@@ -87,6 +88,16 @@ public sealed class TradingDbContext(DbContextOptions<TradingDbContext> options)
             e.HasIndex(x => x.SetupId).IsUnique();
             e.HasIndex(x => new { x.Instrument, x.Status });
             e.HasIndex(x => x.ClosedAtUtc);
+        });
+
+        modelBuilder.Entity<TestTradeEntity>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Instrument).HasMaxLength(32);
+            e.Property(x => x.Status).HasMaxLength(16);
+            e.Property(x => x.Message).HasMaxLength(1000);
+            e.Property(x => x.RequestedBy).HasMaxLength(200);
+            e.HasIndex(x => x.RequestedAtUtc);
         });
 
         modelBuilder.Entity<NotificationSettingsEntity>(e =>

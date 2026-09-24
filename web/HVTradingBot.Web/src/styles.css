@@ -279,3 +279,12 @@ textarea { background: var(--panel-2); color: var(--text); border: 1px solid var
 @media (max-width: 900px) { .risk-field { grid-template-columns: minmax(0, 1fr); gap: 8px; } }
 
 .notice { margin: 0 0 10px; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: color-mix(in srgb, var(--info) 12%, var(--panel)); border: 1px solid color-mix(in srgb, var(--info) 40%, transparent); }
+
+.test-trade { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
+.steps { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-bottom: 10px; }
+.step { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+.step-dot { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border); font-size: 11px; font-weight: 700; }
+.step.done { color: var(--text); }
+.step.done .step-dot { background: var(--good); border-color: var(--good); color: white; }
+.step.failed .step-dot { background: var(--bad); border-color: var(--bad); color: white; }
+.test-trade-message { margin: 0 0 4px; }

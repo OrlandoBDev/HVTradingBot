@@ -283,3 +283,23 @@ public sealed class NotificationSettingsEntity
     public bool? LastAttemptSucceeded { get; set; }
     public string? LastError { get; set; }
 }
+
+/// <summary>A test trade requested from the dashboard and carried out by the worker.</summary>
+public sealed class TestTradeEntity
+{
+    public Guid Id { get; set; }
+    public required string Instrument { get; set; }
+    public required string Status { get; set; }
+    public string? Message { get; set; }
+    public required string RequestedBy { get; set; }
+    public DateTime RequestedAtUtc { get; set; }
+    public DateTime? OpenedAtUtc { get; set; }
+    public DateTime? CloseRequestedAtUtc { get; set; }
+    public DateTime? ClosedAtUtc { get; set; }
+    public string? ClientOrderId { get; set; }
+    public Guid? PositionId { get; set; }
+    public decimal? FillPrice { get; set; }
+    public decimal? ExitPrice { get; set; }
+    public decimal? RealizedPnl { get; set; }
+    public int HoldSeconds { get; set; }
+}

@@ -42,8 +42,9 @@ export const PAGES: PageInfo[] = [
     label: "Trades",
     icon: "⇅",
     group: "Trading",
-    summary: "Open positions and the history of closed trades.",
+    summary: "Open positions, the history of closed trades, and a test trade to see the whole pipeline work.",
     details: [
+      "Test trade: sends one real order to your demo account through every risk check, holds it 60 seconds and closes it — then it appears in history, the journal and your email.",
       "Open: every position with its entry, broker-side stop loss and take profit, and live unrealized P&L.",
       "History: how each trade ended (stop, target or manual), its result in money and in R (multiples of the amount risked).",
       "MAE / MFE show how far a trade went against and in favour of you while it was open.",

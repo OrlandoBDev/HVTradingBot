@@ -3,6 +3,7 @@ import type { PageId } from "../pages";
 import { money, num, price, signClass, time } from "../format";
 import { useData } from "../useData";
 import { Badge, Card, Empty, ErrorNote, Segmented } from "./Ui";
+import { TestTrade } from "./TestTrade";
 
 type Navigate = (page: PageId, section?: string) => void;
 
@@ -11,6 +12,7 @@ export function Trades({ refreshKey, view, navigate }: { refreshKey: unknown; vi
   const current = view === "history" ? "history" : "open";
   return (
     <div className="stack">
+      <TestTrade />
       <Segmented
         value={current}
         options={[{ value: "open", label: "Open positions" }, { value: "history", label: "Trade history" }]}

@@ -3,6 +3,7 @@ using HVTradingBot.Api.Services;
 using HVTradingBot.Application.Abstractions;
 using HVTradingBot.Application.Learning;
 using HVTradingBot.Domain.Learning;
+using HVTradingBot.Infrastructure.TestTrades;
 using HVTradingBot.Contracts;
 
 namespace HVTradingBot.Api.Endpoints;
@@ -57,6 +58,39 @@ public static class TradingEndpoints
             };
         });
 
+        api.MapGet("/test-trades", async (TestTradeStore store, CancellationToken ct) =>
+            (await store.RecentAsync(5, ct)).Select(ToDto));
+
+        api.MapPost("/test-trades", async (TestTradeRequest request, TestTradeStore store, DashboardQueries queries, HttpContext http,
+            CancellationToken ct) =>
+        {
+            // The API only records the request; the worker (the only process that talks to the broker) carries it out.
+            var market = (await queries.GetMarketsAsync(ct)).FirstOrDefault(m => m.Instrument == request.Instrument);
+            string? problem = market switch
+            {
+                null => "Choose one of the selected markets.",
+                { IsTradable: false } => $"{market.DisplayName} is analysis-only and cannot be traded.",
+                { IsLoading: true } => $"{market.DisplayName} is still loading.",
+                { IsOpen: false } => $"{market.DisplayName} is closed right now.",
+                _ => null
+            };
+            if (problem is not null)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["instrument"] = [problem] });
+            }
+
+            var status = await queries.GetStatusAsync(ct);
+            if (!status.WorkerHealthy)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["instrument"] = ["The trading worker is not running."] });
+            }
+
+            var created = await store.CreateAsync(request.Instrument, $"dashboard@{http.Connection.RemoteIpAddress}", ct);
+            return created is null
+                ? Results.ValidationProblem(new Dictionary<string, string[]> { ["instrument"] = ["A test trade is already in progress."] })
+                : Results.Ok(ToDto(created));
+        });
+
         api.MapPost("/kill-switch", SetKillSwitchAsync);
 
         api.MapPost("/backtests", async (BacktestRequest request, BacktestService service, CancellationToken ct) =>
@@ -68,6 +102,9 @@ public static class TradingEndpoints
 
         return app;
     }
+
+    private static TestTradeDto ToDto(HVTradingBot.Infrastructure.Persistence.Entities.TestTradeEntity t) => new(t.Id, t.Instrument, t.Status, t.Message,
+        t.RequestedBy, t.RequestedAtUtc, t.OpenedAtUtc, t.ClosedAtUtc, t.ClientOrderId, t.FillPrice, t.ExitPrice, t.RealizedPnl, t.HoldSeconds);
 
     /// <summary>
     /// Activating the kill switch always succeeds. Deactivating requires a reason and is audited.

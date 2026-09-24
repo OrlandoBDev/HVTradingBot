@@ -10,6 +10,7 @@ using HVTradingBot.Domain.Decisions;
 using HVTradingBot.Domain.Execution;
 using HVTradingBot.Domain.MarketData;
 using HVTradingBot.Domain.Risk;
+using HVTradingBot.Domain.Strategies;
 using Microsoft.Extensions.Logging;
 
 namespace HVTradingBot.Application.Trading;
@@ -29,6 +30,7 @@ public sealed class TradingEngine
     private static readonly Counter<long> DecisionCounter = Meter.CreateCounter<long>("hvtb.decisions");
     private static readonly Counter<long> ClosedTradeCounter = Meter.CreateCounter<long>("hvtb.trades.closed");
 
+    private readonly SemaphoreSlim _cycleLock = new(1, 1);
     private readonly Dictionary<Instrument, MultiTimeFrameSeries> _series = new();
     private readonly Dictionary<Instrument, Quote> _quotes = new();
     private readonly Dictionary<Instrument, (MarketRegime Regime, IndicatorSnapshot Primary, DecisionState State, DateTime Time)> _lastEvaluation = new();
@@ -182,6 +184,24 @@ public sealed class TradingEngine
             await RecordIdleAsync(dataStatus, cancellationToken);
             return;
         }
+
+        await _cycleLock.WaitAsync(cancellationToken);
+        try
+        {
+            await ProcessBarsCoreAsync(bars, dataStatus, correlationId, cancellationToken);
+        }
+        finally
+        {
+            _cycleLock.Release();
+        }
+    }
+
+    private async Task ProcessBarsCoreAsync(
+        IReadOnlyList<InstrumentBar> bars,
+        MarketDataStatus dataStatus,
+        string correlationId,
+        CancellationToken cancellationToken)
+    {
 
         using var activity = ActivitySource.StartActivity("TradingCycle");
         activity?.SetTag("correlation.id", correlationId);
@@ -455,6 +475,113 @@ public sealed class TradingEngine
             }, cancellationToken);
         }
     }
+
+    public const string TestTradeStrategy = "TestTrade";
+
+    /// <summary>
+    /// Places a trade on request (from the dashboard) to verify the whole pipeline: the same risk checks (twice),
+    /// execution, journal and notifications as a strategy trade. Direction follows the market regime; stop and target
+    /// are 1.5 and 3 ATR (reward:risk 2). It is sized like a real trade.
+    /// </summary>
+    public async Task<TestTradeOutcome> PlaceTestTradeAsync(Instrument instrument, MarketDataStatus dataStatus, string requestedBy,
+        string correlationId, CancellationToken cancellationToken)
+    {
+        if (!IsReady)
+        {
+            return TestTradeOutcome.Failed("The trading engine is still starting.");
+        }
+
+        await _cycleLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (!_series.TryGetValue(instrument, out var series) || !_quotes.TryGetValue(instrument, out var quote))
+            {
+                return TestTradeOutcome.Failed($"{instrument.DisplayName} is not one of the selected markets.");
+            }
+
+            if (!instrument.IsTradable)
+            {
+                return TestTradeOutcome.Failed($"{instrument.DisplayName} is analysis-only at the broker.");
+            }
+
+            if (series.Indicators(TimeFrame.H1) is not { Atr: { } atr } || series.Indicators(TimeFrame.H4) is null)
+            {
+                return TestTradeOutcome.Failed($"Not enough history for {instrument.DisplayName} yet.");
+            }
+
+            var context = MarketContext.Build(series, quote, _regimeOptions,
+                dataStatus.IsStale(_clock.UtcNow, TimeSpan.FromSeconds(_risk.Current.MaxMarketDataAgeSeconds)));
+            var direction = context.Regime == MarketRegime.TrendingBearish ? Direction.Short : Direction.Long;
+            var entry = direction == Direction.Long ? quote.Ask : quote.Bid;
+            var sign = direction.Sign();
+            var setup = new TradeSetup(direction, entry, instrument.RoundPrice(entry - sign * atr * 1.5m), instrument.RoundPrice(entry + sign * atr * 3m));
+            var clientOrderId = $"TEST-{instrument.BaseCurrency}{(instrument.IsCurrencyPair ? instrument.QuoteCurrency : "")}-{_clock.UtcNow:yyyyMMddHHmmss}";
+            var proposal = new TradeProposal(instrument, setup, quote, context.AverageSpread, TestTradeStrategy, 0, clientOrderId);
+            var decisionId = Guid.NewGuid();
+            var reasons = new List<string> { $"Test trade requested from the dashboard by {requestedBy}." };
+
+            var risk = await _riskManager.EvaluateAsync(proposal, await BuildPortfolioAsync(dataStatus, cancellationToken), cancellationToken);
+            OrderResult? order = null;
+            DecisionState state;
+            if (!risk.IsApproved)
+            {
+                state = DecisionState.RejectedByRisk;
+                reasons.Add(risk.RejectionReason!);
+            }
+            else
+            {
+                (risk, order) = await _execution.ExecuteAsync(proposal, ct => BuildPortfolioAsync(dataStatus, ct), decisionId, correlationId, cancellationToken);
+                state = order.Status == OrderStatus.Filled ? DecisionState.Executed : DecisionState.RejectedByRisk;
+                reasons.Add(order.Status == OrderStatus.Filled
+                    ? $"{_broker.Descriptor.Name} order filled at {order.FillPrice}."
+                    : order.RejectReason ?? $"Order {order.Status}.");
+            }
+
+            await _journal.RecordDecisionAsync(new DecisionRecord(decisionId, correlationId, instrument.Symbol, context.AsOfUtc, state, context.Regime,
+                TestTradeStrategy, direction, 0, null, setup, context.Primary, context.Structural, [], risk, reasons, clientOrderId, order), cancellationToken);
+            await _journal.RecordAuditAsync(requestedBy, "TestTrade", string.Join(" ", reasons), correlationId, cancellationToken);
+
+            if (_notifier is not null && state == DecisionState.Executed)
+            {
+                var broker = _broker.Descriptor;
+                await _notifier.NotifyAsync(new TradeDecisionNotification(decisionId, instrument.DisplayName, TestTradeStrategy, state, _options.Mode,
+                    new DateTimeOffset(context.AsOfUtc, TimeSpan.Zero), reasons)
+                {
+                    Setup = setup,
+                    Regime = context.Regime.ToString(),
+                    Quantity = risk.Units,
+                    BrokerOrderId = order?.OrderId?.ToString(),
+                    Broker = $"{broker.Name}{(broker.IsDemo ? " (demo)" : "")} {broker.AccountId}".Trim(),
+                    DedupeKey = clientOrderId
+                }, cancellationToken);
+            }
+
+            return order is { Status: OrderStatus.Filled }
+                ? new TestTradeOutcome(true, $"{Side(direction)} {instrument.DisplayName} filled at {order.FillPrice}; risk {risk.RiskAmount:F2} {_options.AccountCurrency}.",
+                    clientOrderId, order.PositionId, order.FillPrice)
+                : TestTradeOutcome.Failed(string.Join(" ", reasons.Skip(1)), clientOrderId);
+        }
+        finally
+        {
+            _cycleLock.Release();
+        }
+    }
+
+    /// <summary>Closes a position at the broker (used to end a test trade). The close is recorded by the next reconciliation.</summary>
+    public async Task<OrderResult> ClosePositionAsync(Guid positionId, CancellationToken cancellationToken)
+    {
+        await _cycleLock.WaitAsync(cancellationToken);
+        try
+        {
+            return await _broker.ClosePositionAsync(positionId.ToString(), cancellationToken);
+        }
+        finally
+        {
+            _cycleLock.Release();
+        }
+    }
+
+    private static string Side(Direction d) => d == Direction.Long ? "BUY" : "SELL";
 
     public async Task<PortfolioState> BuildPortfolioAsync(MarketDataStatus dataStatus, CancellationToken cancellationToken)
     {

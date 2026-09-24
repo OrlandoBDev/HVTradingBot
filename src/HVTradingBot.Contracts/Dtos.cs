@@ -221,3 +221,20 @@ public sealed record NotificationSettingsRequest(
     bool OnKillSwitch);
 
 public sealed record TestEmailResult(bool Sent, string Message);
+
+public sealed record TestTradeRequest(string Instrument);
+
+public sealed record TestTradeDto(
+    Guid Id,
+    string Instrument,
+    string Status,
+    string? Message,
+    string RequestedBy,
+    DateTime RequestedAtUtc,
+    DateTime? OpenedAtUtc,
+    DateTime? ClosedAtUtc,
+    string? ClientOrderId,
+    decimal? FillPrice,
+    decimal? ExitPrice,
+    decimal? RealizedPnl,
+    int HoldSeconds);
