@@ -1,5 +1,6 @@
 using HVTradingBot.Application.Abstractions;
 using HVTradingBot.Infrastructure.Brokers;
+using HVTradingBot.Infrastructure.Notifications;
 using HVTradingBot.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -19,6 +20,7 @@ public static class DependencyInjection
         services.AddDbContext<TradingDbContext>(options => options.UseNpgsql(connectionString));
         services.AddSingleton<PaperTradingBroker>();
         services.AddSingleton<IBroker>(sp => sp.GetRequiredService<PaperTradingBroker>());
+        services.AddTradeDecisionNotifications(configuration);
 
         return services;
     }

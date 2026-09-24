@@ -72,3 +72,11 @@ Audit:
 - position changes
 
 Never write secrets to logs.
+
+## Email Notifications (Gmail SMTP)
+
+Trade decision emails are sent through `smtp.gmail.com:587` (STARTTLS).
+
+- Use a Gmail **App Password** (requires 2-Step Verification), never the account password.
+- Supply it via `Notifications__Email__Password` (environment) or .NET User Secrets; never commit it.
+- Notifications are informational only and cannot approve, reject, or execute trades.
