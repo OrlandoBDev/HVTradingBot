@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <ProjectReference Include="..\HVTradingBot.Application\HVTradingBot.Application.csproj" />
+    <ProjectReference Include="..\HVTradingBot.Infrastructure\HVTradingBot.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>
