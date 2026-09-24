@@ -1,0 +1,37 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# JetBrains
+.idea/
+*.sln.iml
+
+# Node
+node_modules/
+dist/
+.next/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+appsettings.Development.local.json
+secrets.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Coverage
+coverage/
+TestResults/
+
+# Docker local data
+docker-data/
