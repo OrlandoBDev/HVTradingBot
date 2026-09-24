@@ -131,8 +131,26 @@ public sealed class PaperTradingBroker(
     public Task<OrderResult> CancelOrderAsync(string orderId, CancellationToken cancellationToken) =>
         Task.FromResult(OrderResult.Rejected(orderId, "Paper market orders fill immediately; there is nothing pending to cancel."));
 
-    public Task<OrderResult> ClosePositionAsync(string positionId, CancellationToken cancellationToken) =>
-        Task.FromResult(OrderResult.Rejected(positionId, "Manual close is not available in the MVP; positions exit at stop loss or take profit."));
+    private readonly ConcurrentDictionary<Guid, bool> _closeRequested = new();
+
+    /// <summary>Marks the position for closing; it is filled at the current price by the next <see cref="ProcessBarAsync"/>.</summary>
+    public async Task<OrderResult> ClosePositionAsync(string positionId, CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(positionId, out var id))
+        {
+            return OrderResult.Rejected(positionId, "Invalid position id.");
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var position = await db.Positions.AsNoTracking().SingleOrDefaultAsync(p => p.Id == id && p.Broker == "Paper" && p.IsOpen, cancellationToken);
+        if (position is null)
+        {
+            return OrderResult.Rejected(positionId, "No open paper position with this id.");
+        }
+
+        _closeRequested[id] = true;
+        return new OrderResult(position.ClientOrderId, OrderStatus.Filled, position.OrderId, position.Id, null, null);
+    }
 
     public async Task<IReadOnlyList<ClosedPosition>> ProcessBarAsync(Instrument instrument, Candle bar, CurrencyConverter converter, CancellationToken cancellationToken)
     {
@@ -155,7 +173,16 @@ public sealed class PaperTradingBroker(
             entity.MaxFavorableExcursion = tracked.MaxFavorableExcursion;
             entity.MaxAdverseExcursion = tracked.MaxAdverseExcursion;
 
-            if (PaperExecutionModel.CheckExit(tracked, bar, costs) is not { } exit)
+            var exitCheck = PaperExecutionModel.CheckExit(tracked, bar, costs);
+            if (exitCheck is null && _closeRequested.TryRemove(entity.Id, out _) && _quotes.TryGetValue(instrument, out var now))
+            {
+                // Closed on request: longs sell at the bid, shorts buy back at the ask (plus slippage).
+                var slippage = instrument.FromPips(costs.SlippagePips);
+                var price = tracked.Direction == Direction.Long ? now.Bid - slippage : now.Ask + slippage;
+                exitCheck = (ExitReason.Manual, instrument.RoundPrice(price));
+            }
+
+            if (exitCheck is not { } exit)
             {
                 continue;
             }

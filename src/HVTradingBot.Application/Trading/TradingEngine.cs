@@ -270,16 +270,18 @@ public sealed class TradingEngine
         }
     }
 
-    private async Task MonitorPositionsAsync(
+    private async Task<IReadOnlyList<ClosedPosition>> MonitorPositionsAsync(
         IReadOnlyList<InstrumentBar> bars,
         CurrencyConverter converter,
         DateTime marketTime,
         string correlationId,
         CancellationToken cancellationToken)
     {
+        var all = new List<ClosedPosition>();
         foreach (var (instrument, bar) in bars)
         {
             var closedPositions = await _broker.ProcessBarAsync(instrument, bar, converter, cancellationToken);
+            all.AddRange(closedPositions);
             foreach (var closed in closedPositions)
             {
                 ClosedTradeCounter.Add(1, new KeyValuePair<string, object?>("reason", closed.Reason.ToString()));
@@ -320,6 +322,8 @@ public sealed class TradingEngine
                     correlationId, cancellationToken);
             }
         }
+
+        return all;
     }
 
     private async Task<TradingSystemState> ApplyAutomaticKillSwitchAsync(
@@ -581,13 +585,33 @@ public sealed class TradingEngine
         }
     }
 
-    /// <summary>Closes a position at the broker (used to end a test trade). The close is recorded by the next reconciliation.</summary>
-    public async Task<OrderResult> ClosePositionAsync(Guid positionId, CancellationToken cancellationToken)
+    /// <summary>
+    /// Closes a position before its stop or target (dashboard "Close" or the end of a test trade), then reconciles that
+    /// market immediately so the result is recorded, counted in the loss limits and emailed without waiting for a bar.
+    /// </summary>
+    public async Task<(OrderResult Result, ClosedPosition? Closed)> ClosePositionAsync(Guid positionId, string correlationId,
+        CancellationToken cancellationToken)
     {
         await _cycleLock.WaitAsync(cancellationToken);
         try
         {
-            return await _broker.ClosePositionAsync(positionId.ToString(), cancellationToken);
+            var position = (await _broker.GetPositionsAsync(cancellationToken)).FirstOrDefault(p => p.Id == positionId);
+            if (position is null)
+            {
+                return (OrderResult.Rejected(positionId.ToString(), "This position is no longer open."), null);
+            }
+
+            var result = await _broker.ClosePositionAsync(positionId.ToString(), cancellationToken);
+            if (result.Status == OrderStatus.Rejected
+                || !_series.TryGetValue(position.Instrument, out var series) || series.LastBar is not { } lastBar)
+            {
+                return (result, null);
+            }
+
+            _broker.UpdateQuotes(_quotes.Values);
+            var closed = await MonitorPositionsAsync([new InstrumentBar(position.Instrument, lastBar)], Converter(), lastBar.CloseTimeUtc,
+                correlationId, cancellationToken);
+            return (result, closed.FirstOrDefault(c => c.Position.Id == positionId));
         }
         finally
         {

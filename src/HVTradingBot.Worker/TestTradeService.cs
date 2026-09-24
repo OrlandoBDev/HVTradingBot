@@ -122,9 +122,10 @@ public sealed class TestTradeService(
         }
 
         Domain.Execution.OrderResult result;
+        Domain.Execution.ClosedPosition? closedNow;
         try
         {
-            result = await engine.ClosePositionAsync(positionId, ct);
+            (result, closedNow) = await engine.ClosePositionAsync(positionId, $"test-{trade.Id:N}", ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -139,11 +140,17 @@ public sealed class TestTradeService(
             return;
         }
 
+        if (closedNow is not null)
+        {
+            await Closed(trade, closedNow.ExitPrice, closedNow.RealizedPnl, closedNow.Reason.ToString(), ct);
+            return;
+        }
+
         await store.UpdateAsync(trade.Id, t =>
         {
             t.Status = TestTradeStatus.Closing;
             t.CloseRequestedAtUtc = clock.UtcNow;
-            t.Message = "Closed at the broker. Recording the result (at the next 5-minute update)…";
+            t.Message = "Closed at the broker. Waiting for the broker to confirm the result…";
         }, ct);
     }
 

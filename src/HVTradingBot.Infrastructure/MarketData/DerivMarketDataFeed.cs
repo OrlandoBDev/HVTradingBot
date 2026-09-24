@@ -197,7 +197,7 @@ public sealed class DerivMarketDataFeed(
             var tickTime = tick.TryGetProperty("epoch", out var ep) && ep.TryGetInt64(out var epoch)
                 ? DateTimeOffset.FromUnixTimeSeconds(epoch).UtcDateTime
                 : clock.UtcNow;
-            _ticks[instrument] = (bid.GetDecimal(), ask.GetDecimal(), clock.UtcNow, tickTime);
+            _ticks[instrument] = (DerivBroker.Dec(bid), DerivBroker.Dec(ask), clock.UtcNow, tickTime);
         }
     }
 
@@ -256,7 +256,7 @@ public sealed class DerivMarketDataFeed(
             var oldest = long.MaxValue;
             foreach (var c in candles.EnumerateArray())
             {
-                var epoch = c.GetProperty("epoch").GetInt64();
+                var epoch = c.GetProperty("epoch") is { ValueKind: JsonValueKind.String } es ? long.Parse(es.GetString()!, System.Globalization.CultureInfo.InvariantCulture) : c.GetProperty("epoch").GetInt64();
                 oldest = Math.Min(oldest, epoch);
                 // Skip bars outside the range, the still-forming bar, and any bar not aligned to the 5-minute grid.
                 if (epoch < fromEpoch || epoch + Granularity > nowEpoch || epoch % Granularity != 0)
@@ -267,10 +267,10 @@ public sealed class DerivMarketDataFeed(
                 collected[epoch] = new Candle(
                     DateTimeOffset.FromUnixTimeSeconds(epoch).UtcDateTime,
                     TimeFrame.M5,
-                    c.GetProperty("open").GetDecimal(),
-                    c.GetProperty("high").GetDecimal(),
-                    c.GetProperty("low").GetDecimal(),
-                    c.GetProperty("close").GetDecimal(),
+                    DerivBroker.Dec(c.GetProperty("open")),
+                    DerivBroker.Dec(c.GetProperty("high")),
+                    DerivBroker.Dec(c.GetProperty("low")),
+                    DerivBroker.Dec(c.GetProperty("close")),
                     spread,
                     0);
             }

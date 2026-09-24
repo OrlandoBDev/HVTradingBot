@@ -53,7 +53,7 @@ public sealed class DerivBroker(
         var socket = await session.GetSocketAsync(cancellationToken);
         var response = await socket.SendAsync(new JsonObject { ["balance"] = 1 }, cancellationToken);
         var balance = response.GetProperty("balance");
-        var amount = balance.GetProperty("balance").GetDecimal();
+        var amount = Dec(balance.GetProperty("balance"));
         var currency = balance.TryGetProperty("currency", out var c) ? c.GetString() ?? "" : session.Account!.Currency;
         if (!string.Equals(currency, engineOptions.AccountCurrency, StringComparison.OrdinalIgnoreCase))
         {
@@ -145,7 +145,7 @@ public sealed class DerivBroker(
         try
         {
             var quoted = await ProposeAsync(socket, order, estimate, withLimits: false, cancellationToken);
-            var commission = quoted.TryGetProperty("commission", out var cm) ? cm.GetDecimal() : estimate.Notional * options.CommissionRate;
+            var commission = quoted.TryGetProperty("commission", out var cm) ? Dec(cm) : estimate.Notional * options.CommissionRate;
             var (priced, pricedRejection) = DerivContractMath.WithQuotedCommission(estimate, entry, order.StopLoss, order.TakeProfit, commission,
                 risk.Current.MaxCommissionShareOfRisk);
             if (priced is null)
@@ -162,7 +162,7 @@ public sealed class DerivBroker(
             return await RejectAsync(entity, $"Proposal failed: {ex.Message}", cancellationToken);
         }
 
-        var spot = proposal.TryGetProperty("spot", out var sp) ? sp.GetDecimal() : entry;
+        var spot = proposal.TryGetProperty("spot", out var sp) ? Dec(sp) : entry;
         var brokerStop = LimitLevel(proposal, "stop_loss") ?? order.StopLoss;
         var brokerTarget = LimitLevel(proposal, "take_profit") ?? order.TakeProfit;
         if (!DerivContractMath.StopWithinTolerance(spot, order.StopLoss, brokerStop, options.StopPriceTolerance))
@@ -172,7 +172,7 @@ public sealed class DerivBroker(
                 cancellationToken);
         }
 
-        var askPrice = proposal.GetProperty("ask_price").GetDecimal();
+        var askPrice = Dec(proposal.GetProperty("ask_price"));
         var proposalId = proposal.GetProperty("id").GetString()!;
 
         // 4. Buy. An explicit API error means "not bought"; a timeout or dropped connection means "unknown".
@@ -224,7 +224,22 @@ public sealed class DerivBroker(
         }
 
         var socket = await session.GetSocketAsync(cancellationToken);
-        await socket.SendAsync(new JsonObject { ["sell"] = long.Parse(contractId, CultureInfo.InvariantCulture), ["price"] = 0 }, cancellationToken);
+        try
+        {
+            // price 0 = sell at the current market price.
+            await socket.SendAsync(new JsonObject { ["sell"] = long.Parse(contractId, CultureInfo.InvariantCulture), ["price"] = 0 }, cancellationToken);
+        }
+        catch (DerivApiException ex) when (ex.Message.Contains("sold", StringComparison.OrdinalIgnoreCase)
+                                           || ex.Message.Contains("expired", StringComparison.OrdinalIgnoreCase))
+        {
+            logger.LogInformation("Deriv contract {ContractId} was already closed: {Message}", contractId, ex.Message);
+        }
+        catch (DerivApiException ex)
+        {
+            return OrderResult.Rejected(position.ClientOrderId, $"Deriv refused the close: {ex.Message}");
+        }
+
+        _portfolioCache = null; // the next reconciliation must see the sale
         return new OrderResult(position.ClientOrderId, OrderStatus.Filled, position.OrderId, position.Id, null, null);
     }
 
@@ -270,7 +285,7 @@ public sealed class DerivBroker(
                 continue; // Not in the portfolio snapshot yet but still open; check again next bar.
             }
 
-            var profit = contract.TryGetProperty("profit", out var pr) ? pr.GetDecimal() : 0m;
+            var profit = contract.TryGetProperty("profit", out var pr) ? Dec(pr) : 0m;
             var exitPrice = FirstDecimal(contract, "exit_tick", "exit_spot", "sell_spot", "current_spot") ?? bar.Close;
             var sellTime = FirstLong(contract, "sell_time", "exit_tick_time", "date_expiry") is { } epoch
                 ? DateTimeOffset.FromUnixTimeSeconds(epoch).UtcDateTime
@@ -353,7 +368,7 @@ public sealed class DerivBroker(
                 DerivSymbols.ToInstrument(FirstString(c, "underlying_symbol", "symbol", "underlying")),
                 FirstString(c, "contract_type") switch { "MULTUP" => Direction.Long, "MULTDOWN" => Direction.Short, _ => null },
                 FirstLong(c, "purchase_time", "date_start") is { } t ? DateTimeOffset.FromUnixTimeSeconds(t).UtcDateTime : DateTime.MinValue,
-                c.TryGetProperty("buy_price", out var bp) ? bp.GetDecimal() : 0))
+                c.TryGetProperty("buy_price", out var bp) ? Dec(bp) : 0))
             .ToList();
 
         if (barClose is not null)
@@ -537,12 +552,26 @@ public sealed class DerivBroker(
     private static decimal? LimitLevel(JsonElement proposal, string name) =>
         proposal.TryGetProperty("limit_order", out var limits) && limits.TryGetProperty(name, out var level)
         && level.TryGetProperty("value", out var value)
-            ? value.ValueKind == JsonValueKind.String ? decimal.Parse(value.GetString()!, CultureInfo.InvariantCulture) : value.GetDecimal()
+            ? Dec(value)
             : null;
 
     private static bool IsSold(JsonElement contract) =>
-        (contract.TryGetProperty("is_sold", out var sold) && sold.ValueKind == JsonValueKind.Number && sold.GetInt32() == 1)
-        || (contract.TryGetProperty("status", out var status) && status.GetString() is "sold" or "won" or "lost");
+        (contract.TryGetProperty("is_sold", out var sold) && sold.ValueKind switch
+        {
+            JsonValueKind.Number => sold.GetInt32() == 1,
+            JsonValueKind.True => true,
+            JsonValueKind.String => sold.GetString() is "1" or "true",
+            _ => false
+        })
+        || (contract.TryGetProperty("status", out var status) && status.ValueKind == JsonValueKind.String && status.GetString() is "sold" or "won" or "lost");
+
+    /// <summary>Deriv sends some numbers as JSON strings (e.g. "profit": "0.87"); accept both.</summary>
+    internal static decimal Dec(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.Number => value.GetDecimal(),
+        JsonValueKind.String when decimal.TryParse(value.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var d) => d,
+        _ => throw new FormatException($"Expected a number from Deriv but got {value.ValueKind} '{value}'.")
+    };
 
     private static string ReadId(JsonElement element, string name)
     {
@@ -572,9 +601,10 @@ public sealed class DerivBroker(
     {
         foreach (var name in names)
         {
-            if (element.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var l))
+            if (element.TryGetProperty(name, out var v))
             {
-                return l;
+                if (v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var l)) return l;
+                if (v.ValueKind == JsonValueKind.String && long.TryParse(v.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var ls)) return ls;
             }
         }
 
