@@ -1,5 +1,4 @@
 using HVTradingBot.Application.Abstractions;
-using HVTradingBot.Application.Configuration;
 using HVTradingBot.Application.Notifications;
 using HVTradingBot.Domain.Common;
 using HVTradingBot.Domain.Strategies;
@@ -7,7 +6,6 @@ using HVTradingBot.Infrastructure.Notifications;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 
 namespace HVTradingBot.UnitTests;
 
@@ -15,203 +13,192 @@ public sealed class TradeDecisionNotificationTests
 {
     private static readonly DateTimeOffset DecidedAt = new(2026, 9, 24, 13, 30, 0, TimeSpan.Zero);
 
-    [Fact]
-    public void Format_IncludesDecisionAndProposalDetails()
+    private static readonly EmailSettings Enabled = EmailSettings.Disabled with
     {
-        var notification = CreateNotification(DecisionState.Executed) with
-        {
-            Quantity = 1000m,
-            BrokerOrderId = "PAPER-123"
-        };
+        Enabled = true, Username = "bot@gmail.com", Password = "app-password", ToAddresses = ["trader@example.com"]
+    };
+
+    [Fact]
+    public void Trade_opened_email_includes_the_setup()
+    {
+        var notification = CreateNotification(DecisionState.Executed) with { Quantity = 1000m, BrokerOrderId = "PAPER-123" };
 
         var message = TradeDecisionEmailFormatter.Format(notification, "[HVTradingBot]");
 
-        Assert.Equal("[HVTradingBot] Executed: BUY EUR_USD (Breakout)", message.Subject);
+        Assert.Equal("[HVTradingBot] Trade opened: BUY EUR/USD @ 1.105 (Breakout)", message.Subject);
         Assert.Contains("Trading mode: PAPER", message.Body);
-        Assert.Contains("Entry: 1.105", message.Body);
         Assert.Contains("Stop loss: 1.1", message.Body);
         Assert.Contains("Take profit: 1.115", message.Body);
         Assert.Contains("Quantity: 1000", message.Body);
         Assert.Contains("Score: 82", message.Body);
         Assert.Contains("Broker: Deriv (demo) DOT1", message.Body);
-        Assert.Contains("Broker order id: PAPER-123", message.Body);
         Assert.Contains("- Trend aligned", message.Body);
-        Assert.Contains("Decided at (UTC): 2026-09-24 13:30:00", message.Body);
     }
 
     [Fact]
-    public void Format_WithoutProposal_OmitsDirection()
+    public void Trade_closed_email_reports_the_result()
     {
-        var notification = CreateNotification(DecisionState.RejectedByRisk) with { Setup = null };
+        var closed = CreateNotification(DecisionState.Executed) with
+        {
+            Kind = NotificationKind.TradeClosed, Setup = null, Direction = Direction.Short, EntryPrice = 1.105m, ExitPrice = 1.095m,
+            ExitReason = "TakeProfit", RealizedPnl = 24.5m, RMultiple = 2.04m, Currency = "USD"
+        };
 
-        var message = TradeDecisionEmailFormatter.Format(notification, "[Bot]");
+        var message = TradeDecisionEmailFormatter.Format(closed, "[HV]");
 
-        Assert.Equal("[Bot] RejectedByRisk: EUR_USD (Breakout)", message.Subject);
-        Assert.DoesNotContain("Stop loss", message.Body);
+        Assert.Equal("[HV] Trade closed: SELL EUR/USD TakeProfit +24.50 USD (+2.0R)", message.Subject);
+        Assert.Contains("Profit / loss: +24.50 USD", message.Body);
+        Assert.Contains("Closed by: TakeProfit", message.Body);
+    }
+
+    [Fact]
+    public void Kill_switch_email_explains_the_state()
+    {
+        var message = TradeDecisionEmailFormatter.Format(
+            CreateNotification(DecisionState.NoTrade) with { Kind = NotificationKind.KillSwitch, KillSwitchActive = true, Setup = null }, "[HV]");
+        Assert.Equal("[HV] Kill switch ACTIVATED", message.Subject);
     }
 
     [Theory]
-    [InlineData(DecisionState.Executed, true)]
-    [InlineData(DecisionState.ApprovalRequired, true)]
-    [InlineData(DecisionState.NoTrade, false)]
-    [InlineData(DecisionState.Observe, false)]
-    public void ShouldNotify_UsesDefaultStatusesWhenNoneConfigured(DecisionState status, bool expected)
-    {
-        Assert.Equal(expected, new EmailNotificationOptions().ShouldNotify(status));
-    }
+    [InlineData(NotificationKind.TradeOpened, true)]
+    [InlineData(NotificationKind.TradeClosed, true)]
+    [InlineData(NotificationKind.OrderRejected, false)]
+    [InlineData(NotificationKind.KillSwitch, true)]
+    public void Default_events_are_opened_closed_and_kill_switch(NotificationKind kind, bool expected) =>
+        Assert.Equal(expected, Enabled.ShouldSend(kind));
 
     [Fact]
-    public void ShouldNotify_UsesConfiguredStatuses()
-    {
-        var options = new EmailNotificationOptions { NotifyOnStatuses = [DecisionState.Executed] };
-
-        Assert.True(options.ShouldNotify(DecisionState.Executed));
-        Assert.False(options.ShouldNotify(DecisionState.Candidate));
-    }
+    public void Nothing_is_sent_while_disabled() =>
+        Assert.False(EmailSettings.Disabled.ShouldSend(NotificationKind.TradeOpened));
 
     [Fact]
-    public async Task Notifier_QueuesOnlyMatchingDecisions()
+    public async Task Notifier_queues_only_enabled_events_once()
     {
         var queue = new TradeDecisionNotificationQueue();
-        var notifier = new QueuedTradeDecisionNotifier(
-            queue,
-            Options.Create(new EmailNotificationOptions { Enabled = true }),
-            NullLogger<QueuedTradeDecisionNotifier>.Instance);
+        var notifier = new QueuedTradeDecisionNotifier(queue, new FixedSettings(Enabled), NullLogger<QueuedTradeDecisionNotifier>.Instance);
 
-        await notifier.NotifyAsync(CreateNotification(DecisionState.NoTrade), CancellationToken.None);
-        await notifier.NotifyAsync(CreateNotification(DecisionState.Executed), CancellationToken.None);
+        var opened = CreateNotification(DecisionState.Executed) with { DedupeKey = "EURUSD-Breakout-L-202609241300" };
+        await notifier.NotifyAsync(CreateNotification(DecisionState.RejectedByRisk), CancellationToken.None); // switched off by default
+        await notifier.NotifyAsync(opened, CancellationToken.None);
+        await notifier.NotifyAsync(opened with { DecisionId = Guid.NewGuid() }, CancellationToken.None); // same signal re-evaluated
+        await notifier.NotifyAsync(opened with { Kind = NotificationKind.TradeClosed, DedupeKey = "closed-EURUSD" }, CancellationToken.None);
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        await using var reader = queue.ReadAllAsync(cts.Token).GetAsyncEnumerator(cts.Token);
-        Assert.True(await reader.MoveNextAsync());
-        Assert.Equal(DecisionState.Executed, reader.Current.Status);
+        Assert.Equal([NotificationKind.TradeOpened, NotificationKind.TradeClosed], await Drain(queue));
     }
 
     [Fact]
-    public async Task Notifier_EmailsEachSignalAndStatusOnlyOnce()
+    public async Task Dispatcher_sends_with_current_settings_and_records_the_result()
     {
-        var queue = new TradeDecisionNotificationQueue();
-        var notifier = new QueuedTradeDecisionNotifier(
-            queue,
-            Options.Create(new EmailNotificationOptions { Enabled = true }),
-            NullLogger<QueuedTradeDecisionNotifier>.Instance);
+        var sender = new RecordingEmailSender();
+        var attempts = new List<bool>();
+        var dispatcher = new EmailNotificationDispatcher(new TradeDecisionNotificationQueue(), sender, new FixedSettings(Enabled with { MaxSendAttempts = 1 }),
+            NullLogger<EmailNotificationDispatcher>.Instance, (ok, _, _) => { attempts.Add(ok); return Task.CompletedTask; });
 
-        // The engine re-evaluates every 5 minutes: the same refused signal must not email 12 times an hour.
-        var rejected = CreateNotification(DecisionState.RejectedByRisk) with { DedupeKey = "EURUSD-Breakout-L-202609241300" };
-        await notifier.NotifyAsync(rejected, CancellationToken.None);
-        await notifier.NotifyAsync(rejected with { DecisionId = Guid.NewGuid() }, CancellationToken.None);
-        await notifier.NotifyAsync(rejected with { Status = DecisionState.Executed }, CancellationToken.None);
+        await dispatcher.SendAsync(CreateNotification(DecisionState.Executed), CancellationToken.None);
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-        var received = new List<DecisionState>();
+        var (message, settings) = Assert.Single(sender.Sent);
+        Assert.StartsWith("[HVTradingBot] Trade opened:", message.Subject);
+        Assert.Equal(["trader@example.com"], settings.ToAddresses);
+        Assert.Equal([true], attempts);
+    }
+
+    [Fact]
+    public async Task Dispatcher_skips_events_switched_off_after_queueing()
+    {
+        var sender = new RecordingEmailSender();
+        var dispatcher = new EmailNotificationDispatcher(new TradeDecisionNotificationQueue(), sender,
+            new FixedSettings(Enabled with { OnTradeOpened = false }), NullLogger<EmailNotificationDispatcher>.Instance);
+
+        await dispatcher.SendAsync(CreateNotification(DecisionState.Executed), CancellationToken.None);
+
+        Assert.Empty(sender.Sent);
+    }
+
+    [Fact]
+    public async Task Dispatcher_swallows_send_failures_and_records_them()
+    {
+        var sender = new RecordingEmailSender { Fail = true };
+        string? recorded = null;
+        var dispatcher = new EmailNotificationDispatcher(new TradeDecisionNotificationQueue(), sender, new FixedSettings(Enabled with { MaxSendAttempts = 1 }),
+            NullLogger<EmailNotificationDispatcher>.Instance, (_, error, _) => { recorded = error; return Task.CompletedTask; });
+
+        await dispatcher.SendAsync(CreateNotification(DecisionState.Executed), CancellationToken.None);
+
+        Assert.Equal(1, sender.Attempts);
+        Assert.Equal("SMTP unavailable", recorded);
+    }
+
+    [Fact]
+    public void Worker_registration_provides_notifier_and_dispatcher()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection().Build();
+        var services = new ServiceCollection();
+        services.AddTradeDecisionNotifications(configuration);
+        services.AddTradeDecisionNotifications(configuration); // idempotent
+
+        Assert.Single(services, d => d.ServiceType == typeof(EmailSettingsStore));
+        Assert.Contains(services, d => d.ServiceType == typeof(Application.Abstractions.ITradeDecisionNotifier) && d.ImplementationType == typeof(QueuedTradeDecisionNotifier));
+    }
+
+    [Theory]
+    [InlineData(true, "bot@gmail.com", "pw", "", "toAddresses")]
+    [InlineData(true, "", "pw", "a@b.com", "username")]
+    [InlineData(true, "bot@gmail.com", null, "a@b.com", "password")]
+    [InlineData(false, "", null, "not-an-email", "toAddresses")]
+    public void Settings_validation(bool enabled, string username, string? password, string recipients, string field)
+    {
+        var input = new EmailSettingsInput(enabled, "smtp.gmail.com", 587, username, password, null, null,
+            recipients.Split(',', StringSplitOptions.RemoveEmptyEntries), true, true, false, true);
+        Assert.Contains(field, EmailSettingsStore.Validate(input, passwordStored: false).Keys);
+    }
+
+    [Fact]
+    public void Stored_password_satisfies_validation()
+    {
+        var input = new EmailSettingsInput(true, "smtp.gmail.com", 587, "bot@gmail.com", null, null, null, ["a@b.com"], true, true, false, true);
+        Assert.Empty(EmailSettingsStore.Validate(input, passwordStored: true));
+    }
+
+    private static async Task<List<NotificationKind>> Drain(TradeDecisionNotificationQueue queue)
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+        var received = new List<NotificationKind>();
         try
         {
             await foreach (var n in queue.ReadAllAsync(cts.Token))
             {
-                received.Add(n.Status);
+                received.Add(n.Kind);
             }
         }
         catch (OperationCanceledException)
         {
         }
 
-        Assert.Equal([DecisionState.RejectedByRisk, DecisionState.Executed], received);
+        return received;
     }
-
-    [Fact]
-    public async Task Dispatcher_SendsFormattedEmail()
-    {
-        var sender = new RecordingEmailSender();
-        var dispatcher = CreateDispatcher(sender, maxAttempts: 1);
-
-        await dispatcher.SendAsync(CreateNotification(DecisionState.Approved), CancellationToken.None);
-
-        var message = Assert.Single(sender.Sent);
-        Assert.StartsWith("[HVTradingBot] Approved:", message.Subject);
-    }
-
-    [Fact]
-    public async Task Dispatcher_SwallowsSendFailures()
-    {
-        var sender = new RecordingEmailSender { Fail = true };
-        var dispatcher = CreateDispatcher(sender, maxAttempts: 1);
-
-        await dispatcher.SendAsync(CreateNotification(DecisionState.Approved), CancellationToken.None);
-
-        Assert.Equal(1, sender.Attempts);
-    }
-
-    [Fact]
-    public void Registration_WhenDisabled_UsesNullNotifier()
-    {
-        using var provider = BuildProvider(new Dictionary<string, string?>
-        {
-            ["Notifications:Email:Enabled"] = "false"
-        });
-
-        Assert.IsType<NullTradeDecisionNotifier>(provider.GetRequiredService<ITradeDecisionNotifier>());
-    }
-
-    [Fact]
-    public void Registration_WhenEnabledWithoutCredentials_FailsValidation()
-    {
-        using var provider = BuildProvider(new Dictionary<string, string?>
-        {
-            ["Notifications:Email:Enabled"] = "true",
-            ["Notifications:Email:ToAddresses:0"] = "trader@example.com"
-        });
-
-        var ex = Assert.Throws<OptionsValidationException>(
-            () => provider.GetRequiredService<IOptions<EmailNotificationOptions>>().Value);
-        Assert.Contains(ex.Failures, f => f.Contains("App Password", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void Registration_WhenEnabled_UsesQueuedNotifier()
-    {
-        using var provider = BuildProvider(new Dictionary<string, string?>
-        {
-            ["Notifications:Email:Enabled"] = "true",
-            ["Notifications:Email:Username"] = "bot@gmail.com",
-            ["Notifications:Email:Password"] = "app-password",
-            ["Notifications:Email:FromAddress"] = "",
-            ["Notifications:Email:ToAddresses:0"] = "trader@example.com"
-        });
-
-        Assert.IsType<QueuedTradeDecisionNotifier>(provider.GetRequiredService<ITradeDecisionNotifier>());
-        Assert.Equal("smtp.gmail.com", provider.GetRequiredService<IOptions<EmailNotificationOptions>>().Value.SmtpHost);
-    }
-
-    private static ServiceProvider BuildProvider(Dictionary<string, string?> settings)
-    {
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddTradeDecisionNotifications(configuration);
-        return services.BuildServiceProvider();
-    }
-
-    private static EmailNotificationDispatcher CreateDispatcher(IEmailSender sender, int maxAttempts) =>
-        new(new TradeDecisionNotificationQueue(),
-            sender,
-            Options.Create(new EmailNotificationOptions { Enabled = true, MaxSendAttempts = maxAttempts }),
-            NullLogger<EmailNotificationDispatcher>.Instance);
 
     private static TradeDecisionNotification CreateNotification(DecisionState status) =>
-        new(Guid.NewGuid(), "EUR_USD", "Breakout", status, TradingMode.Paper, DecidedAt, ["Trend aligned"])
+        new(Guid.NewGuid(), "EUR/USD", "Breakout", status, TradingMode.Paper, DecidedAt, ["Trend aligned"])
         {
             Setup = new TradeSetup(Direction.Long, 1.105m, 1.100m, 1.115m),
             Score = 82,
             Broker = "Deriv (demo) DOT1"
         };
 
+    private sealed class FixedSettings(EmailSettings settings) : IEmailSettingsProvider
+    {
+        public EmailSettings Current => settings;
+
+        public Task<EmailSettings> RefreshAsync(CancellationToken cancellationToken) => Task.FromResult(settings);
+    }
+
     private sealed class RecordingEmailSender : IEmailSender
     {
-        public List<EmailMessage> Sent { get; } = [];
+        public List<(EmailMessage Message, EmailSettings Settings)> Sent { get; } = [];
         public int Attempts { get; private set; }
         public bool Fail { get; init; }
 
-        public Task SendAsync(EmailMessage message, CancellationToken cancellationToken)
+        public Task SendAsync(EmailMessage message, EmailSettings settings, CancellationToken cancellationToken)
         {
             Attempts++;
             if (Fail)
@@ -219,7 +206,7 @@ public sealed class TradeDecisionNotificationTests
                 throw new InvalidOperationException("SMTP unavailable");
             }
 
-            Sent.Add(message);
+            Sent.Add((message, settings));
             return Task.CompletedTask;
         }
     }

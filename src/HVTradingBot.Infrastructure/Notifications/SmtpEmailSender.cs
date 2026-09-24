@@ -1,24 +1,27 @@
 using HVTradingBot.Application.Abstractions;
-using HVTradingBot.Application.Configuration;
 using HVTradingBot.Application.Notifications;
 using MailKit.Net.Smtp;
 using MailKit.Security;
-using Microsoft.Extensions.Options;
 using MimeKit;
 
 namespace HVTradingBot.Infrastructure.Notifications;
 
 /// <summary>
-/// Sends email over SMTP with STARTTLS. Defaults target Gmail (smtp.gmail.com:587) using an App Password.
+/// Sends email over SMTP (STARTTLS on 587, TLS on 465). Defaults target Gmail (smtp.gmail.com:587) with an App Password.
 /// </summary>
-public sealed class SmtpEmailSender(IOptions<EmailNotificationOptions> options) : IEmailSender
+public sealed class SmtpEmailSender : IEmailSender
 {
-    public async Task SendAsync(EmailMessage message, CancellationToken cancellationToken)
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(20);
+
+    public async Task SendAsync(EmailMessage message, EmailSettings settings, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var settings = options.Value;
-        var username = settings.Username ?? throw new InvalidOperationException("Notifications:Email:Username is not configured.");
-        var password = settings.Password ?? throw new InvalidOperationException("Notifications:Email:Password is not configured.");
+        var username = settings.Username ?? throw new InvalidOperationException("SMTP username is not configured.");
+        var password = settings.Password ?? throw new InvalidOperationException("SMTP password is not configured.");
+        if (settings.ToAddresses.Count == 0)
+        {
+            throw new InvalidOperationException("No email recipients are configured.");
+        }
 
         var mime = new MimeMessage();
         mime.From.Add(new MailboxAddress(settings.FromName, settings.EffectiveFromAddress ?? username));
@@ -30,11 +33,13 @@ public sealed class SmtpEmailSender(IOptions<EmailNotificationOptions> options) 
         mime.Subject = message.Subject;
         mime.Body = new TextPart("plain") { Text = message.Body };
 
-        using var client = new SmtpClient();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(Timeout);
+        using var client = new SmtpClient { Timeout = (int)Timeout.TotalMilliseconds };
         var socketOptions = settings.SmtpPort == 465 ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTls;
-        await client.ConnectAsync(settings.SmtpHost, settings.SmtpPort, socketOptions, cancellationToken);
-        await client.AuthenticateAsync(username, password, cancellationToken);
-        await client.SendAsync(mime, cancellationToken);
-        await client.DisconnectAsync(quit: true, cancellationToken);
+        await client.ConnectAsync(settings.SmtpHost, settings.SmtpPort, socketOptions, timeout.Token);
+        await client.AuthenticateAsync(username, password, timeout.Token);
+        await client.SendAsync(mime, timeout.Token);
+        await client.DisconnectAsync(quit: true, timeout.Token);
     }
 }

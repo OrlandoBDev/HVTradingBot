@@ -38,7 +38,7 @@ public sealed class PostgresFixture : IAsyncLifetime
     {
         await using var db = await DbFactory.CreateDbContextAsync();
         await db.Database.ExecuteSqlRawAsync(
-            "TRUNCATE orders, positions, paper_accounts, broker_accounts, broker_settings, broker_connection_status, market_selection, risk_settings, system_state, audit_logs, trade_decisions;");
+            "TRUNCATE orders, positions, paper_accounts, broker_accounts, broker_settings, broker_connection_status, market_selection, risk_settings, notification_settings, system_state, audit_logs, trade_decisions;");
     }
 
     /// <summary>Settings store with an ephemeral (in-memory) Data Protection key ring.</summary>

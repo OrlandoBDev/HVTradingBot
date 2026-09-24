@@ -4,7 +4,9 @@ using HVTradingBot.Api.Services;
 using HVTradingBot.Application.Abstractions;
 using HVTradingBot.Contracts;
 using HVTradingBot.Application.Trading;
+using HVTradingBot.Application.Notifications;
 using HVTradingBot.Infrastructure.Markets;
+using HVTradingBot.Infrastructure.Notifications;
 using HVTradingBot.Infrastructure.Settings;
 
 namespace HVTradingBot.Api.Endpoints;
@@ -99,6 +101,60 @@ public static partial class SettingsEndpoints
             return Results.Ok(await RiskDtoAsync(source, queries, ct));
         });
 
+        var notifications = app.MapGroup("/api/settings/notifications");
+
+        notifications.MapGet("", async (EmailSettingsStore store, CancellationToken ct) => ToDto(await store.GetViewAsync(ct)));
+
+        notifications.MapPut("", async (NotificationSettingsRequest request, EmailSettingsStore store, IDecisionJournal journal,
+            HttpContext http, CancellationToken ct) =>
+        {
+            var input = new EmailSettingsInput(request.Enabled, request.SmtpHost ?? "", request.SmtpPort, request.Username,
+                string.IsNullOrEmpty(request.Password) ? null : request.Password, request.FromAddress, request.FromName,
+                request.ToAddresses ?? [], request.OnTradeOpened, request.OnTradeClosed, request.OnOrderRejected, request.OnKillSwitch);
+            var current = await store.GetViewAsync(ct);
+            var errors = EmailSettingsStore.Validate(input, current.Source == "database" && current.PasswordConfigured);
+            if (errors.Count > 0)
+            {
+                return Results.ValidationProblem(errors.ToDictionary(e => e.Key, e => new[] { e.Value }));
+            }
+
+            var saved = await store.SaveAsync(input, Actor(http), ct);
+            var s = saved.Settings;
+            await journal.RecordAuditAsync(Actor(http), "NotificationSettingsUpdated",
+                $"Email {(s.Enabled ? "enabled" : "disabled")}; SMTP {s.SmtpHost}:{s.SmtpPort}; user {s.Username}; password " +
+                $"{(input.Password is null ? "unchanged" : "replaced")}; recipients {string.Join(", ", s.ToAddresses)}; events " +
+                $"opened={s.OnTradeOpened} closed={s.OnTradeClosed} rejected={s.OnOrderRejected} killswitch={s.OnKillSwitch}.",
+                http.CorrelationId(), ct);
+            return Results.Ok(ToDto(saved));
+        });
+
+        notifications.MapPost("/test", async (EmailSettingsStore store, IEmailSender sender, HttpContext http, ILogger<TestEmailResult> logger,
+            CancellationToken ct) =>
+        {
+            var settings = (await store.GetViewAsync(ct)).Settings;
+            if (!settings.IsComplete)
+            {
+                return Results.Ok(new TestEmailResult(false, "Save the SMTP server, username, app password and at least one recipient first."));
+            }
+
+            var message = TradeDecisionEmailFormatter.Format(
+                new TradeDecisionNotification(Guid.NewGuid(), "-", null, Domain.Common.DecisionState.NoTrade, Domain.Common.TradingMode.Paper,
+                    DateTimeOffset.UtcNow, [$"Requested from the dashboard ({Actor(http)})."]) { Kind = NotificationKind.Test },
+                settings.SubjectPrefix);
+            try
+            {
+                await sender.SendAsync(message, settings, ct);
+                await store.RecordAttemptAsync(true, null, ct);
+                return Results.Ok(new TestEmailResult(true, $"Test email sent to {string.Join(", ", settings.ToAddresses)}."));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                logger.LogWarning(ex, "Test email failed");
+                await store.RecordAttemptAsync(false, ex.Message, ct);
+                return Results.Ok(new TestEmailResult(false, $"Sending failed: {ex.Message}"));
+            }
+        });
+
         var markets = app.MapGroup("/api/settings/markets");
 
         markets.MapGet("", async (MarketCatalogStore catalog, TradingEngineOptions engineOptions, CancellationToken ct) =>
@@ -124,6 +180,12 @@ public static partial class SettingsEndpoints
 
         return app;
     }
+
+    private static NotificationSettingsDto ToDto(EmailSettingsView v) => new(
+        v.Settings.Enabled, v.Settings.SmtpHost, v.Settings.SmtpPort, v.Settings.Username, v.PasswordConfigured, v.PasswordHint,
+        v.Settings.FromAddress, v.Settings.FromName, v.Settings.ToAddresses, v.Settings.OnTradeOpened, v.Settings.OnTradeClosed,
+        v.Settings.OnOrderRejected, v.Settings.OnKillSwitch, v.Source, v.UpdatedAtUtc, v.UpdatedBy, v.LastAttemptUtc,
+        v.LastAttemptSucceeded, v.LastError);
 
     private static async Task<RiskSettingsDto> RiskDtoAsync(RiskOptionsSource source, DashboardQueries queries, CancellationToken ct)
     {

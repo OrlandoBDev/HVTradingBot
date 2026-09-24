@@ -5,6 +5,7 @@ import { time } from "../format";
 import { Badge, Card, ErrorNote } from "./Ui";
 import { MarketSettings } from "./MarketSettings";
 import { RiskSettings } from "./RiskSettings";
+import { NotificationSettings } from "./NotificationSettings";
 import type { PageId } from "../pages";
 
 const connectionTone = (s: DerivSettings["connection"]) =>
@@ -182,7 +183,7 @@ const SECTIONS = [
   { id: "account", label: "Broker account", summary: "Connect your Deriv demo account. The token is stored encrypted and never shown again." },
   { id: "markets", label: "Markets", summary: "Pick the markets to analyse and trade. Saving restarts the trading worker." },
   { id: "risk", label: "Risk limits", summary: "How much each trade may risk and when trading stops for the day or week." },
-  { id: "notifications", label: "Notifications", summary: "Email alerts for trades and rejected orders." },
+  { id: "notifications", label: "Notifications", summary: "Email me when a trade opens or closes. The app password is stored encrypted and never shown again." },
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]["id"];
@@ -208,25 +209,5 @@ export function Settings({ section, navigate }: { section?: string; navigate: (p
         {current === "notifications" && <NotificationSettings />}
       </div>
     </div>
-  );
-}
-
-function NotificationSettings() {
-  return (
-    <Card title="Email notifications (Gmail)">
-      <p>
-        The worker can email you when an order is executed, rejected by risk, or needs approval — once per signal, never for NO_TRADE.
-        Emails are sent in the background, so a mail problem can never delay or stop trading.
-      </p>
-      <p className="hint">Enable it by adding these lines to <code>.env</code> in the project folder, then restart with <code>./run.sh</code>:</p>
-      <pre className="code-block">{`Notifications__Email__Enabled=true
-Notifications__Email__Username=you@gmail.com
-Notifications__Email__Password=<16-character Gmail App Password>
-Notifications__Email__ToAddresses__0=you@gmail.com`}</pre>
-      <p className="hint small">
-        Use a Gmail <b>App Password</b> (Google Account › Security › 2-Step Verification › App passwords), never your normal password.
-        It stays on this Mac in <code>.env</code>, which is not committed to git.
-      </p>
-    </Card>
   );
 }

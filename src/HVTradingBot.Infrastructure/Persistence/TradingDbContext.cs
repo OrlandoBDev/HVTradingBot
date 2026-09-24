@@ -14,6 +14,7 @@ public sealed class TradingDbContext(DbContextOptions<TradingDbContext> options)
     public DbSet<BrokerSettingsEntity> BrokerSettings => Set<BrokerSettingsEntity>();
     public DbSet<MarketEntity> Markets => Set<MarketEntity>();
     public DbSet<RiskSettingsEntity> RiskSettings => Set<RiskSettingsEntity>();
+    public DbSet<NotificationSettingsEntity> NotificationSettings => Set<NotificationSettingsEntity>();
     public DbSet<SetupOutcomeEntity> SetupOutcomes => Set<SetupOutcomeEntity>();
     public DbSet<MarketSelectionEntity> MarketSelection => Set<MarketSelectionEntity>();
     public DbSet<BrokerConnectionStatusEntity> BrokerConnectionStatus => Set<BrokerConnectionStatusEntity>();
@@ -86,6 +87,20 @@ public sealed class TradingDbContext(DbContextOptions<TradingDbContext> options)
             e.HasIndex(x => x.SetupId).IsUnique();
             e.HasIndex(x => new { x.Instrument, x.Status });
             e.HasIndex(x => x.ClosedAtUtc);
+        });
+
+        modelBuilder.Entity<NotificationSettingsEntity>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.SmtpHost).HasMaxLength(255);
+            e.Property(x => x.Username).HasMaxLength(320);
+            e.Property(x => x.PasswordProtected).HasMaxLength(4000);
+            e.Property(x => x.PasswordHint).HasMaxLength(8);
+            e.Property(x => x.FromAddress).HasMaxLength(320);
+            e.Property(x => x.FromName).HasMaxLength(100);
+            e.Property(x => x.ToAddresses).HasColumnType("jsonb");
+            e.Property(x => x.LastError).HasMaxLength(1000);
         });
 
         modelBuilder.Entity<RiskSettingsEntity>(e =>

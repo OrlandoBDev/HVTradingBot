@@ -128,6 +128,7 @@ export const PAGES: PageInfo[] = [
       "Broker account: your Deriv App ID and token (stored encrypted) — only demo accounts are accepted.",
       "Markets: what the engine analyses and trades. Saving restarts the worker.",
       "Risk limits: applied within seconds, within safe ranges.",
+      "Notifications: your SMTP (e.g. Gmail) settings and recipients; an email for every trade opened and closed.",
     ],
   },
 ];

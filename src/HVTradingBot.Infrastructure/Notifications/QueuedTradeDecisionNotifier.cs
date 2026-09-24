@@ -1,8 +1,6 @@
 using HVTradingBot.Application.Abstractions;
-using HVTradingBot.Application.Configuration;
 using HVTradingBot.Application.Notifications;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace HVTradingBot.Infrastructure.Notifications;
 
@@ -12,7 +10,7 @@ namespace HVTradingBot.Infrastructure.Notifications;
 /// </summary>
 public sealed class QueuedTradeDecisionNotifier(
     TradeDecisionNotificationQueue queue,
-    IOptions<EmailNotificationOptions> options,
+    IEmailSettingsProvider settings,
     ILogger<QueuedTradeDecisionNotifier> logger) : ITradeDecisionNotifier
 {
     private const int RememberedSignals = 2000;
@@ -24,7 +22,7 @@ public sealed class QueuedTradeDecisionNotifier(
     {
         ArgumentNullException.ThrowIfNull(notification);
 
-        if (!options.Value.ShouldNotify(notification.Status) || IsRepeat(notification))
+        if (!settings.Current.ShouldSend(notification.Kind) || IsRepeat(notification))
         {
             return ValueTask.CompletedTask;
         }
@@ -46,7 +44,7 @@ public sealed class QueuedTradeDecisionNotifier(
             return false;
         }
 
-        var key = $"{notification.DedupeKey}|{notification.Status}";
+        var key = $"{notification.DedupeKey}|{notification.Kind}";
         lock (_lock)
         {
             if (!_sent.Add(key))

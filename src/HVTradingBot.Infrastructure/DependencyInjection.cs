@@ -77,6 +77,7 @@ public static class DependencyInjection
 
         services.AddSingleton<IReadOnlyList<ITradingStrategy>>(_ => StrategyCatalog.CreateDefault());
         services.AddSingleton<SignalEvaluator>();
+        services.AddEmailSettings(configuration);
         services.AddSingleton<RiskSettingsStore>();
         services.AddSingleton<RiskOptionsSource>();
         services.AddSingleton<IRiskOptionsSource>(sp => sp.GetRequiredService<RiskOptionsSource>());

@@ -1,4 +1,5 @@
 using HVTradingBot.Application.Abstractions;
+using HVTradingBot.Application.Notifications;
 using HVTradingBot.Application.Trading;
 using HVTradingBot.Infrastructure.Brokers.Deriv;
 using HVTradingBot.Infrastructure.MarketData;
@@ -23,6 +24,9 @@ public sealed class BrokerSettingsWatcher(
     IDecisionJournal journal,
     IMarketSnapshotSink snapshots,
     RiskOptionsSource riskSource,
+    IEmailSettingsProvider emailSettings,
+    ITradeDecisionNotifier notifier,
+    TradingEngineOptions engineOptions,
     IHostApplicationLifetime lifetime,
     ILogger<BrokerSettingsWatcher> logger) : BackgroundService
 {
@@ -31,6 +35,7 @@ public sealed class BrokerSettingsWatcher(
 
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(5);
     private DateTime _lastCatalogRefresh = DateTime.UtcNow;
+    private bool? _killSwitchActive;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -70,6 +75,8 @@ public sealed class BrokerSettingsWatcher(
             try
             {
                 await riskSource.RefreshAsync(stoppingToken); // applies risk limits changed on the Settings page
+                await emailSettings.RefreshAsync(stoppingToken); // applies email settings changed on the Settings page
+                await NotifyKillSwitchChangesAsync(stoppingToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -109,6 +116,28 @@ public sealed class BrokerSettingsWatcher(
                 logger.LogWarning(ex, "Broker settings check failed");
             }
         }
+    }
+
+    /// <summary>Emails when the kill switch turns on or off, whether it was switched from the dashboard or by the engine.</summary>
+    private async Task NotifyKillSwitchChangesAsync(CancellationToken cancellationToken)
+    {
+        var state = await stateStore.GetAsync(cancellationToken);
+        if (_killSwitchActive is { } previous && previous != state.KillSwitchActive)
+        {
+            var descriptor = broker.Descriptor;
+            await notifier.NotifyAsync(new TradeDecisionNotification(
+                Guid.NewGuid(), "-", null, Domain.Common.DecisionState.NoTrade, engineOptions.Mode,
+                new DateTimeOffset(state.KillSwitchChangedUtc ?? DateTime.UtcNow, TimeSpan.Zero),
+                string.IsNullOrWhiteSpace(state.KillSwitchReason) ? [] : [state.KillSwitchReason])
+            {
+                Kind = NotificationKind.KillSwitch,
+                KillSwitchActive = state.KillSwitchActive,
+                Broker = $"{descriptor.Name}{(descriptor.IsDemo ? " (demo)" : "")} {descriptor.AccountId}".Trim(),
+                DedupeKey = $"killswitch-{state.KillSwitchChangedUtc:O}-{state.KillSwitchActive}"
+            }, cancellationToken);
+        }
+
+        _killSwitchActive = state.KillSwitchActive;
     }
 
     /// <summary>

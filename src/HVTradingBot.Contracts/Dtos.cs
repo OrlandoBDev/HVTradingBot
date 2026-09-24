@@ -173,3 +173,42 @@ public sealed record RiskSettingsDto(
     string? UpdatedBy,
     decimal Balance,
     string Currency);
+
+/// <summary>Email settings as shown on the Settings page. The SMTP password is never returned.</summary>
+public sealed record NotificationSettingsDto(
+    bool Enabled,
+    string SmtpHost,
+    int SmtpPort,
+    string? Username,
+    bool PasswordConfigured,
+    string? PasswordHint,
+    string? FromAddress,
+    string FromName,
+    IReadOnlyList<string> ToAddresses,
+    bool OnTradeOpened,
+    bool OnTradeClosed,
+    bool OnOrderRejected,
+    bool OnKillSwitch,
+    string Source,
+    DateTime? UpdatedAtUtc,
+    string? UpdatedBy,
+    DateTime? LastAttemptUtc,
+    bool? LastAttemptSucceeded,
+    string? LastError);
+
+/// <summary>Leave <see cref="Password"/> null or empty to keep the stored password.</summary>
+public sealed record NotificationSettingsRequest(
+    bool Enabled,
+    string SmtpHost,
+    int SmtpPort,
+    string? Username,
+    string? Password,
+    string? FromAddress,
+    string? FromName,
+    IReadOnlyList<string>? ToAddresses,
+    bool OnTradeOpened,
+    bool OnTradeClosed,
+    bool OnOrderRejected,
+    bool OnKillSwitch);
+
+public sealed record TestEmailResult(bool Sent, string Message);

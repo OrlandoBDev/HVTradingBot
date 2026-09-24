@@ -251,6 +251,32 @@ public sealed class TradingEngine
                     closed.Position.ClientOrderId, instrument.Symbol, closed.Reason, closed.ExitPrice, closed.RealizedPnl, closed.RMultiple);
 
                 await _state.UpdateAsync(s => s.WithClosedTrade(closed.RealizedPnl, marketTime, _risk.Current), cancellationToken);
+                if (_notifier is not null)
+                {
+                    var broker = _broker.Descriptor;
+                    var position = closed.Position;
+                    await _notifier.NotifyAsync(new TradeDecisionNotification(
+                        position.Id,
+                        instrument.DisplayName,
+                        position.Strategy,
+                        DecisionState.Executed,
+                        _options.Mode,
+                        new DateTimeOffset(closed.ClosedAtUtc, TimeSpan.Zero),
+                        [])
+                    {
+                        Kind = NotificationKind.TradeClosed,
+                        Direction = position.Direction,
+                        EntryPrice = position.EntryPrice,
+                        ExitPrice = closed.ExitPrice,
+                        ExitReason = closed.Reason.ToString(),
+                        RealizedPnl = closed.RealizedPnl,
+                        RMultiple = closed.RMultiple,
+                        Currency = _options.AccountCurrency,
+                        Quantity = position.Units,
+                        Broker = $"{broker.Name}{(broker.IsDemo ? " (demo)" : "")} {broker.AccountId}".Trim(),
+                        DedupeKey = $"closed-{position.ClientOrderId}"
+                    }, cancellationToken);
+                }
                 await _journal.RecordAuditAsync(SystemActor, "PositionClosed",
                     $"{closed.Position.ClientOrderId} {closed.Reason} exit {closed.ExitPrice} P&L {closed.RealizedPnl:F2} R {closed.RMultiple}",
                     correlationId, cancellationToken);
@@ -391,7 +417,7 @@ public sealed class TradingEngine
             clientOrderId,
             order), cancellationToken);
 
-        if (_notifier is not null)
+        if (_notifier is not null && state is DecisionState.Executed or DecisionState.RejectedByRisk or DecisionState.ApprovalRequired or DecisionState.Approved)
         {
             var broker = _broker.Descriptor;
             // Queued and sent in the background: notification delays or failures never affect trading.

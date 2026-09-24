@@ -256,3 +256,28 @@ public sealed class RiskSettingsEntity
     public DateTime UpdatedAtUtc { get; set; }
     public string? UpdatedBy { get; set; }
 }
+
+/// <summary>Email notification settings from the Settings page. The SMTP password is encrypted (Data Protection).</summary>
+public sealed class NotificationSettingsEntity
+{
+    public int Id { get; set; }
+    public bool Enabled { get; set; }
+    public required string SmtpHost { get; set; }
+    public int SmtpPort { get; set; }
+    public string? Username { get; set; }
+    public string? PasswordProtected { get; set; }
+    public string? PasswordHint { get; set; }
+    public string? FromAddress { get; set; }
+    public required string FromName { get; set; }
+    public required string ToAddresses { get; set; }
+    public bool OnTradeOpened { get; set; }
+    public bool OnTradeClosed { get; set; }
+    public bool OnOrderRejected { get; set; }
+    public bool OnKillSwitch { get; set; }
+    public int Version { get; set; }
+    public DateTime UpdatedAtUtc { get; set; }
+    public string? UpdatedBy { get; set; }
+    public DateTime? LastAttemptUtc { get; set; }
+    public bool? LastAttemptSucceeded { get; set; }
+    public string? LastError { get; set; }
+}

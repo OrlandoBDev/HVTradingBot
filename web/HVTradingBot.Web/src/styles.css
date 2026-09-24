@@ -255,3 +255,13 @@ input:focus, select:focus { outline: 2px solid color-mix(in srgb, var(--accent) 
   .brand-name { display: none; }
   .search { min-width: 0; width: 100%; }
 }
+
+textarea { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font: inherit; width: 100%; resize: vertical; }
+.field-block { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; }
+.event-list { display: flex; flex-direction: column; gap: 8px; }
+.event-option { display: flex; gap: 10px; align-items: baseline; cursor: pointer; }
+.switch { display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600; }
+.switch input { appearance: none; width: 36px; height: 20px; border-radius: 999px; background: var(--border); position: relative; cursor: pointer; padding: 0; border: none; transition: background 0.15s; }
+.switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: white; transition: transform 0.15s; }
+.switch input:checked { background: var(--good); }
+.switch input:checked::after { transform: translateX(16px); }
