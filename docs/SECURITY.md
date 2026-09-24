@@ -12,9 +12,16 @@ Never commit:
 
 Use:
 
+- the dashboard Settings page for broker credentials (stored encrypted with ASP.NET Core Data Protection;
+  keys kept outside the database; the token is never returned by the API)
 - environment variables
 - .NET User Secrets for development
 - production secret manager / Azure Key Vault
+
+## Current Limitations
+
+- JWT authentication and roles below are not implemented yet. The API binds to 127.0.0.1, restricts allowed host
+  names, and accepts JSON bodies only (blocking cross-site form posts), but any local process can call it.
 
 ## Authentication
 
@@ -72,3 +79,12 @@ Audit:
 - position changes
 
 Never write secrets to logs.
+
+## Email Notifications (Gmail SMTP)
+
+Trade decision emails are sent through `smtp.gmail.com:587` (STARTTLS).
+
+- Use a Gmail **App Password** (requires 2-Step Verification), never the account password.
+- Enter it under Settings → Notifications (stored encrypted with Data Protection, never returned by the API), or supply
+  it via `Notifications__Email__Password` (environment) as a fallback; never commit it.
+- Notifications are informational only and cannot approve, reject, or execute trades.

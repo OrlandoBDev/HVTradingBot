@@ -1,0 +1,69 @@
+# Full stack: PostgreSQL (all app data, incl. Settings) + API (serves the dashboard) + trading worker.
+#   ./run.sh docker     (creates .env with a random DB password, then `docker compose up --build`)
+# For local development, ./run.sh starts only the `postgres` service and runs .NET natively.
+name: hvtradingbot
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set in .env}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: src/HVTradingBot.Api/Dockerfile
+    environment:
+      ConnectionStrings__TradingDb: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      Urls: http://0.0.0.0:8080
+      Broker__Provider: ${BROKER_PROVIDER:-Deriv}
+      DataProtection__KeysPath: /keys
+    volumes:
+      - dpkeys:/keys
+    ports:
+      - "127.0.0.1:${API_PORT:-5080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: src/HVTradingBot.Worker/Dockerfile
+    environment:
+      ConnectionStrings__TradingDb: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      Broker__Provider: ${BROKER_PROVIDER:-Deriv}
+      MarketData__Provider: ${MARKET_DATA_PROVIDER:-Deriv}
+      # Secrets come from .env; only the worker talks to the broker.
+      Deriv__AppId: ${DERIV_APP_ID:-}
+      Deriv__ApiToken: ${DERIV_API_TOKEN:-}
+      Deriv__AccountId: ${DERIV_ACCOUNT_ID:-}
+      DataProtection__KeysPath: /keys
+      Notifications__Email__Enabled: ${Notifications__Email__Enabled:-false}
+      Notifications__Email__Username: ${Notifications__Email__Username:-}
+      Notifications__Email__Password: ${Notifications__Email__Password:-}
+      Notifications__Email__ToAddresses__0: ${Notifications__Email__ToAddresses__0:-}
+    volumes:
+      # Encryption keys for the Deriv token stored in PostgreSQL; shared with the API, kept outside the database.
+      - dpkeys:/keys
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  dpkeys:

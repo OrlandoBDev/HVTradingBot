@@ -1,0 +1,90 @@
+using System.Text.Json.Serialization;
+using HVTradingBot.Api.Endpoints;
+using HVTradingBot.Api.Hubs;
+using HVTradingBot.Api.Infrastructure;
+using HVTradingBot.Api.Services;
+using HVTradingBot.Infrastructure;
+using HVTradingBot.Infrastructure.Configuration;
+using HVTradingBot.Infrastructure.Observability;
+using HVTradingBot.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
+using Serilog;
+
+const string serviceName = "HVTradingBot.Api";
+Log.Logger = new LoggerConfiguration().WriteTo.Console().CreateBootstrapLogger();
+
+try
+{
+    var builder = WebApplication.CreateBuilder(args);
+    builder.Configuration.AddSharedTradingConfiguration(builder.Environment.EnvironmentName);
+
+    builder.Services.AddSerilog((_, logger) => logger.ConfigureHvLogging(builder.Configuration, serviceName));
+    builder.Services.AddHvTelemetry(builder.Configuration, serviceName,
+        tracing: t => t.AddAspNetCoreInstrumentation(),
+        metrics: m => m.AddAspNetCoreInstrumentation());
+
+    builder.Services.AddTradingCore(builder.Configuration);
+    builder.Services.AddSingleton<DashboardQueries>();
+    builder.Services.AddSingleton<BacktestService>();
+    builder.Services.AddHostedService<DashboardBroadcaster>();
+    builder.Services.AddHostedService<MarketCatalogLoader>();
+    builder.Services.AddProblemDetails();
+    builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+    builder.Services.AddSignalR().AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+    builder.Services.AddHealthChecks()
+        .AddDbContextCheck<TradingDbContext>("database", tags: ["ready"])
+        .AddCheck<WorkerHealthCheck>("trading-worker", tags: ["ready"]);
+
+    var app = builder.Build();
+
+    if (app.Configuration.GetValue("Database:ApplyMigrationsOnStartup", true))
+    {
+        await app.Services.MigrateDatabaseAsync(CancellationToken.None);
+    }
+
+    app.UseMiddleware<CorrelationIdMiddleware>();
+    app.UseSerilogRequestLogging(o => o.GetLevel = (ctx, _, ex) =>
+        ex is not null || ctx.Response.StatusCode >= 500 ? Serilog.Events.LogEventLevel.Error
+        : ctx.Request.Path.StartsWithSegments("/api") ? Serilog.Events.LogEventLevel.Debug
+        : Serilog.Events.LogEventLevel.Verbose);
+    app.UseExceptionHandler();
+    app.UseStatusCodePages();
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+
+    app.MapTradingEndpoints();
+    app.MapSettingsEndpoints();
+    app.MapHub<DashboardHub>(DashboardHub.Path);
+    app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
+    app.MapHealthChecks("/health/ready", new HealthCheckOptions
+    {
+        Predicate = c => c.Tags.Contains("ready"),
+        ResponseWriter = async (ctx, report) =>
+        {
+            ctx.Response.ContentType = "application/json";
+            await ctx.Response.WriteAsJsonAsync(new
+            {
+                status = report.Status.ToString(),
+                checks = report.Entries.Select(e => new { name = e.Key, status = e.Value.Status.ToString(), e.Value.Description })
+            });
+        }
+    });
+    app.MapFallbackToFile("index.html");
+
+    await app.RunAsync();
+    return 0;
+}
+catch (Exception ex) when (ex is not HostAbortedException)
+{
+    Log.Fatal(ex, "{Service} terminated unexpectedly", serviceName);
+    return 1;
+}
+finally
+{
+    await Log.CloseAndFlushAsync();
+}
+
+/// <summary>Exposed for integration tests.</summary>
+public partial class Program;
