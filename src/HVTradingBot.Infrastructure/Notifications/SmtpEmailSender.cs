@@ -33,7 +33,8 @@ public sealed class SmtpEmailSender : IEmailSender
         }
 
         mime.Subject = message.Subject;
-        mime.Body = new TextPart("plain") { Text = message.Body };
+        // multipart/alternative: mail apps show the HTML version and fall back to plain text.
+        mime.Body = new BodyBuilder { TextBody = message.Body, HtmlBody = message.HtmlBody }.ToMessageBody();
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(Timeout);

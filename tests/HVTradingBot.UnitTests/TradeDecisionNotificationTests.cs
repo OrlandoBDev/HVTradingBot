@@ -53,6 +53,35 @@ public sealed class TradeDecisionNotificationTests
     }
 
     [Fact]
+    public void Emails_have_an_html_version_with_escaped_content()
+    {
+        var notification = CreateNotification(DecisionState.Executed) with { Reasons = ["<script>alert(1)</script> & more"], Quantity = 41500m };
+
+        var html = TradeDecisionEmailFormatter.Format(notification, "[HV]").HtmlBody!;
+
+        Assert.Contains("BUY EUR/USD @ 1.105", html);
+        Assert.Contains("1.100", html);            // stop padded to the same decimals as the entry
+        Assert.Contains("41,500 units", html);
+        Assert.Contains("&lt;script&gt;alert(1)&lt;/script&gt; &amp; more", html);
+        Assert.DoesNotContain("<script>", html);
+    }
+
+    [Fact]
+    public void Closed_trade_html_uses_loss_colours_and_readable_labels()
+    {
+        var html = TradeDecisionEmailFormatter.Format(CreateNotification(DecisionState.Executed) with
+        {
+            Kind = NotificationKind.TradeClosed, Setup = null, Direction = Direction.Long, EntryPrice = 1.105m, ExitPrice = 1.1m,
+            ExitReason = "StopLoss", RealizedPnl = -50m, RMultiple = -1m, Currency = "USD"
+        }, "[HV]").HtmlBody!;
+
+        var text = System.Net.WebUtility.HtmlDecode(html); // non-ASCII such as "·" is written as an entity
+        Assert.Contains("EUR/USD · Stop loss", text);
+        Assert.Contains("Trade closed · loss", text);
+        Assert.Contains("#dc2626", html);
+    }
+
+    [Fact]
     public void Kill_switch_email_explains_the_state()
     {
         var message = TradeDecisionEmailFormatter.Format(

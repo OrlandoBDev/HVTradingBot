@@ -63,7 +63,8 @@ public static class TradeDecisionEmailFormatter
 
         body.AppendLine();
         body.AppendLine("Sent by HVTradingBot. Notifications are informational only and cannot approve or execute trades.");
-        return new EmailMessage(subject, body.ToString());
+        var html = TradeEmailTemplate.Render(notification);
+        return new EmailMessage(subject, body.ToString(), html);
     }
 
     private static string Subject(TradeDecisionNotification n)
