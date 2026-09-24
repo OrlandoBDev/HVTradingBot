@@ -46,6 +46,9 @@ Set `BROKER_PROVIDER=Paper` in `.env` to trade on real Deriv prices with local s
 - **Execution:** Deriv demo account (multiplier contracts with broker-side stop loss / take profit, idempotent
   submission, unknown-state reconciliation) or local paper broker.
 - **Journal:** every decision incl. NO_TRADE, orders, positions (R, MAE, MFE), audit log.
+- **Email notifications (optional):** Gmail SMTP emails for decisions that reach the broker (rejected, executed…),
+  one per signal and status, sent in the background so they never delay trading. Enable with the
+  `Notifications__Email__*` variables in `.env` (Gmail App Password; see docs/SECURITY.md).
 - **Backtesting:** same engine code, spread/slippage/commission, reproducible synthetic or stored real data.
 - **Dashboard:** status, markets, decisions, positions, history, risk, performance, learning, backtest, audit,
   settings; live updates over SignalR.

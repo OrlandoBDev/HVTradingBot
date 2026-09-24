@@ -13,6 +13,7 @@ using HVTradingBot.Infrastructure.Brokers;
 using HVTradingBot.Infrastructure.Brokers.Deriv;
 using HVTradingBot.Infrastructure.Configuration;
 using HVTradingBot.Infrastructure.MarketData;
+using HVTradingBot.Infrastructure.Notifications;
 using HVTradingBot.Infrastructure.Markets;
 using HVTradingBot.Infrastructure.Persistence;
 using HVTradingBot.Infrastructure.Persistence.Stores;
@@ -124,6 +125,8 @@ public static class DependencyInjection
         }
 
         services.AddSingleton<ExecutionService>();
+        // Email notifications (Notifications:Email, off by default) are sent by the worker, which makes the decisions.
+        services.AddTradeDecisionNotifications(configuration);
         services.AddSingleton<TradingEngine>();
         return services;
     }

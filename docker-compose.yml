@@ -52,6 +52,10 @@ services:
       Deriv__ApiToken: ${DERIV_API_TOKEN:-}
       Deriv__AccountId: ${DERIV_ACCOUNT_ID:-}
       DataProtection__KeysPath: /keys
+      Notifications__Email__Enabled: ${Notifications__Email__Enabled:-false}
+      Notifications__Email__Username: ${Notifications__Email__Username:-}
+      Notifications__Email__Password: ${Notifications__Email__Password:-}
+      Notifications__Email__ToAddresses__0: ${Notifications__Email__ToAddresses__0:-}
     volumes:
       # Encryption keys for the Deriv token stored in PostgreSQL; shared with the API, kept outside the database.
       - dpkeys:/keys

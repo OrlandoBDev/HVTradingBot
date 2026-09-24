@@ -3,6 +3,7 @@ using System.Diagnostics.Metrics;
 using Instrument = HVTradingBot.Domain.MarketData.Instrument;
 using HVTradingBot.Application.Abstractions;
 using HVTradingBot.Application.Learning;
+using HVTradingBot.Application.Notifications;
 using HVTradingBot.Domain.Analysis;
 using HVTradingBot.Domain.Common;
 using HVTradingBot.Domain.Decisions;
@@ -46,6 +47,7 @@ public sealed class TradingEngine
     private readonly IRiskOptionsSource _risk;
     private readonly RegimeOptions _regimeOptions;
     private readonly ILogger<TradingEngine> _logger;
+    private readonly ITradeDecisionNotifier? _notifier;
 
     public TradingEngine(
         SignalEvaluator evaluator,
@@ -61,7 +63,8 @@ public sealed class TradingEngine
         TradingEngineOptions options,
         IRiskOptionsSource risk,
         RegimeOptions regimeOptions,
-        ILogger<TradingEngine> logger)
+        ILogger<TradingEngine> logger,
+        ITradeDecisionNotifier? notifier = null)
     {
         _evaluator = evaluator;
         _riskManager = riskManager;
@@ -77,6 +80,7 @@ public sealed class TradingEngine
         _risk = risk;
         _regimeOptions = regimeOptions;
         _logger = logger;
+        _notifier = notifier;
     }
 
     public IReadOnlyCollection<Instrument> TradedInstruments => _series.Keys;
@@ -386,6 +390,29 @@ public sealed class TradingEngine
             reasons,
             clientOrderId,
             order), cancellationToken);
+
+        if (_notifier is not null)
+        {
+            var broker = _broker.Descriptor;
+            // Queued and sent in the background: notification delays or failures never affect trading.
+            await _notifier.NotifyAsync(new TradeDecisionNotification(
+                decisionId,
+                instrument.DisplayName,
+                signal.Best?.Result.Strategy,
+                state,
+                _options.Mode,
+                new DateTimeOffset(context.AsOfUtc, TimeSpan.Zero),
+                reasons)
+            {
+                Setup = signal.Best?.Setup,
+                Score = signal.Best?.Score.Total,
+                Regime = context.Regime.ToString(),
+                Quantity = risk?.Units is > 0 ? risk.Units : null,
+                BrokerOrderId = order?.OrderId?.ToString(),
+                Broker = $"{broker.Name}{(broker.IsDemo ? " (demo)" : "")} {broker.AccountId}".Trim(),
+                DedupeKey = clientOrderId ?? $"{instrument.Symbol}|{signal.Best?.Result.Strategy}|{series.Closed(TimeFrame.H1)[^1].CloseTimeUtc:O}"
+            }, cancellationToken);
+        }
     }
 
     public async Task<PortfolioState> BuildPortfolioAsync(MarketDataStatus dataStatus, CancellationToken cancellationToken)
