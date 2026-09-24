@@ -1,0 +1,9 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/logs/
+src/HVTradingBot.Api/wwwroot/
+.env
+.git
+.run
+tests/

@@ -1,0 +1,88 @@
+{
+  "Trading": {
+    "Mode": "Paper",
+    "Instruments": [
+      "EUR/USD",
+      "GBP/USD",
+      "USD/JPY",
+      "AUD/USD",
+      "USD/CAD"
+    ],
+    "AccountCurrency": "USD",
+    "StartingBalance": 100000,
+    "MinPrimaryBars": 120,
+    "MinStructuralBars": 60,
+    "EvaluationTimeFrame": "M5"
+  },
+  "Risk": {
+    "MaxRiskPerTradePercent": 0.5,
+    "MaxDailyLossPercent": 2,
+    "MaxWeeklyLossPercent": 5,
+    "MaxOpenPositions": 3,
+    "MinRewardToRisk": 2,
+    "MaxSpreadPips": 3,
+    "MaxSpreadToAverageMultiple": 2.5,
+    "MaxSlippagePips": 1.5,
+    "MaxCurrencyExposure": 2,
+    "MaxConsecutiveLosses": 3,
+    "CooldownMinutes": 240,
+    "MaxMarketDataAgeSeconds": 30,
+    "MinUnits": 1,
+    "UnitStep": 1,
+    "MaxUnits": 1000000,
+    "KillSwitchOnDailyLossBreach": true,
+    "KillSwitchOnStaleData": false
+  },
+  "Scoring": {
+    "ObserveThreshold": 60,
+    "CandidateThreshold": 75,
+    "HighQualityThreshold": 85,
+    "AbnormalSpreadMultiple": 2.5
+  },
+  "Regime": {
+    "TrendAdxThreshold": 23,
+    "RangeAdxThreshold": 20,
+    "HighVolatilityPercentile": 0.9,
+    "ExtremeVolatilityPercentile": 0.98,
+    "LowVolatilityPercentile": 0.1
+  },
+  "ExecutionCosts": {
+    "SlippagePips": 0.2,
+    "CommissionPer100K": 10.65
+  },
+  "MarketData": {
+    "Provider": "Deriv",
+    "WarmupDays": 45,
+    "Simulated": {
+      "Seed": 20260924,
+      "BarIntervalMilliseconds": 2000,
+      "WarmupDays": 45
+    },
+    "CatalogRefreshHours": 24
+  },
+  "Broker": {
+    "Provider": "Deriv"
+  },
+  "Deriv": {
+    "RestBaseUrl": "https://api.derivws.com",
+    "PublicWebSocketUrl": "wss://api.derivws.com/trading/v1/options/ws/public",
+    "AccountType": "Demo",
+    "MinStake": 1,
+    "MaxStake": 500,
+    "CommissionRate": 0.000213,
+    "StopPriceTolerance": 0.25,
+    "MaxCommissionShareOfRisk": 0.25,
+    "RequestTimeoutSeconds": 15
+  },
+  "Learning": {
+    "Enabled": true,
+    "PriorStrength": 20,
+    "PointsPerR": 20,
+    "MaxBoost": 8,
+    "MaxPenalty": 15,
+    "DisableAfterSamples": 30,
+    "DisableBelowR": -0.15,
+    "LookbackDays": 90,
+    "ExpireAfterHours": 72
+  }
+}

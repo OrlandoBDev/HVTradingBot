@@ -1,0 +1,33 @@
+using HVTradingBot.Infrastructure;
+using HVTradingBot.Infrastructure.Configuration;
+using HVTradingBot.Infrastructure.Observability;
+using HVTradingBot.Worker;
+using Serilog;
+
+const string serviceName = "HVTradingBot.Worker";
+Log.Logger = new LoggerConfiguration().WriteTo.Console().CreateBootstrapLogger();
+
+try
+{
+    var builder = Host.CreateApplicationBuilder(args);
+    builder.Configuration.AddSharedTradingConfiguration(builder.Environment.EnvironmentName);
+
+    builder.Services.AddSerilog((_, logger) => logger.ConfigureHvLogging(builder.Configuration, serviceName));
+    builder.Services.AddHvTelemetry(builder.Configuration, serviceName);
+    builder.Services.AddTradingCore(builder.Configuration).AddLiveTrading(builder.Configuration);
+    builder.Services.AddHostedService<TradingWorker>();
+    builder.Services.AddHostedService<BrokerSettingsWatcher>();
+
+    await builder.Build().RunAsync();
+    // BrokerSettingsWatcher sets exit code 3 to ask run.sh / Docker for a restart (market selection changed).
+    return Environment.ExitCode;
+}
+catch (Exception ex) when (ex is not HostAbortedException)
+{
+    Log.Fatal(ex, "{Service} terminated unexpectedly", serviceName);
+    return 1;
+}
+finally
+{
+    await Log.CloseAndFlushAsync();
+}

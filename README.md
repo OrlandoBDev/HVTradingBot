@@ -10,6 +10,44 @@ The default decision is **NO_TRADE** unless multiple independent signals, market
 
 AI/LLM components are advisory only and must never bypass deterministic risk controls.
 
+## Quick Start (macOS)
+
+Requirements: Docker Desktop, .NET 10 SDK, Node.js 22 (`brew install --cask dotnet-sdk docker && brew install node@22`).
+
+```bash
+./run.sh          # PostgreSQL in Docker, API + worker natively -> http://localhost:5080
+./run.sh docker   # everything in Docker
+./run.sh test     # all automated tests (integration tests need Docker)
+./run.sh stop     # stop PostgreSQL
+./run.sh reset    # delete the local database (all trading history)
+```
+
+Then open the dashboard, go to **Settings** and enter your Deriv App ID and Personal Access Token
+(from [developers.deriv.com](https://developers.deriv.com)). Only **demo** accounts are accepted.
+Choose markets under **Settings → Markets**.
+
+Set `BROKER_PROVIDER=Paper` in `.env` to trade on real Deriv prices with local simulated fills, and additionally
+`MARKET_DATA_PROVIDER=Simulated` to run fully offline.
+
+## What Is Implemented
+
+- **Market data:** real prices from Deriv's public API (5-minute candles, live ticks); offline synthetic feed.
+- **Markets:** Deriv catalog — Forex majors, Derived/synthetic indices, metals, crypto (tradable via multiplier
+  contracts) and stock indices (analysis only; no multiplier contracts via the API).
+- **Analysis:** EMA 9/20/50/200, RSI, MACD, ATR, ADX, Bollinger, ROC; market structure; regimes.
+- **Strategies:** Trend Following, Breakout + Retest, Momentum, Mean Reversion, Volatility Expansion.
+- **Evaluation:** every market at every 5-minute close; setups from closed 1H/4H/Daily bars; 15-minute timing.
+- **Scoring:** 0–100 per `docs/TRADING_ENGINE.md`, abstention rules, configurable thresholds.
+- **Adaptive learning:** every setup is tracked as a virtual trade; bounded score adjustments and disabling of
+  persistently losing strategy/regime/asset-class combinations (never changes size or risk limits).
+- **Risk engine:** all rules in `docs/RISK_MANAGEMENT.md`, checked at proposal and again before execution, kill switch.
+- **Execution:** Deriv demo account (multiplier contracts with broker-side stop loss / take profit, idempotent
+  submission, unknown-state reconciliation) or local paper broker.
+- **Journal:** every decision incl. NO_TRADE, orders, positions (R, MAE, MFE), audit log.
+- **Backtesting:** same engine code, spread/slippage/commission, reproducible synthetic or stored real data.
+- **Dashboard:** status, markets, decisions, positions, history, risk, performance, learning, backtest, audit,
+  settings; live updates over SignalR.
+
 ## Initial Scope
 
 The MVP focuses on:
@@ -78,7 +116,7 @@ See the `docs/` folder:
 - PAPER mode is always the default.
 - No AI component can place an order directly.
 - Every trade must pass deterministic risk validation.
-- Broker credentials must never be committed.
+- Broker credentials must never be committed (Deriv token is stored encrypted in PostgreSQL via the Settings page).
 - Backtests must include spread, fees, and slippage assumptions.
 - Live broker state is authoritative for open positions.
 - Duplicate execution must be prevented with idempotency.
@@ -88,6 +126,11 @@ See the `docs/` folder:
 
 ## Status
 
-Project foundation / pre-MVP.
+MVP running against a Deriv **demo** account (see ADR-008). Real-money trading, approval mode, authentication and
+Interactive Brokers remain on the roadmap.
 
-The first milestone is a complete Forex paper-trading loop with market scanning, signal generation, risk validation, simulated execution, journaling, and performance analysis.
+Known gaps:
+
+- No user authentication yet (docs/SECURITY.md); the API listens on localhost only.
+- Redis and RabbitMQ are not used yet; the modular monolith does not need them at this stage.
+- Learning starts empty and needs weeks of setups before its adjustments carry weight.

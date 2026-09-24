@@ -21,11 +21,24 @@ Responsibilities:
 - P&L
 - rejection scenarios
 
+### Deriv (implemented, demo only)
+
+See ADR-008. Implementation: `src/HVTradingBot.Infrastructure/Brokers/Deriv`.
+
+- Authentication: Personal Access Token + App ID (`Authorization: Bearer`, `Deriv-App-ID`) against
+  `https://api.derivws.com`; `GET /trading/v1/options/accounts`, then `POST .../accounts/{id}/otp` for a single-use
+  WebSocket URL (`wss://api.derivws.com/trading/v1/options/ws/demo`).
+- Market data: public WebSocket (`.../ws/public`, no auth): `active_symbols`, `contracts_for`, `ticks_history`
+  (5-minute candles), `ticks` (bid/ask).
+- Orders: `proposal` without limits (commission quote) → stop/target amounts → `proposal` with `limit_order` →
+  broker stop level checked against the strategy stop → `buy`.
+- Reconciliation: `portfolio` + `proposal_open_contract` for closed contracts; contracts opened outside the app count
+  toward exposure limits.
+- Credentials are entered on the dashboard Settings page (encrypted in PostgreSQL); environment variables are a fallback.
+
 ### OANDA
 
-Initial Forex broker adapter candidate.
-
-Keep all OANDA-specific SDK/HTTP models in Infrastructure.
+Former initial candidate; superseded by Deriv (ADR-008). Keep any OANDA-specific models in Infrastructure.
 
 ## Later Broker
 
