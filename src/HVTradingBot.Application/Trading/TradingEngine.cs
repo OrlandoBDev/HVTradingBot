@@ -264,7 +264,8 @@ public sealed class TradingEngine
                     "Position {ClientOrderId} {Instrument} closed by {Reason} at {ExitPrice}: P&L {Pnl} ({R}R)",
                     closed.Position.ClientOrderId, instrument.Symbol, closed.Reason, closed.ExitPrice, closed.RealizedPnl, closed.RMultiple);
 
-                await _state.UpdateAsync(s => s.WithClosedTrade(closed.RealizedPnl, marketTime, _risk.Current), cancellationToken);
+                await _state.UpdateAsync(s => s.WithClosedTrade(closed.RealizedPnl, marketTime, _risk.Current, RiskOptions.IsDerived(instrument)),
+                    cancellationToken);
                 if (_notifier is not null)
                 {
                     var broker = _broker.Descriptor;
@@ -480,25 +481,39 @@ public sealed class TradingEngine
             dataStatus,
             marketTime,
             _clock.UtcNow,
-            converter);
+            converter)
+        {
+            DerivedDailyRealizedPnl = state.PnlDay == DateOnly.FromDateTime(marketTime) ? state.DerivedDailyRealizedPnl : 0
+        };
     }
 
+    /// <summary>
+    /// Publishes price, regime and indicators for the dashboard. Regime and indicators come from the market's own bars on
+    /// every update, so they are shown even for markets that are not being evaluated (e.g. Derived while Forex is open)
+    /// and immediately after a restart. The last decision is shown only once the market has been evaluated.
+    /// </summary>
     private async Task PublishSnapshotAsync(Instrument instrument, CancellationToken cancellationToken)
     {
-        if (!_quotes.TryGetValue(instrument, out var quote))
+        if (!_quotes.TryGetValue(instrument, out var quote) || !_series.TryGetValue(instrument, out var series))
         {
             return;
         }
 
+        var primary = series.Indicators(TimeFrame.H1);
+        var structural = series.Indicators(TimeFrame.H4);
+        MarketRegime? regime = primary is not null && structural is not null
+            ? RegimeClassifier.Classify(structural, primary, _regimeOptions)
+            : null;
         var last = _lastEvaluation.TryGetValue(instrument, out var e) ? e : default;
+
         await _snapshots.PublishAsync(new MarketSnapshot(
             instrument.Symbol,
             quote.TimestampUtc,
             quote.Bid,
             quote.Ask,
             Math.Round(instrument.ToPips(quote.Spread), 2),
-            last.Primary is null ? null : last.Regime,
-            last.Primary,
+            regime,
+            primary,
             last.Primary is null ? null : last.State,
             last.Primary is null ? null : last.Time), cancellationToken);
     }

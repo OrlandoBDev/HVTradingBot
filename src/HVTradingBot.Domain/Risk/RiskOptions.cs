@@ -26,6 +26,21 @@ public sealed class RiskOptions
     /// <summary>Positions are rounded down to a multiple of this size (1,000 = micro lot; 1 for brokers that size by stake).</summary>
     [Range(1, 100_000)] public decimal UnitStep { get; set; } = 1_000m;
     [Range(1_000, 100_000_000)] public decimal MaxUnits { get; set; } = 1_000_000m;
+    /// <summary>Derived (synthetic) markets: at most this many open at once, so they cannot take the slots Forex needs.</summary>
+    [Range(0, 20)] public int MaxDerivedOpenPositions { get; set; } = 1;
+
+    /// <summary>Derived (synthetic) markets: risk per trade (% of equity), typically lower than for Forex.</summary>
+    [Range(0.01, 5)] public decimal DerivedRiskPerTradePercent { get; set; } = 0.5m;
+
+    /// <summary>Derived (synthetic) markets: after losing this much in a day, only Derived trading pauses until the next day.</summary>
+    [Range(0.1, 20)] public decimal MaxDerivedDailyLossPercent { get; set; } = 1m;
+
+    public static bool IsDerived(MarketData.Instrument instrument) => instrument.AssetClass == MarketData.AssetClass.SyntheticIndex;
+
+    /// <summary>Risk per trade that applies to <paramref name="instrument"/>.</summary>
+    public decimal RiskPercentFor(MarketData.Instrument instrument) =>
+        IsDerived(instrument) ? Math.Min(DerivedRiskPerTradePercent, MaxRiskPerTradePercent) : MaxRiskPerTradePercent;
+
     /// <summary>Orders are not sent when the broker's quoted commission exceeds this share of the amount at risk.</summary>
     [Range(0.01, 1)] public decimal MaxCommissionShareOfRisk { get; set; } = 0.25m;
     public bool KillSwitchOnDailyLossBreach { get; set; } = true;

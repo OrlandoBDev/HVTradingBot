@@ -56,6 +56,7 @@ public sealed class EfTradingStateStore(IDbContextFactory<TradingDbContext> dbFa
         CooldownUntilUtc = e.CooldownUntilUtc,
         PnlDay = e.PnlDay,
         DailyRealizedPnl = e.DailyRealizedPnl,
+        DerivedDailyRealizedPnl = e.DerivedDailyRealizedPnl,
         PnlWeekStart = e.PnlWeekStart,
         WeeklyRealizedPnl = e.WeeklyRealizedPnl,
         LastBarTimeUtc = e.LastBarTimeUtc,
@@ -77,6 +78,7 @@ public sealed class EfTradingStateStore(IDbContextFactory<TradingDbContext> dbFa
         e.CooldownUntilUtc = s.CooldownUntilUtc;
         e.PnlDay = s.PnlDay;
         e.DailyRealizedPnl = s.DailyRealizedPnl;
+        e.DerivedDailyRealizedPnl = s.DerivedDailyRealizedPnl;
         e.PnlWeekStart = s.PnlWeekStart;
         e.WeeklyRealizedPnl = s.WeeklyRealizedPnl;
         e.LastBarTimeUtc = s.LastBarTimeUtc;

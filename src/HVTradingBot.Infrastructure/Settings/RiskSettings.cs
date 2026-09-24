@@ -18,10 +18,22 @@ public sealed record RiskLimits(
     int MaxConsecutiveLosses,
     int CooldownMinutes,
     int MaxCurrencyExposure,
-    decimal MaxCommissionShareOfRisk)
+    decimal MaxCommissionShareOfRisk,
+    int? MaxDerivedOpenPositions = null,
+    decimal? DerivedRiskPerTradePercent = null,
+    decimal? MaxDerivedDailyLossPercent = null)
 {
     public static RiskLimits From(RiskOptions o) => new(o.MaxRiskPerTradePercent, o.MaxDailyLossPercent, o.MaxWeeklyLossPercent,
-        o.MaxOpenPositions, o.MinRewardToRisk, o.MaxConsecutiveLosses, o.CooldownMinutes, o.MaxCurrencyExposure, o.MaxCommissionShareOfRisk);
+        o.MaxOpenPositions, o.MinRewardToRisk, o.MaxConsecutiveLosses, o.CooldownMinutes, o.MaxCurrencyExposure, o.MaxCommissionShareOfRisk,
+        o.MaxDerivedOpenPositions, o.DerivedRiskPerTradePercent, o.MaxDerivedDailyLossPercent);
+
+    /// <summary>Limits saved before the Derived limits existed take the configured Derived defaults.</summary>
+    public RiskLimits WithDefaultsFrom(RiskOptions defaults) => this with
+    {
+        MaxDerivedOpenPositions = MaxDerivedOpenPositions ?? defaults.MaxDerivedOpenPositions,
+        DerivedRiskPerTradePercent = DerivedRiskPerTradePercent ?? defaults.DerivedRiskPerTradePercent,
+        MaxDerivedDailyLossPercent = MaxDerivedDailyLossPercent ?? defaults.MaxDerivedDailyLossPercent
+    };
 
     public RiskOptions ApplyTo(RiskOptions defaults)
     {
@@ -35,6 +47,9 @@ public sealed record RiskLimits(
         o.CooldownMinutes = CooldownMinutes;
         o.MaxCurrencyExposure = MaxCurrencyExposure;
         o.MaxCommissionShareOfRisk = MaxCommissionShareOfRisk;
+        o.MaxDerivedOpenPositions = MaxDerivedOpenPositions ?? defaults.MaxDerivedOpenPositions;
+        o.DerivedRiskPerTradePercent = DerivedRiskPerTradePercent ?? defaults.DerivedRiskPerTradePercent;
+        o.MaxDerivedDailyLossPercent = MaxDerivedDailyLossPercent ?? defaults.MaxDerivedDailyLossPercent;
         return o;
     }
 
@@ -60,6 +75,23 @@ public sealed record RiskLimits(
         Check(CooldownMinutes is >= 0 and <= 1440, nameof(CooldownMinutes), "Cooldown must be between 0 and 1440 minutes.");
         Check(MaxCurrencyExposure is >= 1 and <= 5, nameof(MaxCurrencyExposure), "Currency exposure must be between 1 and 5.");
         Check(MaxCommissionShareOfRisk is >= 0.05m and <= 0.5m, nameof(MaxCommissionShareOfRisk), "Fee cap must be between 5% and 50% of the risk.");
+        if (MaxDerivedOpenPositions is { } derivedPositions)
+        {
+            Check(derivedPositions >= 0 && derivedPositions <= MaxOpenPositions, nameof(MaxDerivedOpenPositions),
+                "Derived positions must be between 0 (no Derived trading) and the total open-position limit.");
+        }
+
+        if (DerivedRiskPerTradePercent is { } derivedRisk)
+        {
+            Check(derivedRisk >= 0.1m && derivedRisk <= MaxRiskPerTradePercent, nameof(DerivedRiskPerTradePercent),
+                "Derived risk per trade must be between 0.1% and the risk per trade.");
+        }
+
+        if (MaxDerivedDailyLossPercent is { } derivedDaily)
+        {
+            Check(derivedDaily >= 0.1m && derivedDaily <= MaxDailyLossPercent, nameof(MaxDerivedDailyLossPercent),
+                "Derived daily loss must be between 0.1% and the daily loss limit.");
+        }
         return errors;
     }
 }
@@ -116,6 +148,7 @@ public sealed class RiskOptionsSource(RiskOptions configured, RiskSettingsStore 
         var (limits, version, updatedAt, updatedBy) = await store.GetAsync(cancellationToken);
         if (version != _version)
         {
+            limits = limits?.WithDefaultsFrom(configured);
             if (limits is not null && limits.Validate().Count > 0)
             {
                 logger.LogError("Stored risk limits (version {Version}) are invalid; keeping configured defaults", version);

@@ -267,3 +267,13 @@ textarea { background: var(--panel-2); color: var(--text); border: 1px solid var
 .switch input:checked::after { transform: translateX(16px); }
 
 .closed-note { margin: 10px 0 0; }
+
+.risk-group { margin-top: 18px; }
+.risk-group h3 { font-size: 14px; margin-bottom: 2px; }
+.risk-group > p { margin: 0 0 10px; }
+.risk-fields { display: flex; flex-direction: column; }
+.risk-field { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 18px; padding: 12px 0; border-top: 1px solid var(--border); }
+.risk-input { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.risk-help { font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 6px; padding-top: 2px; }
+.risk-example { color: var(--text); background: var(--panel-2); border-left: 3px solid var(--accent); padding: 6px 10px; border-radius: 4px; }
+@media (max-width: 900px) { .risk-field { grid-template-columns: minmax(0, 1fr); gap: 8px; } }

@@ -33,8 +33,10 @@ internal sealed class RiskRules(RiskOptions options, ExecutionCostOptions costs)
             Spread(proposal),
             Slippage(),
             OpenPositions(portfolio),
+            DerivedPositions(proposal, portfolio),
             DuplicateInstrument(proposal, portfolio),
             DailyLoss(portfolio),
+            DerivedDailyLoss(proposal, portfolio),
             WeeklyLoss(portfolio),
             Cooldown(portfolio),
             CurrencyExposure(proposal, portfolio),
@@ -95,6 +97,31 @@ internal sealed class RiskRules(RiskOptions options, ExecutionCostOptions costs)
     private RiskCheck OpenPositions(PortfolioState p) => p.OpenPositions.Count < options.MaxOpenPositions
         ? Pass(nameof(OpenPositions), $"{p.OpenPositions.Count}/{options.MaxOpenPositions} open.")
         : Fail(nameof(OpenPositions), $"Maximum of {options.MaxOpenPositions} open positions reached.");
+
+    private RiskCheck DerivedPositions(TradeProposal proposal, PortfolioState p)
+    {
+        if (!RiskOptions.IsDerived(proposal.Instrument))
+        {
+            return Pass(nameof(DerivedPositions), "Not a Derived market.");
+        }
+
+        return p.DerivedOpenPositions < options.MaxDerivedOpenPositions
+            ? Pass(nameof(DerivedPositions), $"{p.DerivedOpenPositions}/{options.MaxDerivedOpenPositions} Derived open.")
+            : Fail(nameof(DerivedPositions), $"Maximum of {options.MaxDerivedOpenPositions} Derived position(s) reached; remaining slots are kept for Forex.");
+    }
+
+    private RiskCheck DerivedDailyLoss(TradeProposal proposal, PortfolioState p)
+    {
+        if (!RiskOptions.IsDerived(proposal.Instrument))
+        {
+            return Pass(nameof(DerivedDailyLoss), "Not a Derived market.");
+        }
+
+        var limit = p.Balance * options.MaxDerivedDailyLossPercent / 100m;
+        return -p.DerivedDailyRealizedPnl >= limit
+            ? Fail(nameof(DerivedDailyLoss), $"Derived loss today {-p.DerivedDailyRealizedPnl:F2} reached its limit {limit:F2}; Derived pauses until tomorrow.")
+            : Pass(nameof(DerivedDailyLoss), $"Derived P&L today {p.DerivedDailyRealizedPnl:F2}.");
+    }
 
     private static RiskCheck DuplicateInstrument(TradeProposal proposal, PortfolioState p) =>
         p.OpenPositions.Any(x => x.Instrument == proposal.Instrument)

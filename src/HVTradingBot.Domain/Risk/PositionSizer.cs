@@ -11,7 +11,7 @@ public static class PositionSizer
     public static PositionSize Calculate(TradeProposal proposal, PortfolioState portfolio, RiskOptions options, decimal expectedSlippagePips,
         decimal commissionPer100K = 0)
     {
-        var maxRisk = Math.Round(portfolio.Equity * options.MaxRiskPerTradePercent / 100m, 2);
+        var maxRisk = Math.Round(portfolio.Equity * options.RiskPercentFor(proposal.Instrument) / 100m, 2);
         var stopDistance = proposal.Setup.RiskDistance + proposal.Instrument.FromPips(expectedSlippagePips);
         var rate = portfolio.Converter.QuoteToAccountRate(proposal.Instrument);
         // Commission uses the same basis as PaperExecutionModel.RealizedPnl (account currency per 100k units per side).

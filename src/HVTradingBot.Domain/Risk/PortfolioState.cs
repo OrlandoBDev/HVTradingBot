@@ -23,6 +23,11 @@ public sealed record PortfolioState(
     DateTime WallClockUtc,
     CurrencyConverter Converter)
 {
+    /// <summary>Realized P&amp;L of Derived (synthetic) markets today, for the Derived daily loss limit.</summary>
+    public decimal DerivedDailyRealizedPnl { get; init; }
+
+    public int DerivedOpenPositions => OpenPositions.Count(p => RiskOptions.IsDerived(p.Instrument));
+
     /// <summary>
     /// Net count of same-direction exposure per currency (long EUR/USD = +1 EUR, -1 USD). Non-currency assets count only
     /// against their own symbol, so e.g. a synthetic index does not add USD exposure.

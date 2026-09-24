@@ -167,7 +167,10 @@ public sealed record RiskLimitsDto(
     int MaxConsecutiveLosses,
     int CooldownMinutes,
     int MaxCurrencyExposure,
-    decimal MaxCommissionShareOfRisk);
+    decimal MaxCommissionShareOfRisk,
+    int? MaxDerivedOpenPositions = null,
+    decimal? DerivedRiskPerTradePercent = null,
+    decimal? MaxDerivedDailyLossPercent = null);
 
 public sealed record RiskSettingsDto(
     RiskLimitsDto Effective,

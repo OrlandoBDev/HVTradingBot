@@ -161,6 +161,8 @@ public sealed class DashboardQueries(
         var risk = riskSource.Current;
         var status = await GetStatusAsync(cancellationToken);
         var positions = await GetOpenPositionsAsync(cancellationToken);
+        var state = await stateStore.GetAsync(cancellationToken);
+        var derivedOpen = positions.Count(p => Instruments.TryGet(p.Instrument, out var i) && RiskOptions.IsDerived(i));
         var balance = status.Account.Balance;
         var dailyLimit = balance * risk.MaxDailyLossPercent / 100m;
         var weeklyLimit = balance * risk.MaxWeeklyLossPercent / 100m;
@@ -179,10 +181,14 @@ public sealed class DashboardQueries(
         var limits = new List<RiskLimitStatusDto>
         {
             new("Risk per trade", $"{risk.MaxRiskPerTradePercent}% of equity", $"{risk.MaxRiskPerTradePercent}%", false),
+            new("Risk per Derived trade", $"{risk.DerivedRiskPerTradePercent}% of equity", $"{risk.DerivedRiskPerTradePercent}%", false),
             new("Daily loss", $"{status.DailyRealizedPnl:F2}", $"-{dailyLimit:F2}", -status.DailyRealizedPnl >= dailyLimit),
             new("Weekly loss", $"{status.WeeklyRealizedPnl:F2}", $"-{weeklyLimit:F2}", -status.WeeklyRealizedPnl >= weeklyLimit),
             new("Open positions", $"{positions.Count}", $"{risk.MaxOpenPositions}", positions.Count >= risk.MaxOpenPositions),
             new("Consecutive losses", $"{status.ConsecutiveLosses}", $"{risk.MaxConsecutiveLosses}", cooling),
+            new("Derived open positions", $"{derivedOpen}", $"{risk.MaxDerivedOpenPositions}", derivedOpen >= risk.MaxDerivedOpenPositions),
+            new("Derived loss today", $"{state.DerivedDailyRealizedPnl:F2}", $"-{balance * risk.MaxDerivedDailyLossPercent / 100m:F2}",
+                -state.DerivedDailyRealizedPnl >= balance * risk.MaxDerivedDailyLossPercent / 100m),
             new("Max currency exposure", exposure.Count == 0 ? "0" : $"{exposure.Values.Max(Math.Abs)}", $"{risk.MaxCurrencyExposure}",
                 exposure.Values.Any(v => Math.Abs(v) > risk.MaxCurrencyExposure)),
             new("Min reward:risk", "-", $"{risk.MinRewardToRisk}:1", false),

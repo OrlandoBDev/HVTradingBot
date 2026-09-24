@@ -14,6 +14,7 @@ public sealed record TradingSystemState
     public DateTime? CooldownUntilUtc { get; init; }
     public DateOnly? PnlDay { get; init; }
     public decimal DailyRealizedPnl { get; init; }
+    public decimal DerivedDailyRealizedPnl { get; init; }
     public DateOnly? PnlWeekStart { get; init; }
     public decimal WeeklyRealizedPnl { get; init; }
     public DateTime? LastBarTimeUtc { get; init; }
@@ -33,13 +34,14 @@ public sealed record TradingSystemState
         {
             PnlDay = day,
             DailyRealizedPnl = PnlDay == day ? DailyRealizedPnl : 0,
+            DerivedDailyRealizedPnl = PnlDay == day ? DerivedDailyRealizedPnl : 0,
             PnlWeekStart = weekStart,
             WeeklyRealizedPnl = PnlWeekStart == weekStart ? WeeklyRealizedPnl : 0
         };
     }
 
     /// <summary>Applies a closed trade: P&amp;L windows, loss streak and cooldown.</summary>
-    public TradingSystemState WithClosedTrade(decimal realizedPnl, DateTime marketTimeUtc, RiskOptions options)
+    public TradingSystemState WithClosedTrade(decimal realizedPnl, DateTime marketTimeUtc, RiskOptions options, bool isDerived = false)
     {
         var rolled = RollPeriods(marketTimeUtc);
         var losses = realizedPnl < 0 ? rolled.ConsecutiveLosses + 1 : 0;
@@ -53,6 +55,7 @@ public sealed record TradingSystemState
         return rolled with
         {
             DailyRealizedPnl = rolled.DailyRealizedPnl + realizedPnl,
+            DerivedDailyRealizedPnl = rolled.DerivedDailyRealizedPnl + (isDerived ? realizedPnl : 0),
             WeeklyRealizedPnl = rolled.WeeklyRealizedPnl + realizedPnl,
             ConsecutiveLosses = losses,
             CooldownUntilUtc = cooldown

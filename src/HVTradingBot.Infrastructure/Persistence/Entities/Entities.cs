@@ -122,6 +122,7 @@ public sealed class SystemStateEntity
     public DateTime? CooldownUntilUtc { get; set; }
     public DateOnly? PnlDay { get; set; }
     public decimal DailyRealizedPnl { get; set; }
+    public decimal DerivedDailyRealizedPnl { get; set; }
     public DateOnly? PnlWeekStart { get; set; }
     public decimal WeeklyRealizedPnl { get; set; }
     public DateTime? LastBarTimeUtc { get; set; }
