@@ -46,6 +46,9 @@ public interface IExecutionBroker : IBroker
 {
     BrokerDescriptor Descriptor { get; }
 
+    /// <summary>Latest executable prices (used for fills, sizing and currency conversion) between closed bars.</summary>
+    void UpdateQuotes(IEnumerable<Quote> quotes);
+
     /// <summary>
     /// Called with each closed bar. Updates the executable quote and MAE/MFE tracking, and returns positions that
     /// closed: simulated brokers fill stops/targets from the bar; live brokers reconcile with the broker's own state.

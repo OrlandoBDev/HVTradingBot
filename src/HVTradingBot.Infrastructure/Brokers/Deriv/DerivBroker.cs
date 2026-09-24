@@ -36,6 +36,14 @@ public sealed class DerivBroker(
     private readonly Dictionary<Instrument, Quote> _quotes = new();
     private (DateTime BarClose, IReadOnlyList<PortfolioContract> Contracts)? _portfolioCache;
 
+    public void UpdateQuotes(IEnumerable<Quote> quotes)
+    {
+        foreach (var quote in quotes)
+        {
+            _quotes[quote.Instrument] = quote;
+        }
+    }
+
     public BrokerDescriptor Descriptor => new(BrokerName, session.Account?.AccountId, session.Account?.IsDemo ?? true);
 
     private string AccountId => session.Account?.AccountId ?? throw new InvalidOperationException("Deriv session is not connected.");

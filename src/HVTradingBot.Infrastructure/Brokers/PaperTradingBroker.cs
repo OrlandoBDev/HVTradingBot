@@ -26,6 +26,14 @@ public sealed class PaperTradingBroker(
     private const int AccountId = 1;
     private readonly ConcurrentDictionary<Instrument, Quote> _quotes = new();
 
+    public void UpdateQuotes(IEnumerable<Quote> quotes)
+    {
+        foreach (var quote in quotes)
+        {
+            _quotes[quote.Instrument] = quote;
+        }
+    }
+
     public BrokerDescriptor Descriptor { get; } = new("Paper", null, IsDemo: true);
 
     public async Task<BrokerAccount> GetAccountAsync(CancellationToken cancellationToken)

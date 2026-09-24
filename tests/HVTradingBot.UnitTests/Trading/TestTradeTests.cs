@@ -20,7 +20,8 @@ public class TestTradeTests
 {
     private static readonly DateTime End = new(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
 
-    private static async Task<(TradingEngine Engine, InMemoryJournal Journal, InMemorySimulatedBroker Broker, InMemoryStateStore State, MarketDataStatus Status)> Ready()
+    private static async Task<(TradingEngine Engine, InMemoryJournal Journal, InMemorySimulatedBroker Broker, InMemoryStateStore State, MarketDataStatus Status)> Ready(
+        bool processFirstBar = true)
     {
         var costs = new ExecutionCostOptions();
         var broker = new InMemorySimulatedBroker("USD", 10_000m, costs);
@@ -39,7 +40,11 @@ public class TestTradeTests
         var last = bars[^1];
         clock.UtcNow = last.CloseTimeUtc;
         var status = new MarketDataStatus(last.CloseTimeUtc, last.CloseTimeUtc);
-        await engine.ProcessBarsAsync([new InstrumentBar(Instruments.EurUsd, last)], status, "t", CancellationToken.None); // gives the broker a quote
+        if (processFirstBar)
+        {
+            await engine.ProcessBarsAsync([new InstrumentBar(Instruments.EurUsd, last)], status, "t", CancellationToken.None);
+        }
+
         return (engine, journal, broker, state, status);
     }
 
@@ -57,6 +62,18 @@ public class TestTradeTests
         Assert.Equal(DecisionState.Executed, decision.State);
         Assert.True(decision.Risk!.IsApproved);
         Assert.True(decision.Setup!.RewardToRisk >= 2m);
+    }
+
+    [Fact]
+    public async Task Test_trade_works_right_after_startup_before_any_new_bar()
+    {
+        var (engine, _, broker, _, status) = await Ready(processFirstBar: false);
+        var live = new Quote(Instruments.EurUsd, End, 1.10000m, 1.10008m);
+
+        var outcome = await engine.PlaceTestTradeAsync(Instruments.EurUsd, status, "tester", "c1", CancellationToken.None, [live]);
+
+        Assert.True(outcome.Filled, outcome.Message);
+        Assert.Single(await broker.GetPositionsAsync(CancellationToken.None));
     }
 
     [Fact]

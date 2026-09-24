@@ -83,7 +83,7 @@ public sealed class TestTradeService(
         }
 
         logger.LogInformation("Placing test trade on {Instrument} requested by {User}", instrument.Symbol, trade.RequestedBy);
-        var outcome = await engine.PlaceTestTradeAsync(instrument, feed.Status, trade.RequestedBy, $"test-{trade.Id:N}", ct);
+        var outcome = await engine.PlaceTestTradeAsync(instrument, feed.Status, trade.RequestedBy, $"test-{trade.Id:N}", ct, feed.LatestQuotes);
         if (!outcome.Filled)
         {
             await store.UpdateAsync(trade.Id, t =>

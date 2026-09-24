@@ -19,6 +19,14 @@ public sealed class InMemorySimulatedBroker(string currency, decimal startingBal
 
     public IReadOnlyList<(ClosedPosition Closed, decimal MaePips, decimal MfePips)> ClosedPositions => _closed;
 
+    public void UpdateQuotes(IEnumerable<Quote> quotes)
+    {
+        foreach (var quote in quotes)
+        {
+            _quotes[quote.Instrument] = quote;
+        }
+    }
+
     public BrokerDescriptor Descriptor { get; } = new("Backtest", null, IsDemo: true);
 
     public Task<BrokerAccount> GetAccountAsync(CancellationToken cancellationToken) =>

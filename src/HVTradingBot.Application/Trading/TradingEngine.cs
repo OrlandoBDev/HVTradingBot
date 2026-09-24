@@ -131,6 +131,9 @@ public sealed class TradingEngine
             }
         }
 
+        // The broker needs current prices for sizing and fills before the first new bar arrives.
+        _broker.UpdateQuotes(_quotes.Values);
+
         // Broker state is authoritative: connect, read the account and open positions before any new trade.
         var account = await _broker.GetAccountAsync(cancellationToken);
         var positions = await _broker.GetPositionsAsync(cancellationToken);
@@ -484,7 +487,7 @@ public sealed class TradingEngine
     /// are 1.5 and 3 ATR (reward:risk 2). It is sized like a real trade.
     /// </summary>
     public async Task<TestTradeOutcome> PlaceTestTradeAsync(Instrument instrument, MarketDataStatus dataStatus, string requestedBy,
-        string correlationId, CancellationToken cancellationToken)
+        string correlationId, CancellationToken cancellationToken, IReadOnlyCollection<Quote>? liveQuotes = null)
     {
         if (!IsReady)
         {
@@ -494,6 +497,17 @@ public sealed class TradingEngine
         await _cycleLock.WaitAsync(cancellationToken);
         try
         {
+            // Use live tick prices when available (bars are up to five minutes old) and hand them to the broker.
+            foreach (var live in liveQuotes ?? [])
+            {
+                if (_series.ContainsKey(live.Instrument) && live.Ask > live.Bid)
+                {
+                    _quotes[live.Instrument] = live;
+                }
+            }
+
+            _broker.UpdateQuotes(_quotes.Values);
+
             if (!_series.TryGetValue(instrument, out var series) || !_quotes.TryGetValue(instrument, out var quote))
             {
                 return TestTradeOutcome.Failed($"{instrument.DisplayName} is not one of the selected markets.");
