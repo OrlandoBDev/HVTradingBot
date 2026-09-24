@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/HVTradingBot.Api/HVTradingBot.Api.csproj" />
+    <Project Path="src/HVTradingBot.Application/HVTradingBot.Application.csproj" />
+    <Project Path="src/HVTradingBot.Contracts/HVTradingBot.Contracts.csproj" />
+    <Project Path="src/HVTradingBot.Domain/HVTradingBot.Domain.csproj" />
+    <Project Path="src/HVTradingBot.Infrastructure/HVTradingBot.Infrastructure.csproj" />
+    <Project Path="src/HVTradingBot.Worker/HVTradingBot.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/HVTradingBot.UnitTests/HVTradingBot.UnitTests.csproj" />
+  </Folder>
+</Solution>
