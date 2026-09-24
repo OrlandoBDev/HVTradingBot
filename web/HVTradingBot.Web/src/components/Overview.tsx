@@ -1,54 +1,46 @@
 import type { SystemStatus } from "../types";
+import type { PageId } from "../pages";
 import { ago, money, signClass, time } from "../format";
-import { Badge, Card, Stat } from "./Ui";
+import { Badge, Stat } from "./Ui";
 import { Markets } from "./Markets";
-import { Positions } from "./Positions";
+import { OpenPositions } from "./Positions";
 
-export function Overview({ status, refreshKey }: { status: SystemStatus; refreshKey: unknown }) {
+type Navigate = (page: PageId, section?: string) => void;
+
+export function Overview({ status, refreshKey, navigate }: { status: SystemStatus; refreshKey: unknown; navigate: Navigate }) {
   const a = status.account;
+  const totalReturn = a.balance - a.startingBalance;
   return (
-    <>
+    <div className="stack">
       <div className="grid-stats">
-        <Stat label="Equity" value={money(a.equity, a.currency)} />
-        <Stat label="Balance" value={money(a.balance, a.currency)} />
-        <Stat label="Unrealized P&L" value={money(a.unrealizedPnl, a.currency)} tone={signClass(a.unrealizedPnl)} />
-        <Stat label="Total return" value={money(a.balance - a.startingBalance, a.currency)} tone={signClass(a.balance - a.startingBalance)} />
-        <Stat label="Today (market day)" value={money(status.dailyRealizedPnl, a.currency)} tone={signClass(status.dailyRealizedPnl)} />
-        <Stat label="This week" value={money(status.weeklyRealizedPnl, a.currency)} tone={signClass(status.weeklyRealizedPnl)} />
-        <Stat label="Open positions" value={status.openPositions} />
-        <Stat label="Loss streak" value={status.consecutiveLosses} />
+        <Stat label="Equity" value={money(a.equity, a.currency)} sub={`balance ${money(a.balance, a.currency)}`} />
+        <Stat label="Open P&L" value={money(a.unrealizedPnl, a.currency)} tone={signClass(a.unrealizedPnl)} sub={`${status.openPositions} open position(s)`} />
+        <Stat label="Today" value={money(status.dailyRealizedPnl, a.currency)} tone={signClass(status.dailyRealizedPnl)} sub="realized, market day" />
+        <Stat label="This week" value={money(status.weeklyRealizedPnl, a.currency)} tone={signClass(status.weeklyRealizedPnl)} sub="realized" />
+        <Stat label="Since start" value={money(totalReturn, a.currency)} tone={signClass(totalReturn)} sub={`from ${money(a.startingBalance, a.currency)}`} />
       </div>
-      <Card title="System">
-        <dl className="kv">
-          <dt>Mode</dt>
-          <dd><Badge tone="info">{status.mode}</Badge></dd>
-          <dt>Broker</dt>
-          <dd>
-            {status.broker.name === "Deriv" ? (
-              <>
-                <Badge tone={status.broker.isDemo ? "good" : "bad"}>{status.broker.isDemo ? "Deriv DEMO" : "Deriv REAL"}</Badge>{" "}
-                account {status.broker.accountId ?? "connecting…"} · multiplier contracts with broker-side stop loss / take profit
-              </>
-            ) : (
-              <><Badge tone="neutral">{status.broker.name}</Badge> local simulated fills</>
-            )}
-          </dd>
-          <dt>Worker</dt>
-          <dd>
-            <Badge tone={status.workerHealthy ? "good" : "bad"}>{status.workerHealthy ? "running" : "not running"}</Badge> heartbeat{" "}
-            {ago(status.workerHeartbeatUtc, status.serverTimeUtc)}
-          </dd>
-          <dt>Market data</dt>
-          <dd>
-            <Badge tone={status.marketData.isStale ? "bad" : "good"}>{status.marketData.isStale ? "stale" : "fresh"}</Badge> market time{" "}
-            {time(status.marketData.lastBarTimeUtc)}{status.broker.name === "Deriv" ? " (Deriv)" : ""}
-          </dd>
-          <dt>Cooldown</dt>
-          <dd>{status.cooldownUntilUtc && Date.parse(status.cooldownUntilUtc) > Date.parse(status.marketData.lastBarTimeUtc ?? "") ? `until ${time(status.cooldownUntilUtc)}` : "none"}</dd>
-        </dl>
-      </Card>
-      <Markets refreshKey={refreshKey} />
-      <Positions refreshKey={refreshKey} />
-    </>
+
+      <div className="status-strip">
+        <span>
+          <Badge tone={status.workerHealthy ? "good" : "bad"}>{status.workerHealthy ? "Worker running" : "Worker down"}</Badge>
+          <span className="muted small"> heartbeat {ago(status.workerHeartbeatUtc, status.serverTimeUtc)}</span>
+        </span>
+        <span>
+          <Badge tone={status.marketData.isStale ? "bad" : "good"}>{status.marketData.isStale ? "Data stale" : "Data fresh"}</Badge>
+          <span className="muted small"> last bar {time(status.marketData.lastBarTimeUtc)}</span>
+        </span>
+        <span>
+          <Badge tone={status.broker.isDemo ? "good" : "bad"}>{status.broker.name}{status.broker.isDemo ? " demo" : ""}</Badge>
+          <span className="muted small"> {status.broker.accountId ?? "not connected"}</span>
+        </span>
+        {status.consecutiveLosses > 0 && <Badge tone="warn">{status.consecutiveLosses} loss(es) in a row</Badge>}
+        {status.cooldownUntilUtc && Date.parse(status.cooldownUntilUtc) > Date.parse(status.marketData.lastBarTimeUtc ?? "") && (
+          <Badge tone="warn">cooldown until {time(status.cooldownUntilUtc)}</Badge>
+        )}
+      </div>
+
+      <Markets refreshKey={refreshKey} navigate={navigate} compact />
+      <OpenPositions refreshKey={refreshKey} compact onMore={() => navigate("trades")} />
+    </div>
   );
 }

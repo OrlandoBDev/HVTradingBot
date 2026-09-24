@@ -5,6 +5,7 @@ import { time } from "../format";
 import { Badge, Card, ErrorNote } from "./Ui";
 import { MarketSettings } from "./MarketSettings";
 import { RiskSettings } from "./RiskSettings";
+import type { PageId } from "../pages";
 
 const connectionTone = (s: DerivSettings["connection"]) =>
   !s || !s.isCurrent ? "warn" : s.state === "Connected" ? "good" : s.state === "Failed" ? "bad" : "neutral";
@@ -12,7 +13,7 @@ const connectionTone = (s: DerivSettings["connection"]) =>
 const connectionLabel = (s: DerivSettings["connection"]) =>
   !s ? "not checked yet" : !s.isCurrent ? "checking new settings…" : s.state === "Connected" ? "connected" : s.state === "Failed" ? "failed" : "not configured";
 
-export function Settings() {
+function BrokerAccountSettings() {
   const [settings, setSettings] = useState<DerivSettings | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [appId, setAppId] = useState("");
@@ -84,6 +85,7 @@ export function Settings() {
         </div>
       )}
 
+      <div className="two-col">
       <Card title="Deriv account">
         <p className="hint">
           Orders are placed as Deriv multiplier contracts with broker-side stop loss and take profit. Only <b>demo</b> accounts can be used in this
@@ -134,7 +136,7 @@ export function Settings() {
           {saved && <span className="pos small">Saved. The worker will connect within a few seconds.</span>}
         </div>
         <ErrorNote error={saveError} />
-        <p className="hint small">
+        <p className="hint small" style={{ marginTop: 12 }}>
           Stored in the PostgreSQL database (Docker). The token is encrypted with keys kept outside the database, is never sent back to this page,
           and only the trading worker uses it.
           {settings?.source === "environment" && " Currently using credentials from environment variables (.env); saving here overrides them."}
@@ -142,11 +144,7 @@ export function Settings() {
         </p>
       </Card>
 
-      <RiskSettings />
-
-      <MarketSettings />
-
-      <Card title="Connection">
+      <Card title="Connection status">
         <dl className="kv">
           <dt>Status</dt>
           <dd><Badge tone={connectionTone(settings?.connection ?? null)}>{connectionLabel(settings?.connection ?? null)}</Badge></dd>
@@ -175,6 +173,60 @@ export function Settings() {
           </div>
         )}
       </Card>
+      </div>
     </>
+  );
+}
+
+const SECTIONS = [
+  { id: "account", label: "Broker account", summary: "Connect your Deriv demo account. The token is stored encrypted and never shown again." },
+  { id: "markets", label: "Markets", summary: "Pick the markets to analyse and trade. Saving restarts the trading worker." },
+  { id: "risk", label: "Risk limits", summary: "How much each trade may risk and when trading stops for the day or week." },
+  { id: "notifications", label: "Notifications", summary: "Email alerts for trades and rejected orders." },
+] as const;
+
+type SectionId = (typeof SECTIONS)[number]["id"];
+
+/** Settings page: one focused section at a time instead of one long page. */
+export function Settings({ section, navigate }: { section?: string; navigate: (page: PageId, section?: string) => void }) {
+  const current: SectionId = SECTIONS.some((s) => s.id === section) ? (section as SectionId) : "account";
+  const info = SECTIONS.find((s) => s.id === current)!;
+  return (
+    <div className="settings-layout">
+      <nav className="subnav">
+        {SECTIONS.map((s) => (
+          <button key={s.id} className={s.id === current ? "active" : ""} onClick={() => navigate("settings", s.id)}>
+            {s.label}
+          </button>
+        ))}
+      </nav>
+      <div className="stack">
+        <p className="section-summary">{info.summary}</p>
+        {current === "account" && <BrokerAccountSettings />}
+        {current === "markets" && <MarketSettings />}
+        {current === "risk" && <RiskSettings />}
+        {current === "notifications" && <NotificationSettings />}
+      </div>
+    </div>
+  );
+}
+
+function NotificationSettings() {
+  return (
+    <Card title="Email notifications (Gmail)">
+      <p>
+        The worker can email you when an order is executed, rejected by risk, or needs approval — once per signal, never for NO_TRADE.
+        Emails are sent in the background, so a mail problem can never delay or stop trading.
+      </p>
+      <p className="hint">Enable it by adding these lines to <code>.env</code> in the project folder, then restart with <code>./run.sh</code>:</p>
+      <pre className="code-block">{`Notifications__Email__Enabled=true
+Notifications__Email__Username=you@gmail.com
+Notifications__Email__Password=<16-character Gmail App Password>
+Notifications__Email__ToAddresses__0=you@gmail.com`}</pre>
+      <p className="hint small">
+        Use a Gmail <b>App Password</b> (Google Account › Security › 2-Step Verification › App passwords), never your normal password.
+        It stays on this Mac in <code>.env</code>, which is not committed to git.
+      </p>
+    </Card>
   );
 }

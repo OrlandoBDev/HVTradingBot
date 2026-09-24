@@ -84,13 +84,12 @@ export function RiskSettings() {
 
   return (
     <Card
-      title="Risk limits"
+      title="Limits"
       actions={data && <Badge tone={data.isCustomized ? "info" : "neutral"}>{data.isCustomized ? "custom" : "defaults"}</Badge>}
     >
       <p className="hint">
-        Deterministic limits with final authority over every trade. Amounts below use the current balance
-        {data ? ` (${money(data.balance, data.currency)})` : ""}. Changes apply within a few seconds without a restart; ranges are
-        restricted so limits can be tuned but not switched off.
+        Dollar amounts use the current balance{data ? ` (${money(data.balance, data.currency)})` : ""}. Changes apply within a few seconds;
+        ranges are restricted so limits can be tuned but not switched off.
       </p>
       {form && data && (
         <div className="settings-form">

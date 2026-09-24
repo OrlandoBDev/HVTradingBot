@@ -1,15 +1,16 @@
 import type { RiskStatus } from "../types";
+import type { PageId } from "../pages";
 import { useData } from "../useData";
 import { Badge, Card, ErrorNote } from "./Ui";
 
-export function Risk({ refreshKey }: { refreshKey: unknown }) {
+export function Risk({ refreshKey, navigate }: { refreshKey: unknown; navigate: (page: PageId, section?: string) => void }) {
   const { data, error } = useData<RiskStatus>("/api/risk", refreshKey);
   return (
     <>
       <ErrorNote error={error} />
       {data && (
         <>
-          <Card title="Risk status">
+          <Card title="Can the engine trade right now?" actions={<button className="link" onClick={() => navigate("settings", "risk")}>Edit limits →</button>}>
             <p>
               New trades:{" "}
               <Badge tone={data.newTradesAllowed ? "good" : "bad"}>{data.newTradesAllowed ? "allowed" : "blocked"}</Badge>
@@ -19,7 +20,6 @@ export function Risk({ refreshKey }: { refreshKey: unknown }) {
                 {data.blockingReasons.map((r) => <li key={r}>{r}</li>)}
               </ul>
             )}
-            <p className="hint">Risk rules are deterministic and have final authority. Each candidate is checked when proposed and again immediately before execution.</p>
           </Card>
           <Card title="Limits">
             <div className="table-wrap">
@@ -38,7 +38,7 @@ export function Risk({ refreshKey }: { refreshKey: unknown }) {
               </table>
             </div>
           </Card>
-          <Card title="Currency exposure (net same-direction positions)">
+          <Card title="Exposure by currency / asset (net same-direction positions)">
             {Object.keys(data.currencyExposure).length === 0 ? (
               <p className="empty">No exposure.</p>
             ) : (

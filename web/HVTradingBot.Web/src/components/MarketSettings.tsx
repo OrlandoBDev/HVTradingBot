@@ -19,6 +19,7 @@ export function MarketSettings() {
   const [data, setData] = useState<MarketSettingsData | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState("");
+  const [tradableOnly, setTradableOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -73,62 +74,84 @@ export function MarketSettings() {
   };
 
   const q = filter.trim().toLowerCase();
-  const visible = (data?.catalog ?? []).filter(
-    (m) => !q || m.name.toLowerCase().includes(q) || m.symbol.toLowerCase().includes(q) || m.submarket.toLowerCase().includes(q),
+  const catalog = data?.catalog ?? [];
+  const visible = catalog.filter(
+    (m) =>
+      (!tradableOnly || m.isTradable) &&
+      (!q || m.name.toLowerCase().includes(q) || m.symbol.toLowerCase().includes(q) || m.submarket.toLowerCase().includes(q)),
   );
+  const byName = new Map(catalog.map((m) => [m.symbol, m]));
 
   return (
-    <Card
-      title="Markets"
-      actions={<input className="search" placeholder="Search markets…" value={filter} onChange={(e) => setFilter(e.target.value)} />}
-    >
-      <p className="hint">
-        Choose what the engine analyses and trades (max {data?.maxSelected ?? 30}). Saving restarts the trading worker, which reloads 45 days of
-        history per market; open positions stay protected by their broker-side stop loss and take profit.
-      </p>
-      {data && data.catalog.length === 0 && (
-        <p className="empty">The market catalog appears once the worker has started with Deriv market data.</p>
-      )}
-      {GROUPS.map((group) => {
-        const items = visible.filter((m) => m.assetClass === group.key);
-        if (items.length === 0) return null;
-        return (
-          <div key={group.key} className="market-group">
-            <h3>
-              {group.title} <span className="muted small">{items.filter((m) => selected.has(m.symbol)).length} selected</span>
-            </h3>
-            {group.note && <p className={`hint small ${group.key === "SyntheticIndex" ? "warn-text" : ""}`}>{group.note}</p>}
-            <div className="market-grid">
-              {items.map((m) => (
-                <label key={m.brokerSymbol} className={`market-option ${selected.has(m.symbol) ? "checked" : ""}`}>
-                  <input type="checkbox" checked={selected.has(m.symbol)} onChange={() => toggle(m.symbol)} />
-                  <span className="market-name">{m.name}</span>
-                  <span className="market-meta">
-                    {m.symbol}
-                    {m.isTradable ? ` · x${m.multipliers[0]}–${m.multipliers[m.multipliers.length - 1]}` : ""}
-                  </span>
-                  <span className="market-badges">
-                    {!m.isTradable && <Badge tone="neutral">analysis only</Badge>}
-                    <Badge tone={m.isOpen ? "good" : "neutral"}>{m.isOpen ? "open" : "closed"}</Badge>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-      <div className="form-actions" style={{ marginTop: 12 }}>
-        <button className="primary" onClick={save} disabled={saving || !dirty || selected.size === 0}>
-          {saving ? "Saving…" : `Save selection (${selected.size})`}
-        </button>
-        {dirty && <button onClick={() => data && setSelected(new Set(data.selected))}>Discard changes</button>}
-        {pending ? (
-          <Badge tone="warn">restarting worker to apply…</Badge>
+    <div className="stack">
+      <Card title={`Selected markets (${selected.size}/${data?.maxSelected ?? 30})`}>
+        {selected.size === 0 ? (
+          <p className="empty">Nothing selected — pick at least one market below.</p>
         ) : (
-          data && <span className="muted small">{data.isDefaultSelection ? "Using the default Forex majors." : "Applied."}</span>
+          <div className="chips">
+            {[...selected].map((symbol) => (
+              <span key={symbol} className="chip removable">
+                {byName.get(symbol)?.name ?? symbol}
+                <button aria-label={`Remove ${symbol}`} onClick={() => toggle(symbol)}>×</button>
+              </span>
+            ))}
+          </div>
         )}
-      </div>
-      <ErrorNote error={error} />
-    </Card>
+        <div className="form-actions" style={{ marginTop: 12 }}>
+          <button className="primary" onClick={save} disabled={saving || !dirty || selected.size === 0}>
+            {saving ? "Saving…" : "Save selection"}
+          </button>
+          {dirty && <button onClick={() => data && setSelected(new Set(data.selected))}>Discard changes</button>}
+          {pending ? (
+            <Badge tone="warn">restarting worker to apply…</Badge>
+          ) : (
+            data && !dirty && <span className="muted small">{data.isDefaultSelection ? "Using the default Forex majors." : "Applied."}</span>
+          )}
+          {dirty && <span className="muted small">Unsaved changes. Saving restarts the worker (about a minute to reload history).</span>}
+        </div>
+        <ErrorNote error={error} />
+      </Card>
+
+      <Card
+        title="Available markets"
+        actions={
+          <div className="toolbar">
+            <label className="check">
+              <input type="checkbox" checked={tradableOnly} onChange={(e) => setTradableOnly(e.target.checked)} /> tradable only
+            </label>
+            <input className="search" placeholder="Search…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+          </div>
+        }
+      >
+        {catalog.length === 0 && <p className="empty">The market catalog appears once the worker has started with Deriv market data.</p>}
+        {GROUPS.map((group) => {
+          const items = visible.filter((m) => m.assetClass === group.key);
+          if (items.length === 0) return null;
+          const chosen = items.filter((m) => selected.has(m.symbol)).length;
+          return (
+            <details key={`${group.key}-${q}`} className="market-group" open={!!q || chosen > 0}>
+              <summary>
+                <span className="strong">{group.title}</span>
+                <span className="muted small"> · {items.length} markets{chosen > 0 ? ` · ${chosen} selected` : ""}</span>
+              </summary>
+              {group.note && <p className={`hint small ${group.key === "SyntheticIndex" ? "warn-text" : ""}`}>{group.note}</p>}
+              <div className="market-grid">
+                {items.map((m) => (
+                  <label key={m.brokerSymbol} className={`market-option ${selected.has(m.symbol) ? "checked" : ""}`}>
+                    <input type="checkbox" checked={selected.has(m.symbol)} onChange={() => toggle(m.symbol)} />
+                    <span className="market-name">{m.name}</span>
+                    <span className="market-meta">
+                      {[m.name !== m.symbol ? m.symbol : null, m.isTradable ? null : "analysis only", m.isOpen ? null : "closed"]
+                        .filter(Boolean)
+                        .join(" · ") || "tradable"}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </details>
+          );
+        })}
+      </Card>
+    </div>
   );
 }

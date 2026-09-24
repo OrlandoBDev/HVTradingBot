@@ -30,15 +30,14 @@ export function LearningView({ refreshKey }: { refreshKey: unknown }) {
     <>
       <ErrorNote error={error} />
       {data && (
-        <Card title="Adaptive learning">
-          <p className="hint">
-            Every setup the engine finds — traded or not — is followed as a virtual trade until its stop, target or {""}
-            expiry. Results per strategy, regime and asset class adjust future scores between −{data.maxPenalty} and +{data.maxBoost} points,
-            shrunk towards zero by {data.priorStrength} neutral samples so a few lucky trades cannot dominate. A combination is switched off
-            after {data.disableAfterSamples} setups if its expectancy stays below {data.disableBelowR}R. Learning never changes position size or
-            risk limits. Window: last {data.lookbackDays} days · {data.outcomes.toLocaleString()} resolved setups ·{" "}
-            <Badge tone={data.enabled ? "good" : "neutral"}>{data.enabled ? "enabled" : "disabled"}</Badge>
-          </p>
+        <Card>
+          <div className="chips" style={{ marginBottom: 12 }}>
+            <Badge tone={data.enabled ? "good" : "neutral"}>{data.enabled ? "learning enabled" : "learning disabled"}</Badge>
+            <span className="chip">{data.outcomes.toLocaleString()} resolved setups</span>
+            <span className="chip">last {data.lookbackDays} days</span>
+            <span className="chip">score range −{data.maxPenalty} … +{data.maxBoost}</span>
+            <span className="chip">off after {data.disableAfterSamples} setups below {data.disableBelowR}R</span>
+          </div>
           {data.combinations.length === 0 ? (
             <Empty>Nothing learned yet. Virtual trades resolve as markets reach their stops and targets.</Empty>
           ) : (

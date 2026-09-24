@@ -30,7 +30,6 @@ export function Decisions({ refreshKey }: { refreshKey: unknown }) {
 
   return (
     <Card
-      title="Trade decisions"
       actions={
         <div className="segmented">
           {Object.keys(FILTERS).map((f) => (
@@ -39,7 +38,6 @@ export function Decisions({ refreshKey }: { refreshKey: unknown }) {
         </div>
       }
     >
-      <p className="hint">Every evaluation (each 5-minute close) is journaled, including NO_TRADE and rejections. Click a row for the full audit record.</p>
       <ErrorNote error={error} />
       {data && data.length === 0 && <Empty>No decisions in this view yet. Strategies start evaluating once indicators have warmed up.</Empty>}
       {data && data.length > 0 && (

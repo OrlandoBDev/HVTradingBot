@@ -35,7 +35,12 @@ public sealed class DashboardQueries(
             var broker = await db.BrokerAccounts.AsNoTracking().SingleOrDefaultAsync(a => a.AccountKey == accountId, cancellationToken);
             if (broker is not null)
             {
-                return new AccountSnapshot(broker.Currency, broker.LastBalance, broker.StartingBalance);
+                // The baseline is derived from the app's own closed trades, so deposits, withdrawals or a demo-balance
+                // reset at the broker are not reported as trading profit.
+                var realized = await db.Positions.AsNoTracking()
+                    .Where(p => !p.IsOpen && p.BrokerAccountId == accountId)
+                    .SumAsync(p => p.RealizedPnl ?? 0, cancellationToken);
+                return new AccountSnapshot(broker.Currency, broker.LastBalance, broker.LastBalance - realized);
             }
         }
 
