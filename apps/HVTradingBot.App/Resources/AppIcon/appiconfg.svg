@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="456" height="456" viewBox="0 0 456 456" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <!-- Rising price line over three candles. -->
+    <rect x="118" y="238" width="44" height="100" rx="6" fill="#22C55E" />
+    <rect x="206" y="188" width="44" height="130" rx="6" fill="#EF4444" />
+    <rect x="294" y="138" width="44" height="120" rx="6" fill="#22C55E" />
+    <polyline points="100,320 184,250 272,280 356,130" fill="none" stroke="#F8FAFC" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" />
+</svg>
