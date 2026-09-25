@@ -64,6 +64,35 @@ Set `BROKER_PROVIDER=Paper` in `.env` to trade on real Deriv prices with local s
   read and write the key folder. On a Linux Docker host, make the folder writable for the container user (UID 1654,
   `APP_UID` of the .NET images), e.g. `sudo chown 1654 "$HOME/Library/Application Support/HVTradingBot/keys"`.
 
+## Mac app
+
+A native macOS app (`apps/HVTradingBot.App`, .NET MAUI / Mac Catalyst) that starts PostgreSQL, the API and the worker
+in Docker and shows the dashboard in its own window, so everyday use needs no terminal. Design: [docs/MACOS_APP.md](docs/MACOS_APP.md).
+
+**Install** (needs Xcode and the MAUI workload: `sudo dotnet workload install maui`):
+
+```bash
+apps/HVTradingBot.App/build-app.sh               # builds, ad-hoc signs and copies HVTradingBot.app to /Applications
+apps/HVTradingBot.App/build-app.sh --no-install  # build only
+```
+
+The app is not signed by Apple; a copy built on another Mac needs right-click → **Open** the first time.
+
+**First run.** The app expects the repository checkout in `~/HVTradingBot` (change it under **Settings** in the app).
+It finds Docker (starting Docker Desktop if needed), creates `.env` with a random database password if missing,
+creates the encryption key folder, refuses to start while a native API/worker runs (`./run.sh local`, `dotnet run`,
+an IDE; `./run.sh dev` is allowed), then runs `docker compose up -d --build` with live output. The first build takes
+several minutes, later starts seconds. The dashboard then opens in the app; create the login with the setup code as
+described above (`./run.sh setup-code` prints it; the app's WebView has its own cookies, separate from the browser).
+
+**Using it.** The status bar shows the worker state from `/health/ready` every 15 s (running, data stale, kill switch
+active, offline). Controls: **Stop trading** (`docker compose stop`), **Start**, **Restart worker**, **Logs** and
+**Open in browser**. **Quitting the app leaves the stack running** so trading continues; enable **Stop trading when
+the app quits** in the app's Settings to change that. The browser at `http://localhost:5080` works at the same time.
+
+**Logs.** The startup screen keeps the `docker compose` output (expand **Log**); the **Logs** page shows the last 200
+lines of the `worker` or `api` container, the same as `docker compose logs --tail 200 worker` in the checkout.
+
 ## What Is Implemented
 
 - **Market data:** real prices from Deriv's public API (5-minute candles, live ticks); offline synthetic feed.

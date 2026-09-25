@@ -6,6 +6,10 @@ A native macOS app (.NET MAUI) that starts PostgreSQL, the API and the worker in
 dashboard in a WebView; it replaces `./run.sh` for everyday use until the bot moves to an external server.
 Design and implementation tasks: [MACOS_APP.md](MACOS_APP.md).
 
+Status: implemented on `feature/macos-app` (shared encryption keys, single-worker database lock, `run.sh` guards and
+`./run.sh dev`, `HVTradingBot.App.Core` with tests, the Mac Catalyst app, CI). Remaining: the manual acceptance test
+on a Mac.
+
 ## Next: learn Kubernetes with this application
 
 After the macOS MVP. A step-by-step guide (`docs/KUBERNETES_GUIDE.md`, written when this phase starts) that moves

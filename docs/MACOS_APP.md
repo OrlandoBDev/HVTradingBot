@@ -1,7 +1,8 @@
 # macOS App (Docker-based MVP)
 
-Status: **planned**, on branch `feature/macos-app`. This document is the design and the implementation plan; an
-agent implementing it should work through [Implementation tasks](#implementation-tasks) in order.
+Status: **implemented** on branch `feature/macos-app` (tasks 1–7 below); the Mac app itself is only compiled by the
+`macos-latest` CI job and still needs the [manual acceptance test](#manual-acceptance-test-on-the-mac-after-task-5).
+See [Deviations from the plan](#deviations-from-the-plan).
 
 ## Goal
 
@@ -162,6 +163,18 @@ Each task is one commit (or a few) on `feature/macos-app`. Keep `dotnet build HV
 - [ ] Quit the app: containers keep running. Stop trading: containers stop; dashboard shows the worker offline.
 - [ ] Change the market selection in Settings: the worker container restarts and applies it.
 - [ ] `./run.sh dev` runs alongside the app on port 5081 with simulated data.
+
+## Deviations from the plan
+
+- **First-quit explanation.** Mac Catalyst cannot hold up quitting, so the note that trading continues without the app
+  is shown once when the dashboard first opens, not at the first quit.
+- **Stop on quit** starts `docker compose stop` in the background; the app exits before the containers have stopped.
+- **Lock loss.** Besides taking the advisory lock at startup, the worker checks it every 5 s; if the lock connection
+  was lost (e.g. PostgreSQL restarted), the worker exits with the restart code and waits for the lock again.
+- **Dev processes.** `./run.sh dev` starts its API and worker with `--HVTradingBot:Instance=dev`; the Docker guard in
+  `run.sh` and the app's conflict check ignore those processes (they use a separate database).
+- **Kill switch in the status bar** is recognised from the text of the worker health message ("Kill switch active…");
+  keep `WorkerHealthCheck` and `ReadyResponseParser` in step when changing it.
 
 ## Notes for cloud agents
 
