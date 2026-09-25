@@ -17,13 +17,20 @@ public partial class App : Application
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
+        // Open at the preferred size, but never larger than 90 % of the screen (small laptops, scaled displays).
+        var screen = DeviceDisplay.Current.MainDisplayInfo;
+        var density = screen.Density > 0 ? screen.Density : 1;
+        var width = Math.Min(1360, screen.Width / density * 0.9);
+        var height = Math.Min(900, screen.Height / density * 0.9);
+
         var window = new Window(new NavigationPage(startupPage))
         {
             Title = "HVTradingBot",
-            Width = 1360,
-            Height = 900,
-            MinimumWidth = 900,
-            MinimumHeight = 600
+            Width = width > 0 ? width : 1360,
+            Height = height > 0 ? height : 900,
+            // Small enough that the dashboard can switch to its compact layout (sidebar behind the menu button).
+            MinimumWidth = 480,
+            MinimumHeight = 480
         };
         // On Mac Catalyst closing the only window quits the app.
         window.Destroying += (_, _) => quitHandler.OnQuit();

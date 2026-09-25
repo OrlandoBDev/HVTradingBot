@@ -13,7 +13,7 @@
         <WebView x:Name="Dashboard" Grid.Row="0" />
 
         <!-- Status bar: worker state from /health/ready, polled every 15 s, and the stack controls. -->
-        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10" Padding="12,6" BackgroundColor="#0F172A">
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,2*,3*" ColumnSpacing="10" Padding="12,6" BackgroundColor="#0F172A">
             <BoxView Grid.Column="0" WidthRequest="12" HeightRequest="12" CornerRadius="6"
                      Color="{Binding StatusColor}" VerticalOptions="Center" />
             <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
@@ -21,15 +21,21 @@
                 <Label Text="{Binding StatusDetail}" TextColor="#94A3B8" FontSize="11" LineBreakMode="TailTruncation" />
                 <Label Text="{Binding ActionMessage}" TextColor="#F59E0B" FontSize="11" LineBreakMode="TailTruncation" />
             </VerticalStackLayout>
-            <HorizontalStackLayout Grid.Column="2" Spacing="8" VerticalOptions="Center">
-                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="White" />
+            <!-- Wraps onto extra rows when the window is narrow instead of pushing buttons off-screen. -->
+            <FlexLayout Grid.Column="2" Wrap="Wrap" JustifyContent="End" AlignItems="Center" VerticalOptions="Center">
+                <FlexLayout.Resources>
+                    <Style TargetType="Button">
+                        <Setter Property="Margin" Value="4,2" />
+                    </Style>
+                </FlexLayout.Resources>
+                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="White" Margin="4,2" />
                 <Button Text="Stop trading" Command="{Binding StopTradingCommand}" BackgroundColor="#B91C1C" TextColor="White" />
                 <Button Text="Start" Command="{Binding StartCommand}" />
                 <Button Text="Restart worker" Command="{Binding RestartWorkerCommand}" />
                 <Button Text="Logs" Command="{Binding LogsCommand}" />
                 <Button Text="Open in browser" Command="{Binding OpenInBrowserCommand}" />
                 <Button Text="Settings" Command="{Binding SettingsCommand}" />
-            </HorizontalStackLayout>
+            </FlexLayout>
         </Grid>
     </Grid>
 </ContentPage>
