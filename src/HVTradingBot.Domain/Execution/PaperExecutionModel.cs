@@ -7,9 +7,6 @@ public sealed class ExecutionCostOptions
 {
     /// <summary>Slippage applied against the trader on every simulated market fill and stop exit.</summary>
     public decimal SlippagePips { get; set; } = 0.2m;
-
-    /// <summary>Commission per 100,000 units per side, in account currency.</summary>
-    public decimal CommissionPer100K { get; set; } = 3m;
 }
 
 /// <summary>
@@ -70,11 +67,14 @@ public static class PaperExecutionModel
         return null;
     }
 
-    /// <summary>Profit in account currency, net of round-trip commission.</summary>
-    public static decimal RealizedPnl(OpenPosition position, decimal exitPrice, decimal quoteToAccountRate, ExecutionCostOptions costs)
+    /// <summary>
+    /// Profit in account currency, net of round-trip commission charged as <paramref name="commissionPercent"/> % of the
+    /// position value (units x entry price, in account currency).
+    /// </summary>
+    public static decimal RealizedPnl(OpenPosition position, decimal exitPrice, decimal quoteToAccountRate, decimal commissionPercent)
     {
         var gross = position.Direction.Sign() * (exitPrice - position.EntryPrice) * position.Units * quoteToAccountRate;
-        var commission = 2m * costs.CommissionPer100K * position.Units / 100_000m;
+        var commission = commissionPercent / 100m * position.Units * position.EntryPrice * quoteToAccountRate;
         return Math.Round(gross - commission, 2, MidpointRounding.ToEven);
     }
 

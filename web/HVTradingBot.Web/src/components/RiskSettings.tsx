@@ -16,6 +16,7 @@ interface RiskLimits {
   maxDerivedOpenPositions: number;
   derivedRiskPerTradePercent: number;
   maxDerivedDailyLossPercent: number;
+  assumedCommissionPercent: number;
 }
 
 interface RiskSettingsData {
@@ -114,6 +115,11 @@ const GROUPS: { title: string; intro: string; fields: Field[] }[] = [
         key: "cooldownMinutes", label: "Cooldown", step: 15, min: 0, max: 1440, unit: "min",
         what: "How long trading pauses after the losing streak above (market time).",
         example: ({ v }) => `${v} minutes = ${(v / 60).toFixed(v % 60 === 0 ? 0 : 1)} hour(s).`,
+      },
+      {
+        key: "assumedCommissionPercent", label: "Assumed broker commission", step: 0.01, min: 0, max: 0.5, unit: "%",
+        what: "Commission the broker charges per trade (opening and closing together) as a percentage of the position value. Position sizes are reduced so the fee is part of the amount at risk; paper trading and backtests charge it too. Deriv currently charges about 0.05%. Live Deriv orders still use Deriv's own quoted fee.",
+        example: ({ v, c }) => `A position worth ${money(1000, c)} pays about ${money(1000 * v / 100, c)} in commission; one worth ${money(10000, c)} pays ${money(10000 * v / 100, c)}.`,
       },
       {
         key: "maxCommissionShareOfRisk", label: "Max broker fee share of risk", step: 0.05, min: 0.05, max: 0.5, unit: "",

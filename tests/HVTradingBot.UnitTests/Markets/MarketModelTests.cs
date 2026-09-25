@@ -67,15 +67,15 @@ public class MarketModelTests
     [Fact]
     public async Task Synthetic_indices_are_sized_in_fractional_units()
     {
-        var risk = new RiskManager(new RiskOptions { MinUnits = 1, UnitStep = 1 }, new ExecutionCostOptions { SlippagePips = 0, CommissionPer100K = 0 });
+        var risk = new RiskManager(new RiskOptions { MinUnits = 1, UnitStep = 1 }, new ExecutionCostOptions { SlippagePips = 0 });
         var proposal = new TradeProposal(Vol100, new TradeSetup(Direction.Long, 588m, 585m, 596m), new Quote(Vol100, Bars.Start, 587.9m, 588.1m),
             0.2m, "Test", 80, "R100-T-L-1");
 
         var decision = await risk.EvaluateAsync(proposal, Bars.Portfolio(balance: 100m), CancellationToken.None);
 
         Assert.True(decision.IsApproved, decision.RejectionReason);
-        // 0.5% of 100 = 0.50 at risk over a 3-point stop -> 0.166666 units (~98 USD notional)
-        Assert.Equal(0.166666m, decision.Units);
+        // 0.5% of 100 = 0.50 at risk over a 3-point stop + 0.05% commission on 588 (0.294) -> 0.151791 units (~89 USD notional)
+        Assert.Equal(0.151791m, decision.Units);
     }
 
     [Fact]

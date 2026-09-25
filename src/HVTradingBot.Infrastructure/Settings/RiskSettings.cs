@@ -21,18 +21,20 @@ public sealed record RiskLimits(
     decimal MaxCommissionShareOfRisk,
     int? MaxDerivedOpenPositions = null,
     decimal? DerivedRiskPerTradePercent = null,
-    decimal? MaxDerivedDailyLossPercent = null)
+    decimal? MaxDerivedDailyLossPercent = null,
+    decimal? AssumedCommissionPercent = null)
 {
     public static RiskLimits From(RiskOptions o) => new(o.MaxRiskPerTradePercent, o.MaxDailyLossPercent, o.MaxWeeklyLossPercent,
         o.MaxOpenPositions, o.MinRewardToRisk, o.MaxConsecutiveLosses, o.CooldownMinutes, o.MaxCurrencyExposure, o.MaxCommissionShareOfRisk,
-        o.MaxDerivedOpenPositions, o.DerivedRiskPerTradePercent, o.MaxDerivedDailyLossPercent);
+        o.MaxDerivedOpenPositions, o.DerivedRiskPerTradePercent, o.MaxDerivedDailyLossPercent, o.AssumedCommissionPercent);
 
     /// <summary>Limits saved before the Derived limits existed take the configured Derived defaults.</summary>
     public RiskLimits WithDefaultsFrom(RiskOptions defaults) => this with
     {
         MaxDerivedOpenPositions = MaxDerivedOpenPositions ?? defaults.MaxDerivedOpenPositions,
         DerivedRiskPerTradePercent = DerivedRiskPerTradePercent ?? defaults.DerivedRiskPerTradePercent,
-        MaxDerivedDailyLossPercent = MaxDerivedDailyLossPercent ?? defaults.MaxDerivedDailyLossPercent
+        MaxDerivedDailyLossPercent = MaxDerivedDailyLossPercent ?? defaults.MaxDerivedDailyLossPercent,
+        AssumedCommissionPercent = AssumedCommissionPercent ?? defaults.AssumedCommissionPercent
     };
 
     public RiskOptions ApplyTo(RiskOptions defaults)
@@ -50,6 +52,7 @@ public sealed record RiskLimits(
         o.MaxDerivedOpenPositions = MaxDerivedOpenPositions ?? defaults.MaxDerivedOpenPositions;
         o.DerivedRiskPerTradePercent = DerivedRiskPerTradePercent ?? defaults.DerivedRiskPerTradePercent;
         o.MaxDerivedDailyLossPercent = MaxDerivedDailyLossPercent ?? defaults.MaxDerivedDailyLossPercent;
+        o.AssumedCommissionPercent = AssumedCommissionPercent ?? defaults.AssumedCommissionPercent;
         return o;
     }
 
@@ -85,6 +88,11 @@ public sealed record RiskLimits(
         {
             Check(derivedRisk >= 0.1m && derivedRisk <= MaxRiskPerTradePercent, nameof(DerivedRiskPerTradePercent),
                 "Derived risk per trade must be between 0.1% and the risk per trade.");
+        }
+
+        if (AssumedCommissionPercent is { } commission)
+        {
+            Check(commission >= 0m && commission <= 0.5m, nameof(AssumedCommissionPercent), "Assumed commission must be between 0% and 0.5% of the position value.");
         }
 
         if (MaxDerivedDailyLossPercent is { } derivedDaily)

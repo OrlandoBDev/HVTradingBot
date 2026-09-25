@@ -7,7 +7,7 @@ namespace HVTradingBot.UnitTests.Execution;
 
 public class PaperExecutionModelTests
 {
-    private readonly ExecutionCostOptions _costs = new() { SlippagePips = 0.2m, CommissionPer100K = 3m };
+    private readonly ExecutionCostOptions _costs = new() { SlippagePips = 0.2m };
 
     [Fact]
     public void Longs_fill_at_ask_plus_slippage_and_shorts_at_bid_minus_slippage()
@@ -57,11 +57,12 @@ public class PaperExecutionModelTests
     public void Realized_pnl_includes_commission_and_currency_conversion()
     {
         var eur = Bars.Position(Instruments.EurUsd, Direction.Long, entry: 1.1000m, units: 100_000m);
-        Assert.Equal(94m, PaperExecutionModel.RealizedPnl(eur, 1.1010m, 1m, _costs)); // 100 - 6 commission
+        // 0.05% of 110,000 USD position value = 55 commission
+        Assert.Equal(45m, PaperExecutionModel.RealizedPnl(eur, 1.1010m, 1m, 0.05m));
 
         var jpy = Bars.Position(Instruments.UsdJpy, Direction.Short, entry: 150.00m, units: 100_000m);
-        // 0.30 JPY * 100k = 30,000 JPY / 150 = 200 USD - 6
-        Assert.Equal(194m, PaperExecutionModel.RealizedPnl(jpy, 149.70m, 1m / 150m, _costs));
+        // 0.30 JPY * 100k = 30,000 JPY / 150 = 200 USD, minus 0.05% of 15,000,000 JPY = 50 USD
+        Assert.Equal(150m, PaperExecutionModel.RealizedPnl(jpy, 149.70m, 1m / 150m, 0.05m));
     }
 
     [Fact]

@@ -38,9 +38,6 @@ public sealed class DerivOptions
 
     [Range(1, 100_000)] public decimal MaxStake { get; set; } = 500m;
 
-    /// <summary>Commission as a fraction of notional, used to place stop/target amounts (observed ≈ 2.13 per 10,000).</summary>
-    [Range(0, 0.01)] public decimal CommissionRate { get; set; } = 0.000213m;
-
     /// <summary>The broker's stop-loss price must lie within this fraction of the strategy's stop distance, or the order is not sent.</summary>
     [Range(0.01, 1)] public decimal StopPriceTolerance { get; set; } = 0.25m;
 

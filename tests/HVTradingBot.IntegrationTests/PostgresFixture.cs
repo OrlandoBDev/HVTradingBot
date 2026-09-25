@@ -1,3 +1,4 @@
+using HVTradingBot.Domain.Risk;
 using HVTradingBot.Application.Abstractions;
 using HVTradingBot.Application.Trading;
 using HVTradingBot.Domain.Execution;
@@ -32,7 +33,8 @@ public sealed class PostgresFixture : IAsyncLifetime
     public Task DisposeAsync() => _container.DisposeAsync().AsTask();
 
     public PaperTradingBroker NewBroker() =>
-        new(DbFactory, new ExecutionCostOptions(), new TradingEngineOptions(), new FixedClock(), NullLogger<PaperTradingBroker>.Instance);
+        new(DbFactory, new ExecutionCostOptions(), new TradingEngineOptions(), new FixedRiskOptions(new RiskOptions()), new FixedClock(),
+            NullLogger<PaperTradingBroker>.Instance);
 
     public async Task ResetAsync()
     {

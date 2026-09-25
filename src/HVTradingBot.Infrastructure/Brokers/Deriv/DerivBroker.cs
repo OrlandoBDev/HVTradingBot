@@ -133,7 +133,8 @@ public sealed class DerivBroker(
         var entry = order.Direction == Direction.Long ? quote.Ask : quote.Bid;
         var notional = converter.Notional(order.Instrument, order.Units, entry);
         var (estimate, rejection) = DerivContractMath.Plan(order.Direction, notional, entry, order.StopLoss, order.TakeProfit,
-            await MultipliersAsync(socket, order.Instrument, cancellationToken), options.MinStake, options.MaxStake, options.CommissionRate);
+            await MultipliersAsync(socket, order.Instrument, cancellationToken), options.MinStake, options.MaxStake,
+            risk.Current.AssumedCommissionPercent / 100m);
         if (estimate is null)
         {
             return await RejectAsync(entity, rejection!, cancellationToken);
@@ -145,7 +146,7 @@ public sealed class DerivBroker(
         try
         {
             var quoted = await ProposeAsync(socket, order, estimate, withLimits: false, cancellationToken);
-            var commission = quoted.TryGetProperty("commission", out var cm) ? Dec(cm) : estimate.Notional * options.CommissionRate;
+            var commission = quoted.TryGetProperty("commission", out var cm) ? Dec(cm) : estimate.Notional * risk.Current.AssumedCommissionPercent / 100m;
             var (priced, pricedRejection) = DerivContractMath.WithQuotedCommission(estimate, entry, order.StopLoss, order.TakeProfit, commission,
                 risk.Current.MaxCommissionShareOfRisk);
             if (priced is null)

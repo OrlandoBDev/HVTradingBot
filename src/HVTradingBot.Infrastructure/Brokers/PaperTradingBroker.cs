@@ -4,6 +4,7 @@ using HVTradingBot.Application.Trading;
 using HVTradingBot.Domain.Common;
 using HVTradingBot.Domain.Execution;
 using HVTradingBot.Domain.MarketData;
+using HVTradingBot.Domain.Risk;
 using HVTradingBot.Infrastructure.Persistence;
 using HVTradingBot.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +21,7 @@ public sealed class PaperTradingBroker(
     IDbContextFactory<TradingDbContext> dbFactory,
     ExecutionCostOptions costs,
     TradingEngineOptions engineOptions,
+    IRiskOptionsSource risk,
     IClock clock,
     ILogger<PaperTradingBroker> logger) : IExecutionBroker
 {
@@ -191,7 +193,7 @@ public sealed class PaperTradingBroker(
                 continue;
             }
 
-            var pnl = PaperExecutionModel.RealizedPnl(tracked, exit.Price, converter.QuoteToAccountRate(instrument), costs);
+            var pnl = PaperExecutionModel.RealizedPnl(tracked, exit.Price, converter.QuoteToAccountRate(instrument), risk.Current.AssumedCommissionPercent);
             var r = PaperExecutionModel.RMultiple(tracked, pnl);
             entity.IsOpen = false;
             entity.ClosedAtUtc = bar.CloseTimeUtc;

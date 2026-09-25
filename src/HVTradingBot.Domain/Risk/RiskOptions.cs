@@ -41,6 +41,12 @@ public sealed class RiskOptions
     public decimal RiskPercentFor(MarketData.Instrument instrument) =>
         IsDerived(instrument) ? Math.Min(DerivedRiskPerTradePercent, MaxRiskPerTradePercent) : MaxRiskPerTradePercent;
 
+    /// <summary>
+    /// Broker commission assumed per trade, round trip, as % of the position value. Used for position sizing, for
+    /// paper trading and backtests, and for planning Deriv orders before Deriv quotes the exact commission.
+    /// </summary>
+    [Range(0, 1)] public decimal AssumedCommissionPercent { get; set; } = 0.05m;
+
     /// <summary>Orders are not sent when the broker's quoted commission exceeds this share of the amount at risk.</summary>
     [Range(0.01, 1)] public decimal MaxCommissionShareOfRisk { get; set; } = 0.25m;
     public bool KillSwitchOnDailyLossBreach { get; set; } = true;

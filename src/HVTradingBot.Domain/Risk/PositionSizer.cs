@@ -6,16 +6,16 @@ public static class PositionSizer
 {
     /// <summary>
     /// Units such that hitting the stop loses at most <see cref="RiskOptions.MaxRiskPerTradePercent"/> of equity,
-    /// including expected slippage and round-trip commission, rounded down to <see cref="RiskOptions.UnitStep"/>.
+    /// including expected slippage and the assumed round-trip commission, rounded down to <see cref="RiskOptions.UnitStep"/>.
     /// </summary>
-    public static PositionSize Calculate(TradeProposal proposal, PortfolioState portfolio, RiskOptions options, decimal expectedSlippagePips,
-        decimal commissionPer100K = 0)
+    public static PositionSize Calculate(TradeProposal proposal, PortfolioState portfolio, RiskOptions options, decimal expectedSlippagePips)
     {
         var maxRisk = Math.Round(portfolio.Equity * options.RiskPercentFor(proposal.Instrument) / 100m, 2);
         var stopDistance = proposal.Setup.RiskDistance + proposal.Instrument.FromPips(expectedSlippagePips);
         var rate = portfolio.Converter.QuoteToAccountRate(proposal.Instrument);
-        // Commission uses the same basis as PaperExecutionModel.RealizedPnl (account currency per 100k units per side).
-        var lossPerUnit = stopDistance * rate + 2m * commissionPer100K / 100_000m;
+        // Round-trip commission on the position value (units x price in account currency), as in PaperExecutionModel.
+        var commissionPerUnit = options.AssumedCommissionPercent / 100m * proposal.Setup.Entry * rate;
+        var lossPerUnit = stopDistance * rate + commissionPerUnit;
         if (lossPerUnit <= 0 || maxRisk <= 0)
         {
             return new PositionSize(0, 0, maxRisk);

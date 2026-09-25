@@ -55,7 +55,7 @@ public sealed class BacktestEngine(
             EvaluationTimeFrame = engineOptions.EvaluationTimeFrame
         };
 
-        var broker = new InMemorySimulatedBroker(options.AccountCurrency, options.StartingBalance, costs);
+        var broker = new InMemorySimulatedBroker(options.AccountCurrency, options.StartingBalance, costs, riskOptions.AssumedCommissionPercent);
         var journal = new InMemoryJournal();
         var clock = new ReplayClock();
         // The automatic kill switch waits for a person to reset it, which never happens in a replay; after a daily-loss

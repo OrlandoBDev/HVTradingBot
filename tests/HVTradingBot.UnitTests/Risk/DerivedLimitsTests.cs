@@ -22,7 +22,7 @@ public class DerivedLimitsTests
         MaxDerivedDailyLossPercent = 1, MaxDailyLossPercent = 3, MinUnits = 1, UnitStep = 1
     };
 
-    private readonly RiskManager _risk = new(Options, new ExecutionCostOptions { SlippagePips = 0, CommissionPer100K = 0 });
+    private readonly RiskManager _risk = new(Options, new ExecutionCostOptions { SlippagePips = 0 });
 
     private static TradeProposal DerivedProposal() =>
         new(Vol75, new TradeSetup(Direction.Long, 1000m, 990m, 1030m), new Quote(Vol75, Bars.Start, 999.9m, 1000.1m), 0.2m, "Test", 80, "R75-1");

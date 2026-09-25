@@ -22,7 +22,7 @@ internal sealed class RiskRules(RiskOptions options, ExecutionCostOptions costs)
     public Task<RiskDecision> EvaluateAsync(TradeProposal proposal, PortfolioState portfolio, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var size = PositionSizer.Calculate(proposal, portfolio, options, costs.SlippagePips, costs.CommissionPer100K);
+        var size = PositionSizer.Calculate(proposal, portfolio, options, costs.SlippagePips);
         var checks = new List<RiskCheck>
         {
             TradingMode(portfolio),

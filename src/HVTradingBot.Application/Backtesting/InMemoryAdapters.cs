@@ -8,7 +8,8 @@ using HVTradingBot.Domain.MarketData;
 namespace HVTradingBot.Application.Backtesting;
 
 /// <summary>In-memory simulated broker for backtests. Uses the same <see cref="PaperExecutionModel"/> as the paper broker.</summary>
-public sealed class InMemorySimulatedBroker(string currency, decimal startingBalance, ExecutionCostOptions costs) : IExecutionBroker
+public sealed class InMemorySimulatedBroker(string currency, decimal startingBalance, ExecutionCostOptions costs, decimal commissionPercent = 0.05m)
+    : IExecutionBroker
 {
     private readonly decimal _startingBalance = startingBalance;
     private readonly Dictionary<Guid, OpenPosition> _open = new();
@@ -103,7 +104,7 @@ public sealed class InMemorySimulatedBroker(string currency, decimal startingBal
                 continue;
             }
 
-            var pnl = PaperExecutionModel.RealizedPnl(tracked, exit.Value.Price, converter.QuoteToAccountRate(instrument), costs);
+            var pnl = PaperExecutionModel.RealizedPnl(tracked, exit.Value.Price, converter.QuoteToAccountRate(instrument), commissionPercent);
             var closed = new ClosedPosition(tracked, bar.CloseTimeUtc, exit.Value.Price, exit.Value.Reason, pnl,
                 PaperExecutionModel.RMultiple(tracked, pnl));
             _open.Remove(position.Id);

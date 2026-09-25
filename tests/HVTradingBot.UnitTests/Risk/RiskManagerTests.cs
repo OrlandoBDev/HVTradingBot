@@ -36,11 +36,11 @@ public class RiskManagerTests
     [Fact]
     public async Task Position_size_for_20_pip_stop_risks_about_half_a_percent()
     {
-        // Loss per unit = 20.2 pips incl. slippage (0.00202) + round-trip commission 2 x 3 / 100k (0.00006) = 0.00208
-        // 500 USD / 0.00208 = 240,384 -> 240,000 units
+        // Loss per unit = 20.2 pips incl. slippage (0.00202) + 0.05% commission on 1.1000 (0.00055) = 0.00257
+        // 500 USD / 0.00257 = 194,552 -> 194,000 units
         var decision = await Evaluate();
-        Assert.Equal(240_000m, decision.Units);
-        Assert.Equal(499.20m, decision.RiskAmount);
+        Assert.Equal(194_000m, decision.Units);
+        Assert.Equal(498.58m, decision.RiskAmount);
     }
 
     [Fact]
@@ -50,8 +50,8 @@ public class RiskManagerTests
         var decision = await Evaluate(proposal);
 
         Assert.True(decision.IsApproved, decision.RejectionReason);
-        // Loss per unit = 0.202 JPY / 150 + 0.00006 commission = 0.0014067 USD -> 500 / that = 355,450 -> 355,000
-        Assert.Equal(355_000m, decision.Units);
+        // Loss per unit = 0.202 JPY / 150 + 0.05% of 150 JPY / 150 = 0.0018467 USD -> 500 / that = 270,758 -> 270,000
+        Assert.Equal(270_000m, decision.Units);
         Assert.True(decision.RiskAmount <= 500m);
     }
 

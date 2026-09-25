@@ -35,6 +35,7 @@
     "MaxUnits": 1000000,
     "KillSwitchOnDailyLossBreach": true,
     "KillSwitchOnStaleData": false,
+    "AssumedCommissionPercent": 0.05,
     "MaxCommissionShareOfRisk": 0.3
   },
   "Scoring": {
@@ -51,8 +52,7 @@
     "LowVolatilityPercentile": 0.1
   },
   "ExecutionCosts": {
-    "SlippagePips": 0.2,
-    "CommissionPer100K": 10.65
+    "SlippagePips": 0.2
   },
   "MarketData": {
     "Provider": "Deriv",
@@ -73,7 +73,6 @@
     "AccountType": "Demo",
     "MinStake": 1,
     "MaxStake": 500,
-    "CommissionRate": 0.000213,
     "StopPriceTolerance": 0.25,
     "RequestTimeoutSeconds": 15
   },
