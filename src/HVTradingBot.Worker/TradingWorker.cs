@@ -14,7 +14,7 @@ using Serilog.Context;
 namespace HVTradingBot.Worker;
 
 /// <summary>
-/// Hosts the paper-trading loop: migrate, warm up, reconcile, then process each new bar.
+/// Hosts the paper-trading loop: take the single-instance lock, migrate, warm up, reconcile, then process each new bar.
 /// Repeated consecutive failures stop the host so the supervisor (Docker / run script) can restart it cleanly.
 /// </summary>
 public sealed class TradingWorker(
@@ -31,6 +31,7 @@ public sealed class TradingWorker(
     TradingUniverse universe,
     TradingEngineOptions engineOptions,
     RiskOptionsSource riskSource,
+    WorkerInstanceLock instanceLock,
     IHostApplicationLifetime lifetime,
     ILogger<TradingWorker> logger) : BackgroundService
 {
@@ -40,6 +41,8 @@ public sealed class TradingWorker(
     {
         try
         {
+            // A second worker on the same database would place duplicate orders: wait (alive) until the other one stops.
+            await instanceLock.AcquireAsync(WorkerInstanceLock.DefaultRetryInterval, stoppingToken);
             await services.MigrateDatabaseAsync(stoppingToken);
             await EnsureSingleMarketDataSourceAsync(stoppingToken);
             await riskSource.RefreshAsync(stoppingToken);
