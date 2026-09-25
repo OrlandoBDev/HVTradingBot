@@ -123,6 +123,7 @@ See the `docs/` folder:
 - [Backtesting](docs/BACKTESTING.md)
 - [Security](docs/SECURITY.md)
 - [Roadmap](docs/ROADMAP.md)
+- [macOS App](docs/MACOS_APP.md)
 - [Agent Build Guide](docs/AGENTS.md)
 - [ADRs](docs/ADR.md)
 
