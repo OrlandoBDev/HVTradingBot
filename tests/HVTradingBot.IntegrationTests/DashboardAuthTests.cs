@@ -79,6 +79,15 @@ public sealed class DashboardAuthTests(PostgresFixture fixture) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Setup_code_tolerates_copy_paste_differences()
+    {
+        var code = _app.Services.GetRequiredService<SetupCode>().Current();
+        var pasted = $" \u201c{code.ToLowerInvariant().Replace("-", " \u2013 ")}\u201d ";
+        var response = await Client().PostAsJsonAsync("/api/auth/setup", new SetupRequest(pasted, "owner", Password));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Short_passwords_are_refused()
     {
         var code = _app.Services.GetRequiredService<SetupCode>().Current();

@@ -26,12 +26,18 @@ public sealed class SetupCode(ILogger<SetupCode> logger)
         }
     }
 
+    /// <summary>
+    /// Compares only the eight code characters, so copy-paste differences (other dash characters, spaces, quotes,
+    /// lowercase) do not matter.
+    /// </summary>
     public bool Matches(string? candidate)
     {
-        var expected = Current();
-        return candidate is not null && CryptographicOperations.FixedTimeEquals(
-            System.Text.Encoding.UTF8.GetBytes(expected), System.Text.Encoding.UTF8.GetBytes(candidate.Trim().ToUpperInvariant()));
+        var expected = Normalize(Current());
+        var given = Normalize(candidate ?? "");
+        return CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(expected), System.Text.Encoding.UTF8.GetBytes(given));
     }
+
+    private static string Normalize(string code) => new(code.ToUpperInvariant().Where(char.IsAsciiHexDigit).ToArray());
 
     /// <summary>Used once the account exists; a new code is created if the login is ever reset.</summary>
     public void Consume()
