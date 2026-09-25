@@ -15,8 +15,9 @@ AI/LLM components are advisory only and must never bypass deterministic risk con
 Requirements: Docker Desktop, .NET 10 SDK, Node.js 22 (`brew install --cask dotnet-sdk docker && brew install node@22`).
 
 ```bash
-./run.sh          # PostgreSQL in Docker, API + worker natively -> http://localhost:5080
+./run.sh          # PostgreSQL in Docker, API + worker natively -> http://localhost:5080 (same as ./run.sh local)
 ./run.sh docker   # everything in Docker
+./run.sh dev      # .NET development next to the Docker stack: http://localhost:5081, simulated data, paper broker
 ./run.sh test     # all automated tests (integration tests need Docker)
 ./run.sh stop     # stop PostgreSQL
 ./run.sh reset    # delete the local database (all trading history)
@@ -39,8 +40,17 @@ Choose markets under **Settings → Markets**.
 Set `BROKER_PROVIDER=Paper` in `.env` to trade on real Deriv prices with local simulated fills, and additionally
 `MARKET_DATA_PROVIDER=Simulated` to run fully offline.
 
-### Docker notes
+### Docker and native runs
 
+- **Never two workers on one account.** `./run.sh` (native) refuses to start while the `api` or `worker` container
+  runs, and `./run.sh docker` refuses while a native `HVTradingBot.Api`/`HVTradingBot.Worker` process runs
+  (`./run.sh local`, `dotnet run`, an IDE). The worker also holds a PostgreSQL advisory lock: a second worker on the
+  same database logs a warning and waits until the first one stops.
+- **`./run.sh dev`** is for changing .NET code while the Docker stack (or the Mac app) keeps trading: a native API on
+  port **5081** and a native worker with `MARKET_DATA_PROVIDER=Simulated` and `BROKER_PROVIDER=Paper`, on a separate
+  database `hvtradingbot_dev` that is created in the same PostgreSQL container if missing. No Deriv orders and no
+  emails; it has its own dashboard login (setup code printed on start). Logs: `.run/dev-api.log`,
+  `.run/dev-worker.log`. It uses a Debug build, so it never overwrites the binaries of a running `./run.sh local`.
 - `./run.sh docker` runs PostgreSQL, the API and the worker as the Compose project `hvtradingbot`
   (`docker-compose.yml`); `./run.sh stop` stops it. Worker logs: `docker compose logs -f worker`.
 - **Encryption keys are shared with native runs.** Deriv and email credentials are stored encrypted in PostgreSQL;

@@ -2,7 +2,12 @@
 # HVTradingBot launcher for macOS (Apple Silicon and Intel). Compatible with the stock Bash 3.2.
 #
 #   ./run.sh          Start PostgreSQL in Docker, then run the API + worker natively. Dashboard: http://localhost:5080
-#   ./run.sh docker   Run the whole stack in Docker (no .NET/Node needed on the host)
+#                     (same as ./run.sh local; refuses while the api/worker containers run)
+#   ./run.sh docker   Run the whole stack in Docker (no .NET/Node needed on the host; refuses while a native API/worker
+#                     from ./run.sh local or an IDE runs)
+#   ./run.sh dev      Develop .NET code next to the Docker stack / Mac app: native API on http://localhost:5081 and a
+#                     native worker with simulated market data and the paper broker, on the separate database
+#                     hvtradingbot_dev (created in the same PostgreSQL container). No Deriv orders, no emails.
 #   ./run.sh test     Run all automated tests (integration tests need Docker)
 #   ./run.sh stop     Stop Docker services
 #   ./run.sh reset    Stop services and DELETE the database volume (all paper-trading history)
@@ -10,6 +15,10 @@
 #   ./run.sh reset-login  Delete the dashboard login (forgotten password); create a new one with the code it prints
 #   ./run.sh migrate-keys Copy encryption keys from the old `dpkeys` Docker volume to the shared host folder
 #                         (done automatically by ./run.sh docker)
+#
+# Never two workers on one account: ./run.sh local and ./run.sh docker refuse to start while the other one runs, and
+# the worker itself holds a PostgreSQL advisory lock per database. ./run.sh dev uses its own database, so it may run
+# alongside either.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -18,6 +27,10 @@ RUN_DIR="$ROOT/.run"
 # Data Protection key ring (decrypts credentials stored in PostgreSQL). Native runs use it directly; docker-compose.yml
 # bind-mounts it into the api and worker containers, so both setups share one key ring.
 KEYS_DIR="$HOME/Library/Application Support/HVTradingBot/keys"
+DEV_API_PORT=5081
+DEV_DB=hvtradingbot_dev
+# Passed as a (harmless) configuration argument to ./run.sh dev processes so the conflict checks can tell them apart.
+DEV_MARKER="--HVTradingBot:Instance=dev"
 
 info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 fail() { printf '\033[1;31mError:\033[0m %s\n' "$*" >&2; exit 1; }
@@ -97,12 +110,50 @@ wait_for_postgres() {
 }
 
 wait_for_api() {
-  local url="$1" i=0
+  local url="$1" log="${2:-docker compose logs api}" i=0
   until curl -fsS "$url/health/live" >/dev/null 2>&1; do
     i=$((i + 1))
-    [ "$i" -gt 90 ] && fail "API did not start. See $RUN_DIR/api.log"
+    [ "$i" -gt 90 ] && fail "API did not start. See: ${log#"$ROOT"/}"
     sleep 1
   done
+}
+
+# Command lines of native API/worker processes (./run.sh local, dotnet run, IDE). A path separator must precede the
+# name: this skips editors showing src/HVTradingBot.Worker/... and the containers' `dotnet HVTradingBot.Worker.dll`
+# (visible to ps on Linux hosts). ./run.sh dev processes carry DEV_MARKER and are skipped (own database and port).
+native_processes() {
+  # shellcheck disable=SC2009 # pgrep cannot exclude the dev marker, and the full command lines are shown to the user
+  ps -Ao args= | grep -E '(^|/)HVTradingBot\.(Api|Worker)(\.dll)?( |$)' | grep -vF -e "$DEV_MARKER" || true
+}
+
+# Names of the api/worker containers of this Compose project that are running.
+running_containers() {
+  docker compose ps --status running --services 2>/dev/null | grep -E '^(api|worker)$' || true
+}
+
+refuse_if_containers_running() {
+  local running
+  running="$(running_containers | tr '\n' ' ')"
+  [ -z "$running" ] || fail "The Docker stack is running (containers: ${running% }), e.g. started by the Mac app or ./run.sh docker. Two workers would trade the same account. Stop it first: docker compose stop api worker   (or ./run.sh dev to work next to it)"
+}
+
+refuse_if_native_running() {
+  local procs
+  procs="$(native_processes)"
+  if [ -n "$procs" ]; then
+    printf '%s\n' "$procs" >&2
+    fail "A native HVTradingBot API/worker is running (above: ./run.sh local, dotnet run or an IDE). Two workers would trade the same account. Stop it first (Ctrl+C in its terminal or stop the IDE run)."
+  fi
+}
+
+# The dev database lives in the same PostgreSQL container; the API and worker apply the migrations on start.
+ensure_dev_database() {
+  local exists
+  exists="$(docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT 1 FROM pg_database WHERE datname = '${DEV_DB}'")"
+  if [ "$exists" != "1" ]; then
+    info "Creating database ${DEV_DB}"
+    docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -qc "CREATE DATABASE ${DEV_DB}" >/dev/null
+  fi
 }
 
 build_web() {
@@ -110,11 +161,56 @@ build_web() {
   (cd web/HVTradingBot.Web && { [ -d node_modules ] || npm ci --no-audit --no-fund; } && npm run build >/dev/null)
 }
 
+# Builds the .NET solution in configuration $1, output in $2.
+build_dotnet() {
+  local config="$1" log="$2"
+  info "Building .NET solution ($config)"
+  if ! dotnet build HVTradingBot.sln -c "$config" -v quiet -nologo >"$log" 2>&1; then
+    grep -E " error " "$log" | sort -u >&2 || true
+    fail ".NET build failed. Full output: ${log#"$ROOT"/}"
+  fi
+}
+
+# start_api CONFIG PORT LOG [app args...]: starts the API in the background, sets API_PID.
+start_api() {
+  local config="$1" port="$2" log="$3"
+  shift 3
+  info "Starting API on port ${port} (logs: ${log#"$ROOT"/})"
+  (cd src/HVTradingBot.Api && exec dotnet run -c "$config" --no-build --no-launch-profile -- --urls "http://127.0.0.1:${port}" "$@") >"$log" 2>&1 &
+  API_PID=$!
+}
+
+# start_worker CONFIG LOG [app args...]: starts the worker in the background with the Broker/MarketData/Deriv settings
+# from the environment, sets WORKER_PID. Exit code 3 = the worker asks to be restarted (e.g. market selection changed on
+# the Settings page).
+start_worker() {
+  local config="$1" log="$2"
+  shift 2
+  info "Starting trading worker: broker ${BROKER_PROVIDER}, market data ${MARKET_DATA_PROVIDER} (logs: ${log#"$ROOT"/})"
+  : >"$log"
+  (
+    export_app_settings
+    cd src/HVTradingBot.Worker
+    while true; do
+      code=0
+      dotnet run -c "$config" --no-build --no-launch-profile -- "$@" || code=$?
+      [ "$code" -eq 3 ] || exit "$code"
+      echo "[run.sh] restarting worker to apply new settings"
+    done
+  ) >>"$log" 2>&1 &
+  WORKER_PID=$!
+}
+
+stop_on_exit() {
+  trap 'info "Stopping"; pkill -P $WORKER_PID 2>/dev/null; kill $API_PID $WORKER_PID 2>/dev/null; wait 2>/dev/null; info "Stopped. PostgreSQL keeps running; ./run.sh stop to stop it."' INT TERM EXIT
+}
+
 run_local() {
   require_docker
   require_dotnet
   require_node
   ensure_env
+  refuse_if_containers_running
   ensure_deriv_credentials
   mkdir -p "$RUN_DIR"
 
@@ -123,41 +219,58 @@ run_local() {
   wait_for_postgres
 
   build_web
-  info "Building .NET solution"
-  if ! dotnet build HVTradingBot.sln -c Release -v quiet -nologo >"$RUN_DIR/build.log" 2>&1; then
-    grep -E " error " "$RUN_DIR/build.log" | sort -u >&2 || true
-    fail ".NET build failed. Full output: .run/build.log"
-  fi
+  build_dotnet Release "$RUN_DIR/build.log"
 
   export ConnectionStrings__TradingDb="Host=127.0.0.1;Port=${POSTGRES_PORT};Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
   export DOTNET_ENVIRONMENT=Production ASPNETCORE_ENVIRONMENT=Production
 
-  info "Starting API (logs: .run/api.log)"
-  (cd src/HVTradingBot.Api && exec dotnet run -c Release --no-build --no-launch-profile --urls "http://127.0.0.1:${API_PORT}") >"$RUN_DIR/api.log" 2>&1 &
-  API_PID=$!
-  info "Starting trading worker: broker ${BROKER_PROVIDER}, market data ${MARKET_DATA_PROVIDER} (logs: .run/worker.log)"
-  : >"$RUN_DIR/worker.log"
-  # Exit code 3 = the worker asks to be restarted (e.g. market selection changed on the Settings page).
-  (
-    export_app_settings
-    cd src/HVTradingBot.Worker
-    while true; do
-      code=0
-      dotnet run -c Release --no-build --no-launch-profile || code=$?
-      [ "$code" -eq 3 ] || exit "$code"
-      echo "[run.sh] restarting worker to apply new settings"
-    done
-  ) >>"$RUN_DIR/worker.log" 2>&1 &
-  WORKER_PID=$!
-
-  trap 'info "Stopping"; pkill -P $WORKER_PID 2>/dev/null; kill $API_PID $WORKER_PID 2>/dev/null; wait 2>/dev/null; info "Stopped. PostgreSQL keeps running; ./run.sh stop to stop it."' INT TERM EXIT
+  start_api Release "$API_PORT" "$RUN_DIR/api.log"
+  start_worker Release "$RUN_DIR/worker.log"
+  stop_on_exit
 
   local url="http://localhost:${API_PORT}"
-  wait_for_api "$url"
+  wait_for_api "$url" "$RUN_DIR/api.log"
   info "Dashboard: $url   (Ctrl+C to stop)"
   curl -fsS "$url/api/auth/me" 2>/dev/null | grep -q '"setupRequired":true' && show_setup_code
   open "$url" >/dev/null 2>&1 || true
   tail -n +1 -f "$RUN_DIR/worker.log"
+}
+
+# Native API + worker next to the Docker stack: own port, own database, simulated prices, paper broker, no emails.
+# Debug build, so it never overwrites the Release binaries of a running ./run.sh local.
+run_dev() {
+  require_docker
+  require_dotnet
+  require_node
+  ensure_env
+  mkdir -p "$RUN_DIR"
+  local url="http://localhost:${DEV_API_PORT}"
+  if curl -fsS "$url/health/live" >/dev/null 2>&1; then
+    fail "Something already answers on port ${DEV_API_PORT} (another ./run.sh dev?). Stop it first."
+  fi
+
+  info "Starting PostgreSQL (Docker, port ${POSTGRES_PORT})"
+  docker compose up -d postgres >/dev/null
+  wait_for_postgres
+  ensure_dev_database
+
+  build_web
+  build_dotnet Debug "$RUN_DIR/dev-build.log"
+
+  export ConnectionStrings__TradingDb="Host=127.0.0.1;Port=${POSTGRES_PORT};Database=${DEV_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+  export DOTNET_ENVIRONMENT=Production ASPNETCORE_ENVIRONMENT=Production
+  BROKER_PROVIDER=Paper MARKET_DATA_PROVIDER=Simulated DERIV_APP_ID="" DERIV_API_TOKEN="" DERIV_ACCOUNT_ID=""
+  export Broker__Provider=Paper MarketData__Provider=Simulated Notifications__Email__Enabled=false
+
+  start_api Debug "$DEV_API_PORT" "$RUN_DIR/dev-api.log" "$DEV_MARKER"
+  start_worker Debug "$RUN_DIR/dev-worker.log" "$DEV_MARKER"
+  stop_on_exit
+
+  wait_for_api "$url" "$RUN_DIR/dev-api.log"
+  info "Dev dashboard: $url   (database ${DEV_DB}, simulated prices, paper broker; Ctrl+C to stop)"
+  curl -fsS "$url/api/auth/me" 2>/dev/null | grep -q '"setupRequired":true' && show_setup_code "$url" "$RUN_DIR/dev-api.log"
+  open "$url" >/dev/null 2>&1 || true
+  tail -n +1 -f "$RUN_DIR/dev-worker.log"
 }
 
 # Creates the host key folder (so Docker does not create it as root) and copies keys from the old `dpkeys` volume
@@ -176,6 +289,7 @@ migrate_keys() {
 run_docker() {
   require_docker
   ensure_env
+  refuse_if_native_running
   ensure_deriv_credentials
   migrate_keys
   info "Building and starting the full stack in Docker"
@@ -188,11 +302,12 @@ run_docker() {
 }
 
 # The API logs a one-time setup code while no dashboard login exists.
+# Optional: $1 = API URL, $2 = the only log to search (./run.sh dev; no fallback to the Docker API's log).
 show_setup_code() {
-  local url="http://localhost:${API_PORT:-5080}" line=""
+  local url="${1:-http://localhost:${API_PORT:-5080}}" log="${2:-$RUN_DIR/api.log}" line=""
   curl -fsS "$url/api/auth/me" 2>/dev/null | grep -q '"setupRequired":true' || { info "A dashboard login already exists. Forgot the password? ./run.sh reset-login"; return 0; }
-  if [ -f "$RUN_DIR/api.log" ]; then line="$(grep -h 'setup code' "$RUN_DIR/api.log" | tail -n 1 || true)"; fi
-  if [ -z "$line" ] && command -v docker >/dev/null 2>&1; then line="$(docker compose logs api 2>/dev/null | grep 'setup code' | tail -n 1 || true)"; fi
+  if [ -f "$log" ]; then line="$(grep -h 'setup code' "$log" | tail -n 1 || true)"; fi
+  if [ -z "$line" ] && [ -z "${2:-}" ] && command -v docker >/dev/null 2>&1; then line="$(docker compose logs api 2>/dev/null | grep 'setup code' | tail -n 1 || true)"; fi
   [ -n "$line" ] || fail "No setup code found in the API log. Is the API running?"
   info "Create your dashboard login at $url with setup code: $(printf '%s' "$line" | grep -oE 'setup code [0-9A-F]{4}-[0-9A-F]{4}' | tail -n 1 | cut -d' ' -f3)"
 }
@@ -220,6 +335,7 @@ run_tests() {
 case "${1:-local}" in
   local) run_local ;;
   docker) run_docker ;;
+  dev) run_dev ;;
   test) run_tests ;;
   stop) require_docker; docker compose stop ;;
   migrate-keys) migrate_keys ;;
@@ -231,5 +347,5 @@ case "${1:-local}" in
     [ "$answer" = "y" ] || [ "$answer" = "Y" ] || exit 0
     docker compose down -v
     ;;
-  *) fail "Unknown command '$1'. Use: local | docker | test | stop | reset | setup-code | reset-login | migrate-keys" ;;
+  *) fail "Unknown command '$1'. Use: local | docker | dev | test | stop | reset | setup-code | reset-login | migrate-keys" ;;
 esac
