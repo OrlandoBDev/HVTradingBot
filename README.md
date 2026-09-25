@@ -20,7 +20,16 @@ Requirements: Docker Desktop, .NET 10 SDK, Node.js 22 (`brew install --cask dotn
 ./run.sh test     # all automated tests (integration tests need Docker)
 ./run.sh stop     # stop PostgreSQL
 ./run.sh reset    # delete the local database (all trading history)
+./run.sh setup-code   # show the one-time code for creating the dashboard login
+./run.sh reset-login  # forgotten password: delete the login and print a new setup code
 ```
+
+**Dashboard login.** On first start the dashboard asks you to create a username and password. This needs a
+one-time setup code that is printed only in the API log (and by `./run.sh`), so nobody who merely finds the
+dashboard can claim it. After that every page, API call and live update requires the login; sessions last
+12 hours (or 30 days with "Keep me signed in"), five wrong passwords lock the login for 15 minutes, and changing
+the password (**Settings → Login & security**) signs out every other device. Health checks (`/health/*`) stay
+public for hosting probes.
 
 Then open the dashboard, go to **Settings** and enter your Deriv App ID and Personal Access Token
 (from [developers.deriv.com](https://developers.deriv.com)). Only **demo** accounts are accepted.

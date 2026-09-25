@@ -320,3 +320,18 @@ public sealed class CloseRequestEntity
     public decimal? ExitPrice { get; set; }
     public decimal? RealizedPnl { get; set; }
 }
+
+/// <summary>Dashboard login. The app has a single owner account; the password is stored only as a salted hash.</summary>
+public sealed class AppUserEntity
+{
+    public Guid Id { get; set; }
+    public required string Username { get; set; }
+    public required string PasswordHash { get; set; }
+    /// <summary>Changes whenever the password changes, which signs out every other session.</summary>
+    public required string SecurityStamp { get; set; }
+    public int FailedLogins { get; set; }
+    public DateTime? LockedUntilUtc { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
+    public DateTime? LastLoginAtUtc { get; set; }
+    public DateTime? PasswordChangedAtUtc { get; set; }
+}
