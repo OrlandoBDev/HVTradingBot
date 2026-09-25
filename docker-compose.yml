@@ -1,5 +1,5 @@
 # Full stack: PostgreSQL (all app data, incl. Settings) + API (serves the dashboard) + trading worker.
-#   ./run.sh docker     (creates .env with a random DB password, then `docker compose up --build`)
+#   ./run.sh docker     (creates .env with a random DB password and the host key folder, then `docker compose up --build`)
 # For local development, ./run.sh starts only the `postgres` service and runs .NET natively.
 name: hvtradingbot
 
@@ -31,7 +31,9 @@ services:
       Broker__Provider: ${BROKER_PROVIDER:-Deriv}
       DataProtection__KeysPath: /keys
     volumes:
-      - dpkeys:/keys
+      # Data Protection keys (decrypt the Deriv/email credentials stored in PostgreSQL). Same host folder as native
+      # runs (./run.sh local, IDE), so both can read each other's encrypted values. ./run.sh creates it before `up`.
+      - "${HOME}/Library/Application Support/HVTradingBot/keys:/keys"
     ports:
       - "127.0.0.1:${API_PORT:-5080}:8080"
     depends_on:
@@ -57,8 +59,9 @@ services:
       Notifications__Email__Password: ${Notifications__Email__Password:-}
       Notifications__Email__ToAddresses__0: ${Notifications__Email__ToAddresses__0:-}
     volumes:
-      # Encryption keys for the Deriv token stored in PostgreSQL; shared with the API, kept outside the database.
-      - dpkeys:/keys
+      # Encryption keys for the credentials stored in PostgreSQL; shared with the API and native runs, kept outside
+      # the database.
+      - "${HOME}/Library/Application Support/HVTradingBot/keys:/keys"
     depends_on:
       postgres:
         condition: service_healthy
@@ -66,4 +69,3 @@ services:
 
 volumes:
   pgdata:
-  dpkeys:

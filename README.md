@@ -22,6 +22,7 @@ Requirements: Docker Desktop, .NET 10 SDK, Node.js 22 (`brew install --cask dotn
 ./run.sh reset    # delete the local database (all trading history)
 ./run.sh setup-code   # show the one-time code for creating the dashboard login
 ./run.sh reset-login  # forgotten password: delete the login and print a new setup code
+./run.sh migrate-keys # copy encryption keys from the old `dpkeys` Docker volume (./run.sh docker does this itself)
 ```
 
 **Dashboard login.** On first start the dashboard asks you to create a username and password. This needs a
@@ -37,6 +38,21 @@ Choose markets under **Settings → Markets**.
 
 Set `BROKER_PROVIDER=Paper` in `.env` to trade on real Deriv prices with local simulated fills, and additionally
 `MARKET_DATA_PROVIDER=Simulated` to run fully offline.
+
+### Docker notes
+
+- `./run.sh docker` runs PostgreSQL, the API and the worker as the Compose project `hvtradingbot`
+  (`docker-compose.yml`); `./run.sh stop` stops it. Worker logs: `docker compose logs -f worker`.
+- **Encryption keys are shared with native runs.** Deriv and email credentials are stored encrypted in PostgreSQL;
+  the keys that decrypt them live in `~/Library/Application Support/HVTradingBot/keys`, which is bind-mounted into
+  the `api` and `worker` containers at `/keys`. Credentials entered in a native run therefore also work in Docker and
+  the other way round. `./run.sh docker` creates the folder before `docker compose up` (otherwise Docker would create
+  it owned by root) and copies keys from the old `hvtradingbot_dpkeys` volume, if present, via
+  `./run.sh migrate-keys` (existing files are never overwritten). After checking that the dashboard still shows your
+  Deriv settings, the old volume can be removed: `docker volume rm hvtradingbot_dpkeys`.
+- The containers run as a non-root user. Docker Desktop on macOS maps file ownership of bind mounts, so that user can
+  read and write the key folder. On a Linux Docker host, make the folder writable for the container user (UID 1654,
+  `APP_UID` of the .NET images), e.g. `sudo chown 1654 "$HOME/Library/Application Support/HVTradingBot/keys"`.
 
 ## What Is Implemented
 

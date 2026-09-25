@@ -8,11 +8,16 @@
 #   ./run.sh reset    Stop services and DELETE the database volume (all paper-trading history)
 #   ./run.sh setup-code   Show the one-time code for creating the dashboard login
 #   ./run.sh reset-login  Delete the dashboard login (forgotten password); create a new one with the code it prints
+#   ./run.sh migrate-keys Copy encryption keys from the old `dpkeys` Docker volume to the shared host folder
+#                         (done automatically by ./run.sh docker)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 RUN_DIR="$ROOT/.run"
+# Data Protection key ring (decrypts credentials stored in PostgreSQL). Native runs use it directly; docker-compose.yml
+# bind-mounts it into the api and worker containers, so both setups share one key ring.
+KEYS_DIR="$HOME/Library/Application Support/HVTradingBot/keys"
 
 info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 fail() { printf '\033[1;31mError:\033[0m %s\n' "$*" >&2; exit 1; }
@@ -155,10 +160,24 @@ run_local() {
   tail -n +1 -f "$RUN_DIR/worker.log"
 }
 
+# Creates the host key folder (so Docker does not create it as root) and copies keys from the old `dpkeys` volume
+# (used before the bind mount) into it. Key files are additive and never overwritten, so this is safe to repeat.
+migrate_keys() {
+  require_docker
+  mkdir -p "$KEYS_DIR"
+  docker volume inspect hvtradingbot_dpkeys >/dev/null 2>&1 || return 0
+  info "Copying encryption keys from the old Docker volume hvtradingbot_dpkeys to $KEYS_DIR"
+  docker run --rm -v hvtradingbot_dpkeys:/from:ro -v "$KEYS_DIR:/to" \
+    alpine sh -c 'cp -n /from/*.xml /to/ 2>/dev/null || true' \
+    || fail "Copying the encryption keys failed. The old volume is untouched; see the Docker output above."
+  info "Done. Once the dashboard shows your Deriv settings, the old volume can go: docker volume rm hvtradingbot_dpkeys"
+}
+
 run_docker() {
   require_docker
   ensure_env
   ensure_deriv_credentials
+  migrate_keys
   info "Building and starting the full stack in Docker"
   docker compose up -d --build
   local url="http://localhost:${API_PORT}"
@@ -203,6 +222,7 @@ case "${1:-local}" in
   docker) run_docker ;;
   test) run_tests ;;
   stop) require_docker; docker compose stop ;;
+  migrate-keys) migrate_keys ;;
   setup-code) show_setup_code ;;
   reset-login) reset_login ;;
   reset)
@@ -211,5 +231,5 @@ case "${1:-local}" in
     [ "$answer" = "y" ] || [ "$answer" = "Y" ] || exit 0
     docker compose down -v
     ;;
-  *) fail "Unknown command '$1'. Use: local | docker | test | stop | reset | setup-code | reset-login" ;;
+  *) fail "Unknown command '$1'. Use: local | docker | test | stop | reset | setup-code | reset-login | migrate-keys" ;;
 esac
