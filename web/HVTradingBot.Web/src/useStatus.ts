@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { HubConnectionBuilder, HubConnectionState, LogLevel } from "@microsoft/signalr";
+import { HubConnectionState } from "@microsoft/signalr";
 import { api } from "./api";
+import { createDashboardConnection } from "./hub";
 import type { SystemStatus } from "./types";
 
 /** Live system status pushed over SignalR, with an initial REST fetch. */
@@ -11,11 +12,7 @@ export function useStatus() {
   useEffect(() => {
     api.get<SystemStatus>("/api/status").then(setStatus).catch(() => undefined);
 
-    const connection = new HubConnectionBuilder()
-      .withUrl("/hubs/dashboard")
-      .withAutomaticReconnect()
-      .configureLogging(LogLevel.Warning)
-      .build();
+    const connection = createDashboardConnection();
     connection.on("status", (s: SystemStatus) => setStatus(s));
     connection.onreconnecting(() => setConnected(false));
     connection.onreconnected(() => setConnected(true));
