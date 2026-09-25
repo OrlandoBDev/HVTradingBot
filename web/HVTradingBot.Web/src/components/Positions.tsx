@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import type { Position } from "../types";
+import { api } from "../api";
 import type { PageId } from "../pages";
 import { money, num, price, signClass, time } from "../format";
 import { useData } from "../useData";
@@ -24,10 +26,33 @@ export function Trades({ refreshKey, view, navigate }: { refreshKey: unknown; vi
 }
 
 export function OpenPositions({ refreshKey, compact = false, onMore }: { refreshKey: unknown; compact?: boolean; onMore?: () => void }) {
-  const { data, error } = useData<Position[]>("/api/positions/open", refreshKey);
+  const [tick, setTick] = useState(0);
+  const [closeError, setCloseError] = useState<string | null>(null);
+  const { data, error } = useData<Position[]>("/api/positions/open", `${refreshKey}|${tick}`);
+
+  // While a close is in progress, refresh every 2 seconds until it is recorded.
+  const closing = data?.some((p) => p.closeStatus === "Pending" || p.closeStatus === "Closing") ?? false;
+  useEffect(() => {
+    if (!closing) return;
+    const id = window.setInterval(() => setTick((t) => t + 1), 2000);
+    return () => window.clearInterval(id);
+  }, [closing]);
+
+  const close = async (p: Position) => {
+    const pnl = p.unrealizedPnl == null ? "" : `\nOpen P&L now: ${money(p.unrealizedPnl)}.`;
+    if (!window.confirm(`Close ${p.direction === "Long" ? "BUY" : "SELL"} ${p.instrument} now at the market price?${pnl}\n\nThis sells the position before its stop loss or take profit.`)) return;
+    setCloseError(null);
+    try {
+      await api.post(`/api/positions/${p.id}/close`, {});
+      setTick((t) => t + 1);
+    } catch (e) {
+      setCloseError((e as Error).message);
+    }
+  };
   return (
     <Card title={compact ? "Open positions" : undefined} actions={onMore && <button className="link" onClick={onMore}>All trades →</button>}>
       <ErrorNote error={error} />
+      <ErrorNote error={closeError} />
       {data && data.length === 0 && <Empty>No open positions. The engine trades only when a setup scores 75+ and every risk rule passes.</Empty>}
       {data && data.length > 0 && (
         <div className="table-wrap">
@@ -43,6 +68,7 @@ export function OpenPositions({ refreshKey, compact = false, onMore }: { refresh
                 <th>Strategy</th>
                 {!compact && <th className="num">Score</th>}
                 {!compact && <th>Opened</th>}
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -60,6 +86,20 @@ export function OpenPositions({ refreshKey, compact = false, onMore }: { refresh
                   <td>{p.strategy}</td>
                   {!compact && <td className="num">{p.score}</td>}
                   {!compact && <td className="mono muted">{time(p.openedAtUtc)}</td>}
+                  <td className="actions">
+                    {p.closeStatus === "Pending" || p.closeStatus === "Closing" ? (
+                      <span title={p.closeMessage ?? ""}><Badge tone="warn">closing…</Badge></span>
+                    ) : (
+                      <>
+                        {p.closeStatus === "Failed" && <span title={p.closeMessage ?? ""}><Badge tone="bad">close failed</Badge> </span>}
+                        {p.strategy !== "External" && (
+                          <button className="small-button" onClick={() => close(p)} title="Close this position now at the market price">
+                            Close
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

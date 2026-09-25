@@ -229,10 +229,13 @@ public sealed class DerivBroker(
             // price 0 = sell at the current market price.
             await socket.SendAsync(new JsonObject { ["sell"] = long.Parse(contractId, CultureInfo.InvariantCulture), ["price"] = 0 }, cancellationToken);
         }
-        catch (DerivApiException ex) when (ex.Message.Contains("sold", StringComparison.OrdinalIgnoreCase)
+        catch (DerivApiException ex) when (ex.Code == "ContractNotFound"
+                                           || ex.Message.Contains("sold", StringComparison.OrdinalIgnoreCase)
                                            || ex.Message.Contains("expired", StringComparison.OrdinalIgnoreCase))
         {
-            logger.LogInformation("Deriv contract {ContractId} was already closed: {Message}", contractId, ex.Message);
+            // Deriv no longer lists it as open (already sold, stopped out or hit its target, possibly by this very
+            // request): treat as closed and let reconciliation read the actual result from Deriv.
+            logger.LogInformation("Deriv contract {ContractId} is no longer open: {Message}", contractId, ex.Message);
         }
         catch (DerivApiException ex)
         {

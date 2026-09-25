@@ -67,17 +67,36 @@ public sealed class InMemorySimulatedBroker(string currency, decimal startingBal
     public Task<OrderResult> CancelOrderAsync(string orderId, CancellationToken cancellationToken) =>
         Task.FromResult(OrderResult.Rejected(orderId, "Market orders fill immediately; nothing to cancel."));
 
-    public Task<OrderResult> ClosePositionAsync(string positionId, CancellationToken cancellationToken) =>
-        Task.FromResult(OrderResult.Rejected(positionId, "Manual close is not supported in backtests."));
+    private readonly HashSet<Guid> _closeRequested = [];
+
+    /// <summary>Marks the position for closing; filled at the current price by the next <see cref="ProcessBarAsync"/>.</summary>
+    public Task<OrderResult> ClosePositionAsync(string positionId, CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(positionId, out var id) || !_open.TryGetValue(id, out var position))
+        {
+            return Task.FromResult(OrderResult.Rejected(positionId, "No open position with this id."));
+        }
+
+        _closeRequested.Add(id);
+        return Task.FromResult(new OrderResult(position.ClientOrderId, OrderStatus.Filled, null, id, null, null));
+    }
 
     public Task<IReadOnlyList<ClosedPosition>> ProcessBarAsync(Instrument instrument, Candle bar, CurrencyConverter converter, CancellationToken cancellationToken)
     {
         _quotes[instrument] = new Quote(instrument, bar.CloseTimeUtc, instrument.RoundPrice(bar.CloseBid), instrument.RoundPrice(bar.CloseAsk));
         var result = new List<ClosedPosition>();
-        foreach (var position in _open.Values.Where(p => p.Instrument == instrument && p.OpenedAtUtc < bar.CloseTimeUtc).ToList())
+        foreach (var position in _open.Values.Where(p => p.Instrument == instrument && (p.OpenedAtUtc < bar.CloseTimeUtc || _closeRequested.Contains(p.Id))).ToList())
         {
-            var tracked = PaperExecutionModel.TrackExcursion(position, bar);
-            var exit = PaperExecutionModel.CheckExit(tracked, bar, costs);
+            // A position opened after this bar closed must not be judged on price action from before it existed.
+            var openedAfterBar = position.OpenedAtUtc >= bar.CloseTimeUtc;
+            var tracked = openedAfterBar ? position : PaperExecutionModel.TrackExcursion(position, bar);
+            var exit = openedAfterBar ? null : PaperExecutionModel.CheckExit(tracked, bar, costs);
+            if (exit is null && _closeRequested.Remove(position.Id) && _quotes.TryGetValue(instrument, out var now))
+            {
+                var slippage = instrument.FromPips(costs.SlippagePips);
+                exit = (ExitReason.Manual, instrument.RoundPrice(tracked.Direction == Direction.Long ? now.Bid - slippage : now.Ask + slippage));
+            }
+
             if (exit is null)
             {
                 _open[position.Id] = tracked;

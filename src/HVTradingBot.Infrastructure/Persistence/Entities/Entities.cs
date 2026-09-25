@@ -303,3 +303,18 @@ public sealed class TestTradeEntity
     public decimal? RealizedPnl { get; set; }
     public int HoldSeconds { get; set; }
 }
+
+/// <summary>A request from the dashboard to close a position before its stop or target; carried out by the worker.</summary>
+public sealed class CloseRequestEntity
+{
+    public Guid Id { get; set; }
+    public Guid PositionId { get; set; }
+    public required string Instrument { get; set; }
+    public required string Status { get; set; }
+    public string? Message { get; set; }
+    public required string RequestedBy { get; set; }
+    public DateTime RequestedAtUtc { get; set; }
+    public DateTime? CompletedAtUtc { get; set; }
+    public decimal? ExitPrice { get; set; }
+    public decimal? RealizedPnl { get; set; }
+}

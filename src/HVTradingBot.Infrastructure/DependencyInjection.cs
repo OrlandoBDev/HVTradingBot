@@ -69,6 +69,7 @@ public static class DependencyInjection
 
         services.AddSingleton<MarketCatalogStore>();
         services.AddSingleton<TestTrades.TestTradeStore>();
+        services.AddSingleton<Trades.CloseRequestStore>();
         services.AddSingleton<TradingUniverse>();
 
         services.AddValidatedOptions<LearningOptions>(configuration, LearningOptions.SectionName);

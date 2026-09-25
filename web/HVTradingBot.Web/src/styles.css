@@ -288,3 +288,7 @@ textarea { background: var(--panel-2); color: var(--text); border: 1px solid var
 .step.done .step-dot { background: var(--good); border-color: var(--good); color: white; }
 .step.failed .step-dot { background: var(--bad); border-color: var(--bad); color: white; }
 .test-trade-message { margin: 0 0 4px; }
+
+td.actions { text-align: right; }
+.small-button { background: transparent; border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
+.small-button:hover { border-color: var(--bad); color: var(--bad); }

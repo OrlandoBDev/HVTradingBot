@@ -101,6 +101,8 @@ export interface Position {
   rMultiple: number | null;
   maePips: number | null;
   mfePips: number | null;
+  closeStatus: "Pending" | "Closing" | "Failed" | null;
+  closeMessage: string | null;
 }
 
 export interface RiskStatus {

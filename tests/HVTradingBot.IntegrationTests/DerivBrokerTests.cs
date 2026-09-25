@@ -229,6 +229,26 @@ public class DerivBrokerTests(PostgresFixture fixture) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Closing_a_contract_deriv_no_longer_lists_counts_as_closed_and_records_the_result()
+    {
+        AcceptProposalAndBuy();
+        var broker = await ReadyBrokerAsync();
+        var fill = await broker.PlaceOrderAsync(Order(), CancellationToken.None);
+        _socket.Handlers["sell"] = _ => throw new DerivApiException("ContractNotFound", "This contract was not found among your open positions.");
+        _socket.Handlers["proposal_open_contract"] = _ => new
+        {
+            proposal_open_contract = new { contract_id = 991, is_sold = 1, profit = "4.38", exit_tick = "1.10020", sell_time = "1767609000" }
+        };
+
+        var close = await broker.ClosePositionAsync(fill.PositionId!.Value.ToString(), CancellationToken.None);
+        var closed = Assert.Single(await broker.ProcessBarAsync(Instruments.EurUsd, Bar(T0.AddMinutes(5)), Converter, CancellationToken.None));
+
+        Assert.Equal(OrderStatus.Filled, close.Status);
+        Assert.Equal(4.38m, closed.RealizedPnl);   // numbers sent as strings are read too
+        Assert.Equal(ExitReason.Manual, closed.Reason);
+    }
+
+    [Fact]
     public async Task Contracts_opened_outside_the_app_count_as_open_positions()
     {
         _socket.Handlers["portfolio"] = _ => new

@@ -4,6 +4,7 @@ using HVTradingBot.Application.Abstractions;
 using HVTradingBot.Application.Learning;
 using HVTradingBot.Domain.Learning;
 using HVTradingBot.Infrastructure.TestTrades;
+using HVTradingBot.Infrastructure.Trades;
 using HVTradingBot.Contracts;
 
 namespace HVTradingBot.Api.Endpoints;
@@ -21,6 +22,27 @@ public static class TradingEndpoints
         api.MapGet("/decisions/{id:guid}", async (Guid id, DashboardQueries q, CancellationToken ct) =>
             await q.GetDecisionAsync(id, ct) is { } d ? Results.Ok(d) : Results.NotFound());
         api.MapGet("/positions/open", (DashboardQueries q, CancellationToken ct) => q.GetOpenPositionsAsync(ct));
+        api.MapPost("/positions/{id:guid}/close", async (Guid id, CloseRequestStore store, DashboardQueries queries, IDecisionJournal journal,
+            HttpContext http, CancellationToken ct) =>
+        {
+            // The API only records the request; the worker (the only process that talks to the broker) closes the position.
+            var status = await queries.GetStatusAsync(ct);
+            if (!status.WorkerHealthy)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["position"] = ["The trading worker is not running."] });
+            }
+
+            var actor = $"dashboard@{http.Connection.RemoteIpAddress}";
+            var (request, problem) = await store.CreateAsync(id, actor, ct);
+            if (request is null)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["position"] = [problem!] });
+            }
+
+            await journal.RecordAuditAsync(actor, "CloseRequested", $"{request.Instrument} position {id}", http.CorrelationId(), ct);
+            return Results.Ok(new { request.Id, request.Status, request.Message });
+        });
+
         api.MapGet("/trades", (DashboardQueries q, int? limit, CancellationToken ct) => q.GetTradeHistoryAsync(limit ?? 200, ct));
         api.MapGet("/risk", (DashboardQueries q, CancellationToken ct) => q.GetRiskStatusAsync(ct));
         api.MapGet("/performance", (DashboardQueries q, CancellationToken ct) => q.GetPerformanceAsync(ct));

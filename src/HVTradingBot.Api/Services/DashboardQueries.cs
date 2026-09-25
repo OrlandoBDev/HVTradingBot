@@ -12,6 +12,7 @@ using HVTradingBot.Infrastructure.Markets;
 using HVTradingBot.Infrastructure.Persistence;
 using HVTradingBot.Infrastructure.Persistence.Entities;
 using HVTradingBot.Infrastructure.Settings;
+using HVTradingBot.Infrastructure.Trades;
 using Microsoft.EntityFrameworkCore;
 
 namespace HVTradingBot.Api.Services;
@@ -23,7 +24,8 @@ public sealed class DashboardQueries(
     IClock clock,
     RiskOptionsSource riskSource,
     TradingEngineOptions engineOptions,
-    MarketCatalogStore catalog)
+    MarketCatalogStore catalog,
+    CloseRequestStore closeRequests)
 {
     private sealed record AccountSnapshot(string Currency, decimal Balance, decimal StartingBalance);
 
@@ -154,7 +156,13 @@ public sealed class DashboardQueries(
     {
         var state = await stateStore.GetAsync(cancellationToken);
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        return await OpenPositionsAsync(db, BrokerOf(state), cancellationToken);
+        var positions = await OpenPositionsAsync(db, BrokerOf(state), cancellationToken);
+
+        // Show "closing…" (or why a close failed) next to positions the user asked to close.
+        var requests = await closeRequests.LatestForAsync(positions.Select(p => p.Id).ToList(), cancellationToken);
+        return positions.Select(p => requests.TryGetValue(p.Id, out var r) && r.Status != CloseRequestStatus.Closed
+            ? p with { CloseStatus = r.Status, CloseMessage = r.Message }
+            : p).ToList();
     }
 
     public async Task<IReadOnlyList<PositionDto>> GetTradeHistoryAsync(int limit, CancellationToken cancellationToken)

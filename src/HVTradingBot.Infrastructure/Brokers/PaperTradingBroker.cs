@@ -158,8 +158,10 @@ public sealed class PaperTradingBroker(
 
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var open = await db.Positions
-            .Where(p => p.IsOpen && p.Broker == "Paper" && p.Instrument == instrument.Symbol && p.OpenedAtUtc < bar.CloseTimeUtc)
+            .Where(p => p.IsOpen && p.Broker == "Paper" && p.Instrument == instrument.Symbol)
             .ToListAsync(cancellationToken);
+        // Stops and targets are checked only against bars after the position opened; close requests apply at once.
+        open = open.Where(p => p.OpenedAtUtc < bar.CloseTimeUtc || _closeRequested.ContainsKey(p.Id)).ToList();
         if (open.Count == 0)
         {
             return [];
@@ -169,11 +171,13 @@ public sealed class PaperTradingBroker(
         PaperAccountEntity? account = null;
         foreach (var entity in open)
         {
-            var tracked = PaperExecutionModel.TrackExcursion(ToModel(entity), bar);
+            // A position opened after this bar closed must not be judged on price action from before it existed.
+            var openedAfterBar = entity.OpenedAtUtc >= bar.CloseTimeUtc;
+            var tracked = openedAfterBar ? ToModel(entity) : PaperExecutionModel.TrackExcursion(ToModel(entity), bar);
             entity.MaxFavorableExcursion = tracked.MaxFavorableExcursion;
             entity.MaxAdverseExcursion = tracked.MaxAdverseExcursion;
 
-            var exitCheck = PaperExecutionModel.CheckExit(tracked, bar, costs);
+            var exitCheck = openedAfterBar ? null : PaperExecutionModel.CheckExit(tracked, bar, costs);
             if (exitCheck is null && _closeRequested.TryRemove(entity.Id, out _) && _quotes.TryGetValue(instrument, out var now))
             {
                 // Closed on request: longs sell at the bid, shorts buy back at the ask (plus slippage).

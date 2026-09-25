@@ -130,6 +130,12 @@ public sealed class TestTradeService(
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(ex, "Test trade close failed");
+            if (await store.PositionAsync(positionId, ct) is { IsOpen: false } recorded)
+            {
+                await Closed(trade, recorded.ExitPrice, recorded.RealizedPnl, recorded.ExitReason, ct);
+                return;
+            }
+
             await Fail(trade, $"Close failed: {ex.Message} The position keeps its stop loss and take profit.", ct);
             return;
         }

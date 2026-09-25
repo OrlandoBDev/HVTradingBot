@@ -18,6 +18,7 @@ try
     builder.Services.AddHostedService<TradingWorker>();
     builder.Services.AddHostedService<BrokerSettingsWatcher>();
     builder.Services.AddHostedService<TestTradeService>();
+    builder.Services.AddHostedService<ClosePositionService>();
 
     await builder.Build().RunAsync();
     // BrokerSettingsWatcher sets exit code 3 to ask run.sh / Docker for a restart (market selection changed).
