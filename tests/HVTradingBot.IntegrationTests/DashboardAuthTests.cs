@@ -22,6 +22,8 @@ public sealed class DashboardAuthTests(PostgresFixture fixture) : IAsyncLifetime
         var keys = Directory.CreateTempSubdirectory("hv-keys-");
         _app = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
         {
+            // Not Development: that reads the repository .env, whose connection string would point at the real database.
+            b.UseEnvironment("Testing");
             b.UseSetting("ConnectionStrings:TradingDb", fixture.ConnectionString);
             b.UseSetting("DataProtection:KeysPath", keys.FullName);
             b.UseSetting("Database:ApplyMigrationsOnStartup", "false");
