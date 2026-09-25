@@ -1,8 +1,16 @@
+/** Fired when the session has ended (signed out elsewhere, password changed, expired); the app shows the login page. */
+export const UNAUTHORIZED_EVENT = "hv:unauthorized";
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    credentials: "same-origin",
+    // The custom header marks the request as coming from this app; the API refuses changes without it.
+    headers: { "Content-Type": "application/json", "X-HV-Request": "1", ...(init?.headers ?? {}) },
   });
+  if (response.status === 401 && !path.startsWith("/api/auth/")) {
+    window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+  }
   if (response.status === 204) {
     return undefined as T;
   }

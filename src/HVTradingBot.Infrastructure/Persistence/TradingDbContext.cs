@@ -23,6 +23,7 @@ public sealed class TradingDbContext(DbContextOptions<TradingDbContext> options)
     public DbSet<SystemStateEntity> SystemState => Set<SystemStateEntity>();
     public DbSet<MarketSnapshotEntity> MarketSnapshots => Set<MarketSnapshotEntity>();
     public DbSet<AuditLogEntity> AuditLogs => Set<AuditLogEntity>();
+    public DbSet<AppUserEntity> AppUsers => Set<AppUserEntity>();
     public DbSet<BacktestRunEntity> BacktestRuns => Set<BacktestRunEntity>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
@@ -179,6 +180,15 @@ public sealed class TradingDbContext(DbContextOptions<TradingDbContext> options)
         {
             e.HasKey(x => x.Instrument);
             e.Property(x => x.Indicators).HasColumnType("jsonb");
+        });
+
+        modelBuilder.Entity<AppUserEntity>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Username).HasMaxLength(64);
+            e.Property(x => x.PasswordHash).HasMaxLength(512);
+            e.Property(x => x.SecurityStamp).HasMaxLength(64);
+            e.HasIndex(x => x.Username).IsUnique();
         });
 
         modelBuilder.Entity<AuditLogEntity>(e =>

@@ -6,6 +6,7 @@ import { Badge, Card, ErrorNote } from "./Ui";
 import { MarketSettings } from "./MarketSettings";
 import { RiskSettings } from "./RiskSettings";
 import { NotificationSettings } from "./NotificationSettings";
+import { SecuritySettings } from "./SecuritySettings";
 import type { PageId } from "../pages";
 
 const connectionTone = (s: DerivSettings["connection"]) =>
@@ -184,6 +185,7 @@ const SECTIONS = [
   { id: "markets", label: "Markets", summary: "Pick the markets to analyse and trade. Saving restarts the trading worker." },
   { id: "risk", label: "Risk limits", summary: "How much each trade may risk and when trading stops for the day or week." },
   { id: "notifications", label: "Notifications", summary: "Email me when a trade opens or closes. The app password is stored encrypted and never shown again." },
+  { id: "security", label: "Login & security", summary: "The username and password that protect this dashboard." },
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]["id"];
@@ -207,6 +209,7 @@ export function Settings({ section, navigate }: { section?: string; navigate: (p
         {current === "markets" && <MarketSettings />}
         {current === "risk" && <RiskSettings />}
         {current === "notifications" && <NotificationSettings />}
+        {current === "security" && <SecuritySettings />}
       </div>
     </div>
   );

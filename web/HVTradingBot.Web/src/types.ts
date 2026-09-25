@@ -216,3 +216,9 @@ export interface MarketSettings {
   maxSelected: number;
   catalog: MarketCatalogItem[];
 }
+
+export interface AuthStatus {
+  authenticated: boolean;
+  username: string | null;
+  setupRequired: boolean;
+}

@@ -6,6 +6,8 @@
 #   ./run.sh test     Run all automated tests (integration tests need Docker)
 #   ./run.sh stop     Stop Docker services
 #   ./run.sh reset    Stop services and DELETE the database volume (all paper-trading history)
+#   ./run.sh setup-code   Show the one-time code for creating the dashboard login
+#   ./run.sh reset-login  Delete the dashboard login (forgotten password); create a new one with the code it prints
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -148,6 +150,7 @@ run_local() {
   local url="http://localhost:${API_PORT}"
   wait_for_api "$url"
   info "Dashboard: $url   (Ctrl+C to stop)"
+  curl -fsS "$url/api/auth/me" 2>/dev/null | grep -q '"setupRequired":true' && show_setup_code
   open "$url" >/dev/null 2>&1 || true
   tail -n +1 -f "$RUN_DIR/worker.log"
 }
@@ -161,7 +164,30 @@ run_docker() {
   local url="http://localhost:${API_PORT}"
   wait_for_api "$url"
   info "Dashboard: $url   (logs: docker compose logs -f worker; stop: ./run.sh stop)"
+  curl -fsS "$url/api/auth/me" 2>/dev/null | grep -q '"setupRequired":true' && show_setup_code
   open "$url" >/dev/null 2>&1 || true
+}
+
+# The API logs a one-time setup code while no dashboard login exists.
+show_setup_code() {
+  local url="http://localhost:${API_PORT:-5080}" line=""
+  curl -fsS "$url/api/auth/me" 2>/dev/null | grep -q '"setupRequired":true' || { info "A dashboard login already exists. Forgot the password? ./run.sh reset-login"; return 0; }
+  if [ -f "$RUN_DIR/api.log" ]; then line="$(grep -h 'setup code' "$RUN_DIR/api.log" | tail -n 1 || true)"; fi
+  if [ -z "$line" ] && command -v docker >/dev/null 2>&1; then line="$(docker compose logs api 2>/dev/null | grep 'setup code' | tail -n 1 || true)"; fi
+  [ -n "$line" ] || fail "No setup code found in the API log. Is the API running?"
+  info "Create your dashboard login at $url with setup code: $(printf '%s' "$line" | grep -oE 'setup code [0-9A-F]{4}-[0-9A-F]{4}' | tail -n 1 | cut -d' ' -f3)"
+}
+
+reset_login() {
+  require_docker
+  ensure_env
+  read -r -p "Delete the dashboard login? You will create a new one with a setup code. [y/N] " answer
+  [ "$answer" = "y" ] || [ "$answer" = "Y" ] || exit 0
+  # shellcheck disable=SC1091
+  set -a; . ./.env; set +a
+  docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -qc "DELETE FROM app_users;" >/dev/null
+  info "Login deleted."
+  show_setup_code
 }
 
 run_tests() {
@@ -177,11 +203,13 @@ case "${1:-local}" in
   docker) run_docker ;;
   test) run_tests ;;
   stop) require_docker; docker compose stop ;;
+  setup-code) show_setup_code ;;
+  reset-login) reset_login ;;
   reset)
     require_docker
     read -r -p "Delete the database volume and all paper-trading history? [y/N] " answer
     [ "$answer" = "y" ] || [ "$answer" = "Y" ] || exit 0
     docker compose down -v
     ;;
-  *) fail "Unknown command '$1'. Use: local | docker | test | stop | reset" ;;
+  *) fail "Unknown command '$1'. Use: local | docker | test | stop | reset | setup-code | reset-login" ;;
 esac

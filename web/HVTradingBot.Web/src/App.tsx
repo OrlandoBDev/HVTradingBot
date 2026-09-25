@@ -1,9 +1,9 @@
-import { useState } from "react";
-import { api } from "./api";
+import { useCallback, useEffect, useState } from "react";
+import { api, UNAUTHORIZED_EVENT } from "./api";
 import { useStatus } from "./useStatus";
 import { useRoute } from "./router";
 import { GROUPS, PAGES, pageInfo } from "./pages";
-import type { SystemStatus } from "./types";
+import type { AuthStatus, SystemStatus } from "./types";
 import { Badge } from "./components/Ui";
 import { PageHeader } from "./components/PageHeader";
 import { Overview } from "./components/Overview";
@@ -17,8 +17,36 @@ import { Audit } from "./components/Audit";
 import { KillSwitch } from "./components/KillSwitch";
 import { Settings } from "./components/Settings";
 import { LearningView } from "./components/LearningView";
+import { Login } from "./components/Login";
 
+/** Shows the sign-in page until there is a session, then the dashboard. */
 export function App() {
+  const [auth, setAuth] = useState<AuthStatus | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  const check = useCallback(() => {
+    api.get<AuthStatus>("/api/auth/me").then((a) => { setAuth(a); setAuthError(null); }).catch((e: Error) => setAuthError(e.message));
+  }, []);
+
+  useEffect(() => {
+    check();
+    window.addEventListener(UNAUTHORIZED_EVENT, check);
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, check);
+  }, [check]);
+
+  if (!auth) {
+    return <div className="login-page"><p className="empty">{authError ? `Cannot reach the API: ${authError}` : "Loading…"}</p></div>;
+  }
+
+  if (!auth.authenticated) {
+    return <Login setupRequired={auth.setupRequired} onSignedIn={setAuth} />;
+  }
+
+  const signOut = () => api.post("/api/auth/logout", {}).finally(check);
+  return <Dashboard username={auth.username ?? ""} onSignOut={signOut} />;
+}
+
+function Dashboard({ username, onSignOut }: { username: string; onSignOut: () => void }) {
   const { status, connected, setStatus } = useStatus();
   const [route, navigate] = useRoute();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -58,6 +86,10 @@ export function App() {
             <KillSwitch status={status} onChanged={refreshStatus} />
           </div>
         )}
+        <div className="user-menu">
+          <span className="user-name" title="Signed in">{username}</span>
+          <button onClick={onSignOut}>Sign out</button>
+        </div>
       </header>
 
       <div className="body">

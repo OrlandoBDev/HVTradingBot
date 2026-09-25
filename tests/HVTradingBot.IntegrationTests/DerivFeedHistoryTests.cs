@@ -63,6 +63,28 @@ public class DerivFeedHistoryTests(PostgresFixture fixture) : IAsyncLifetime
         Assert.True(bars[^1].CloseTimeUtc <= Now);                        // still-forming bar excluded
     }
 
+    [Fact]
+    public async Task Tick_subscription_timeout_resubscribes_on_the_next_attempt()
+    {
+        var socket = new FakeDerivSocket();
+        var ticks = 0;
+        socket.Handlers["ticks"] = _ => ++ticks == 1
+            ? throw new DerivConnectionException("No response from Deriv within 15s (ticks).")
+            : new { tick = new { symbol = "frxEURUSD", bid = 1.10000m, ask = 1.10010m, epoch = Epoch(Now) } };
+        socket.Handlers["ticks_history"] = _ => new
+        {
+            candles = new[] { new { epoch = Epoch(TimeFrame.M5.BarStart(Now.AddMinutes(-10))), open = 1.1m, high = 1.1m, low = 1.1m, close = 1.1m } }
+        };
+
+        var feed = new DerivMarketDataFeed(fixture.DbFactory, new DerivOptions(), new MarketDataOptions { WarmupDays = 1 },
+            TradingUniverse.From([Instruments.EurUsd], "USD"), socket, new FixedClock(), NullLogger<DerivMarketDataFeed>.Instance);
+
+        await Assert.ThrowsAsync<DerivConnectionException>(() => feed.LoadHistoryAsync(CancellationToken.None));
+        await feed.LoadHistoryAsync(CancellationToken.None);
+
+        Assert.Equal(2, socket.Count("ticks")); // the retry subscribed again instead of reusing the half-set-up connection
+    }
+
     private sealed class FixedClock : IClock
     {
         public DateTime UtcNow => Now;

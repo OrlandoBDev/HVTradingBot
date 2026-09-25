@@ -178,6 +178,13 @@ public sealed class DerivMarketDataFeed(
                 // e.g. market closed: no live ticks until it reopens; freshness checks will block trading.
                 logger.LogWarning("Tick subscription for {Instrument} rejected: {Message}", instrument.Symbol, ex.Message);
             }
+            catch (DerivConnectionException)
+            {
+                // Timed out or dropped: discard the half-subscribed connection so the next call resubscribes everything.
+                await _socket.DisposeAsync();
+                _socket = null;
+                throw;
+            }
         }
 
         return _socket;

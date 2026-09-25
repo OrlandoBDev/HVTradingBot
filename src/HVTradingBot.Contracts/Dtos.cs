@@ -247,3 +247,13 @@ public sealed record TestTradeDto(
 
 /// <summary>One page of a larger result. <see cref="Page"/> starts at 1.</summary>
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int PageSize);
+
+/// <summary>Who is signed in. <c>SetupRequired</c> is true until the owner account has been created.</summary>
+public sealed record AuthStatusDto(bool Authenticated, string? Username, bool SetupRequired);
+
+public sealed record LoginRequest(string Username, string Password, bool RememberMe = false);
+
+/// <summary>Creates the owner account. The setup code is printed in the API log so only whoever runs the server can claim it.</summary>
+public sealed record SetupRequest(string SetupCode, string Username, string Password);
+
+public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
