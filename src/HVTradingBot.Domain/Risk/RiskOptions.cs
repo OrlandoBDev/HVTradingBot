@@ -35,6 +35,16 @@ public sealed class RiskOptions
     /// <summary>Derived (synthetic) markets: after losing this much in a day, only Derived trading pauses until the next day.</summary>
     [Range(0.1, 20)] public decimal MaxDerivedDailyLossPercent { get; set; } = 1m;
 
+    /// <summary>
+    /// Derived (synthetic) markets: a candidate scoring at least <see cref="HighScoreOverrideMinScore"/> may open even
+    /// when the Derived position limit is reached or the same market already has a position, up to this many extra
+    /// Derived positions. Extras never use Forex slots and must fit in the Derived daily loss budget. 0 turns it off.
+    /// </summary>
+    [Range(0, 10)] public int MaxExtraDerivedPositions { get; set; } = 2;
+
+    /// <summary>Minimum score for the Derived high-score override.</summary>
+    [Range(75, 100)] public int HighScoreOverrideMinScore { get; set; } = 90;
+
     public static bool IsDerived(MarketData.Instrument instrument) => instrument.AssetClass == MarketData.AssetClass.SyntheticIndex;
 
     /// <summary>Risk per trade that applies to <paramref name="instrument"/>.</summary>

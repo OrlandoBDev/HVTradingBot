@@ -174,7 +174,9 @@ public sealed record RiskLimitsDto(
     int? MaxDerivedOpenPositions = null,
     decimal? DerivedRiskPerTradePercent = null,
     decimal? MaxDerivedDailyLossPercent = null,
-    decimal? AssumedCommissionPercent = null);
+    decimal? AssumedCommissionPercent = null,
+    int? MaxExtraDerivedPositions = null,
+    int? HighScoreOverrideMinScore = null);
 
 public sealed record RiskSettingsDto(
     RiskLimitsDto Effective,

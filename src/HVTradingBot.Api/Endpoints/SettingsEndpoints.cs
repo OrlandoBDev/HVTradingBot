@@ -81,7 +81,8 @@ public static partial class SettingsEndpoints
             var limits = new RiskLimits(request.MaxRiskPerTradePercent, request.MaxDailyLossPercent, request.MaxWeeklyLossPercent,
                 request.MaxOpenPositions, request.MinRewardToRisk, request.MaxConsecutiveLosses, request.CooldownMinutes,
                 request.MaxCurrencyExposure, request.MaxCommissionShareOfRisk, request.MaxDerivedOpenPositions, request.DerivedRiskPerTradePercent,
-                request.MaxDerivedDailyLossPercent, request.AssumedCommissionPercent);
+                request.MaxDerivedDailyLossPercent, request.AssumedCommissionPercent, request.MaxExtraDerivedPositions,
+                request.HighScoreOverrideMinScore);
             limits = limits.WithDefaultsFrom(source.Defaults);
             var errors = limits.Validate();
             if (errors.Count > 0)
@@ -200,7 +201,8 @@ public static partial class SettingsEndpoints
 
     private static RiskLimitsDto ToDto(RiskLimits l) => new(l.MaxRiskPerTradePercent, l.MaxDailyLossPercent, l.MaxWeeklyLossPercent,
         l.MaxOpenPositions, l.MinRewardToRisk, l.MaxConsecutiveLosses, l.CooldownMinutes, l.MaxCurrencyExposure, l.MaxCommissionShareOfRisk,
-        l.MaxDerivedOpenPositions, l.DerivedRiskPerTradePercent, l.MaxDerivedDailyLossPercent, l.AssumedCommissionPercent);
+        l.MaxDerivedOpenPositions, l.DerivedRiskPerTradePercent, l.MaxDerivedDailyLossPercent, l.AssumedCommissionPercent,
+        l.MaxExtraDerivedPositions, l.HighScoreOverrideMinScore);
 
     private static async Task<MarketSettingsDto> MarketsDtoAsync(MarketCatalogStore catalog, TradingEngineOptions engineOptions, CancellationToken ct)
     {

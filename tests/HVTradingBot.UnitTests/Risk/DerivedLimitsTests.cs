@@ -51,6 +51,67 @@ public class DerivedLimitsTests
         Assert.True(forex.IsApproved, forex.RejectionReason);
     }
 
+    private static OpenPosition OpenDerived(string clientOrderId, decimal risk = 50m) =>
+        Bars.Position(Vol75, Direction.Long, entry: 1000m, stop: 990m, target: 1030m, units: 5, clientOrderId: clientOrderId) with { InitialRiskAmount = risk };
+
+    private static TradeProposal HighScore(string clientOrderId) => DerivedProposal() with { Score = 90, ClientOrderId = clientOrderId };
+
+    [Fact]
+    public async Task High_score_derived_trade_is_added_on_the_same_market_without_using_a_forex_slot()
+    {
+        var portfolio = Bars.Portfolio(balance: 10_000m, positions: [OpenDerived("d1")]);
+
+        var extra = await _risk.EvaluateAsync(HighScore("R75-2"), portfolio, CancellationToken.None);
+
+        Assert.True(extra.IsApproved, extra.RejectionReason);
+        Assert.Contains(extra.Checks, c => c.Rule == "HighScoreOverride" && c.Passed);
+
+        // With the extra open, Forex still has two of its three slots.
+        var withExtra = Bars.Portfolio(balance: 10_000m, positions: [OpenDerived("d1"), OpenDerived("d2")]);
+        var forex = await _risk.EvaluateAsync(Bars.Proposal(), withExtra, CancellationToken.None);
+        Assert.True(forex.IsApproved, forex.RejectionReason);
+        Assert.Contains(forex.Checks, c => c.Rule == "OpenPositions" && c.Detail == "1/3 open.");
+    }
+
+    [Fact]
+    public async Task High_score_extra_must_fit_in_the_remaining_derived_loss_budget()
+    {
+        // 1% of 10,000 = 100 budget, 50 already lost today, 50 at risk in the open position: no room for another.
+        var portfolio = Bars.Portfolio(balance: 10_000m, positions: [OpenDerived("d1")]) with { DerivedDailyRealizedPnl = -50m };
+
+        var extra = await _risk.EvaluateAsync(HighScore("R75-2"), portfolio, CancellationToken.None);
+
+        Assert.False(extra.IsApproved);
+        Assert.Contains(extra.Checks, c => c.Rule == "HighScoreOverride" && !c.Passed);
+    }
+
+    [Fact]
+    public async Task High_score_extras_are_capped_and_can_be_turned_off()
+    {
+        var options = Options.Clone();
+        options.MaxExtraDerivedPositions = 1;
+        var risk = new RiskManager(options, new ExecutionCostOptions { SlippagePips = 0 });
+        var full = Bars.Portfolio(balance: 10_000m, positions: [OpenDerived("d1", 10m), OpenDerived("d2", 10m)]);
+        Assert.Contains((await risk.EvaluateAsync(HighScore("R75-3"), full, CancellationToken.None)).Checks, c => c.Rule == "HighScoreOverride" && !c.Passed);
+
+        options.MaxExtraDerivedPositions = 0;
+        var one = Bars.Portfolio(balance: 10_000m, positions: [OpenDerived("d1", 10m)]);
+        Assert.False((await risk.EvaluateAsync(HighScore("R75-2"), one, CancellationToken.None)).IsApproved);
+    }
+
+    [Fact]
+    public async Task Low_score_derived_and_high_score_forex_keep_the_normal_rules()
+    {
+        var derivedOpen = Bars.Portfolio(balance: 10_000m, positions: [OpenDerived("d1")]);
+        var lowScore = await _risk.EvaluateAsync(DerivedProposal() with { ClientOrderId = "R75-2" }, derivedOpen, CancellationToken.None);
+        Assert.Contains(lowScore.Checks, c => c.Rule == "HighScoreOverride" && !c.Passed);
+
+        var forexOpen = Bars.Portfolio(balance: 10_000m, positions: [Bars.Position(Instruments.EurUsd, Direction.Long, units: 1000m)]);
+        var forex = await _risk.EvaluateAsync(Bars.Proposal() with { Score = 95 }, forexOpen, CancellationToken.None);
+        Assert.Contains(forex.Checks, c => c.Rule == "DuplicateInstrument" && !c.Passed);
+        Assert.DoesNotContain(forex.Checks, c => c.Rule == "HighScoreOverride");
+    }
+
     [Fact]
     public async Task Derived_daily_loss_pauses_only_derived()
     {

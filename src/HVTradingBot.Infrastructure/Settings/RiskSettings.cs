@@ -22,11 +22,14 @@ public sealed record RiskLimits(
     int? MaxDerivedOpenPositions = null,
     decimal? DerivedRiskPerTradePercent = null,
     decimal? MaxDerivedDailyLossPercent = null,
-    decimal? AssumedCommissionPercent = null)
+    decimal? AssumedCommissionPercent = null,
+    int? MaxExtraDerivedPositions = null,
+    int? HighScoreOverrideMinScore = null)
 {
     public static RiskLimits From(RiskOptions o) => new(o.MaxRiskPerTradePercent, o.MaxDailyLossPercent, o.MaxWeeklyLossPercent,
         o.MaxOpenPositions, o.MinRewardToRisk, o.MaxConsecutiveLosses, o.CooldownMinutes, o.MaxCurrencyExposure, o.MaxCommissionShareOfRisk,
-        o.MaxDerivedOpenPositions, o.DerivedRiskPerTradePercent, o.MaxDerivedDailyLossPercent, o.AssumedCommissionPercent);
+        o.MaxDerivedOpenPositions, o.DerivedRiskPerTradePercent, o.MaxDerivedDailyLossPercent, o.AssumedCommissionPercent,
+        o.MaxExtraDerivedPositions, o.HighScoreOverrideMinScore);
 
     /// <summary>Limits saved before the Derived limits existed take the configured Derived defaults.</summary>
     public RiskLimits WithDefaultsFrom(RiskOptions defaults) => this with
@@ -34,7 +37,9 @@ public sealed record RiskLimits(
         MaxDerivedOpenPositions = MaxDerivedOpenPositions ?? defaults.MaxDerivedOpenPositions,
         DerivedRiskPerTradePercent = DerivedRiskPerTradePercent ?? defaults.DerivedRiskPerTradePercent,
         MaxDerivedDailyLossPercent = MaxDerivedDailyLossPercent ?? defaults.MaxDerivedDailyLossPercent,
-        AssumedCommissionPercent = AssumedCommissionPercent ?? defaults.AssumedCommissionPercent
+        AssumedCommissionPercent = AssumedCommissionPercent ?? defaults.AssumedCommissionPercent,
+        MaxExtraDerivedPositions = MaxExtraDerivedPositions ?? defaults.MaxExtraDerivedPositions,
+        HighScoreOverrideMinScore = HighScoreOverrideMinScore ?? defaults.HighScoreOverrideMinScore
     };
 
     public RiskOptions ApplyTo(RiskOptions defaults)
@@ -53,6 +58,8 @@ public sealed record RiskLimits(
         o.DerivedRiskPerTradePercent = DerivedRiskPerTradePercent ?? defaults.DerivedRiskPerTradePercent;
         o.MaxDerivedDailyLossPercent = MaxDerivedDailyLossPercent ?? defaults.MaxDerivedDailyLossPercent;
         o.AssumedCommissionPercent = AssumedCommissionPercent ?? defaults.AssumedCommissionPercent;
+        o.MaxExtraDerivedPositions = MaxExtraDerivedPositions ?? defaults.MaxExtraDerivedPositions;
+        o.HighScoreOverrideMinScore = HighScoreOverrideMinScore ?? defaults.HighScoreOverrideMinScore;
         return o;
     }
 
@@ -88,6 +95,16 @@ public sealed record RiskLimits(
         {
             Check(derivedRisk >= 0.1m && derivedRisk <= MaxRiskPerTradePercent, nameof(DerivedRiskPerTradePercent),
                 "Derived risk per trade must be between 0.1% and the risk per trade.");
+        }
+
+        if (MaxExtraDerivedPositions is { } extra)
+        {
+            Check(extra >= 0 && extra <= 5, nameof(MaxExtraDerivedPositions), "Extra Derived positions must be between 0 (off) and 5.");
+        }
+
+        if (HighScoreOverrideMinScore is { } minScore)
+        {
+            Check(minScore >= 75 && minScore <= 100, nameof(HighScoreOverrideMinScore), "Override score must be between 75 and 100.");
         }
 
         if (AssumedCommissionPercent is { } commission)

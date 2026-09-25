@@ -23,6 +23,7 @@ internal sealed class RiskRules(RiskOptions options, ExecutionCostOptions costs)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var size = PositionSizer.Calculate(proposal, portfolio, options, costs.SlippagePips);
+        var overrideCheck = HighScoreOverride(proposal, portfolio, size);
         var checks = new List<RiskCheck>
         {
             TradingMode(portfolio),
@@ -32,9 +33,9 @@ internal sealed class RiskRules(RiskOptions options, ExecutionCostOptions costs)
             StopDistance(proposal),
             Spread(proposal),
             Slippage(),
-            OpenPositions(portfolio),
-            DerivedPositions(proposal, portfolio),
-            DuplicateInstrument(proposal, portfolio),
+            OpenPositions(portfolio, overrideCheck),
+            DerivedPositions(proposal, portfolio, overrideCheck),
+            DuplicateInstrument(proposal, portfolio, overrideCheck),
             DailyLoss(portfolio),
             DerivedDailyLoss(proposal, portfolio),
             WeeklyLoss(portfolio),
@@ -43,6 +44,10 @@ internal sealed class RiskRules(RiskOptions options, ExecutionCostOptions costs)
             Tradable(proposal),
             Sizing(proposal, size)
         };
+        if (overrideCheck is not null)
+        {
+            checks.Add(overrideCheck);
+        }
 
         var approved = checks.All(c => c.Passed);
         return Task.FromResult(new RiskDecision(approved, approved ? size.Units : 0, approved ? size.RiskAmount : 0, checks));
@@ -94,20 +99,76 @@ internal sealed class RiskRules(RiskOptions options, ExecutionCostOptions costs)
         ? Pass(nameof(Slippage), $"Expected {costs.SlippagePips:F1} pips.")
         : Fail(nameof(Slippage), $"Expected slippage {costs.SlippagePips:F1} pips exceeds {options.MaxSlippagePips:F1}.");
 
-    private RiskCheck OpenPositions(PortfolioState p) => p.OpenPositions.Count < options.MaxOpenPositions
-        ? Pass(nameof(OpenPositions), $"{p.OpenPositions.Count}/{options.MaxOpenPositions} open.")
-        : Fail(nameof(OpenPositions), $"Maximum of {options.MaxOpenPositions} open positions reached.");
+    /// <summary>
+    /// Forex slots: Derived positions beyond <see cref="RiskOptions.MaxDerivedOpenPositions"/> (high-score extras) do not
+    /// count, so they can never take a slot Forex needs.
+    /// </summary>
+    private RiskCheck OpenPositions(PortfolioState p, RiskCheck? highScoreOverride)
+    {
+        if (highScoreOverride is { Passed: true } && p.DerivedOpenPositions >= options.MaxDerivedOpenPositions)
+        {
+            return Pass(nameof(OpenPositions), "High-score Derived extra; does not use a Forex slot.");
+        }
 
-    private RiskCheck DerivedPositions(TradeProposal proposal, PortfolioState p)
+        var used = p.OpenPositions.Count - p.DerivedOpenPositions + Math.Min(p.DerivedOpenPositions, options.MaxDerivedOpenPositions);
+        return used < options.MaxOpenPositions
+            ? Pass(nameof(OpenPositions), $"{used}/{options.MaxOpenPositions} open.")
+            : Fail(nameof(OpenPositions), $"Maximum of {options.MaxOpenPositions} open positions reached.");
+    }
+
+    private RiskCheck DerivedPositions(TradeProposal proposal, PortfolioState p, RiskCheck? highScoreOverride)
     {
         if (!RiskOptions.IsDerived(proposal.Instrument))
         {
             return Pass(nameof(DerivedPositions), "Not a Derived market.");
         }
 
-        return p.DerivedOpenPositions < options.MaxDerivedOpenPositions
-            ? Pass(nameof(DerivedPositions), $"{p.DerivedOpenPositions}/{options.MaxDerivedOpenPositions} Derived open.")
+        if (p.DerivedOpenPositions < options.MaxDerivedOpenPositions)
+        {
+            return Pass(nameof(DerivedPositions), $"{p.DerivedOpenPositions}/{options.MaxDerivedOpenPositions} Derived open.");
+        }
+
+        return highScoreOverride is { Passed: true }
+            ? Pass(nameof(DerivedPositions), $"{p.DerivedOpenPositions} Derived open; allowed as a high-score extra.")
             : Fail(nameof(DerivedPositions), $"Maximum of {options.MaxDerivedOpenPositions} Derived position(s) reached; remaining slots are kept for Forex.");
+    }
+
+    /// <summary>
+    /// Present only when a Derived proposal is blocked by the Derived position limit or an open position on the same
+    /// market. Passes when the score is high enough, an extra slot is free and every open Derived position plus this
+    /// one could hit its stop without Derived losing more than its daily limit, so Forex's loss budget is untouched.
+    /// </summary>
+    private RiskCheck? HighScoreOverride(TradeProposal proposal, PortfolioState p, PositionSize size)
+    {
+        var sameMarketOpen = p.OpenPositions.Any(x => x.Instrument == proposal.Instrument);
+        if (!RiskOptions.IsDerived(proposal.Instrument) || (p.DerivedOpenPositions < options.MaxDerivedOpenPositions && !sameMarketOpen))
+        {
+            return null;
+        }
+
+        const string rule = nameof(HighScoreOverride);
+        if (options.MaxExtraDerivedPositions == 0)
+        {
+            return Fail(rule, "High-score override is off.");
+        }
+
+        if (proposal.Score < options.HighScoreOverrideMinScore)
+        {
+            return Fail(rule, $"Score {proposal.Score} is below the override minimum {options.HighScoreOverrideMinScore}.");
+        }
+
+        var limit = options.MaxDerivedOpenPositions + options.MaxExtraDerivedPositions;
+        if (p.DerivedOpenPositions >= limit)
+        {
+            return Fail(rule, $"All {options.MaxExtraDerivedPositions} extra Derived position(s) are in use.");
+        }
+
+        var budget = p.Balance * options.MaxDerivedDailyLossPercent / 100m - Math.Max(0m, -p.DerivedDailyRealizedPnl);
+        var openRisk = p.OpenPositions.Where(x => RiskOptions.IsDerived(x.Instrument)).Sum(x => x.InitialRiskAmount);
+        var total = openRisk + size.RiskAmount;
+        return total <= budget
+            ? Pass(rule, $"Score {proposal.Score} ≥ {options.HighScoreOverrideMinScore}: extra Derived position allowed; Derived risk {total:F2} of remaining budget {Math.Max(0m, budget):F2}.")
+            : Fail(rule, $"Score {proposal.Score} qualifies, but open Derived risk {openRisk:F2} + {size.RiskAmount:F2} would exceed today's remaining Derived loss budget {Math.Max(0m, budget):F2}.");
     }
 
     private RiskCheck DerivedDailyLoss(TradeProposal proposal, PortfolioState p)
@@ -123,12 +184,22 @@ internal sealed class RiskRules(RiskOptions options, ExecutionCostOptions costs)
             : Pass(nameof(DerivedDailyLoss), $"Derived P&L today {p.DerivedDailyRealizedPnl:F2}.");
     }
 
-    private static RiskCheck DuplicateInstrument(TradeProposal proposal, PortfolioState p) =>
-        p.OpenPositions.Any(x => x.Instrument == proposal.Instrument)
-            ? Fail(nameof(DuplicateInstrument), $"A position on {proposal.Instrument} is already open.")
-            : p.OpenPositions.Any(x => x.ClientOrderId == proposal.ClientOrderId)
-                ? Fail(nameof(DuplicateInstrument), "This signal was already executed.")
-                : Pass(nameof(DuplicateInstrument), "No existing position.");
+    private static RiskCheck DuplicateInstrument(TradeProposal proposal, PortfolioState p, RiskCheck? highScoreOverride)
+    {
+        if (p.OpenPositions.Any(x => x.ClientOrderId == proposal.ClientOrderId))
+        {
+            return Fail(nameof(DuplicateInstrument), "This signal was already executed.");
+        }
+
+        if (!p.OpenPositions.Any(x => x.Instrument == proposal.Instrument))
+        {
+            return Pass(nameof(DuplicateInstrument), "No existing position.");
+        }
+
+        return highScoreOverride is { Passed: true }
+            ? Pass(nameof(DuplicateInstrument), $"A position on {proposal.Instrument} is open; adding one as a high-score extra.")
+            : Fail(nameof(DuplicateInstrument), $"A position on {proposal.Instrument} is already open.");
+    }
 
     private RiskCheck DailyLoss(PortfolioState p)
     {

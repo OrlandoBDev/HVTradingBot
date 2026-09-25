@@ -17,6 +17,8 @@ interface RiskLimits {
   derivedRiskPerTradePercent: number;
   maxDerivedDailyLossPercent: number;
   assumedCommissionPercent: number;
+  maxExtraDerivedPositions: number;
+  highScoreOverrideMinScore: number;
 }
 
 interface RiskSettingsData {
@@ -99,6 +101,18 @@ const GROUPS: { title: string; intro: string; fields: Field[] }[] = [
         key: "maxDerivedDailyLossPercent", label: "Max Derived loss per day", step: 0.1, min: 0.1, max: 10, unit: "%",
         what: "After Derived trades lose this much in a day, only Derived pauses until tomorrow — Forex keeps trading.",
         example: ({ v, f, b, c }) => `Derived stops for the day after losing ${pct(b, v, c)} (about ${Math.max(1, Math.floor(v / f.derivedRiskPerTradePercent))} losing Derived trade(s)).`,
+      },
+      {
+        key: "highScoreOverrideMinScore", label: "High-score override from score", step: 1, min: 75, max: 100, unit: "",
+        what: "A Derived candidate scoring at least this much is traded even when the Derived limit is reached or that market already has a position open. Forex is not affected: these extras never use a Forex slot, and they only open if every open Derived trade plus the new one could stop out without going over the Derived daily loss limit.",
+        example: ({ v, f, b, c }) => `Score ${v}+ opens an extra Derived trade while open Derived risk plus the new ${pct(b, f.derivedRiskPerTradePercent, c)} stays within ${pct(b, f.maxDerivedDailyLossPercent, c)} minus today's Derived losses.`,
+      },
+      {
+        key: "maxExtraDerivedPositions", label: "Max high-score extra positions", step: 1, min: 0, max: 5, unit: "",
+        what: "How many Derived positions the high-score override may add on top of the Derived limit. 0 turns the override off.",
+        example: ({ v, f }) => v === 0
+          ? "Override off: the Derived limit and one-position-per-market rule always apply."
+          : `Up to ${f.maxDerivedOpenPositions + v} Derived positions at once (${f.maxDerivedOpenPositions} normal + ${v} extra), still leaving ${Math.max(0, f.maxOpenPositions - f.maxDerivedOpenPositions)} slot(s) for Forex.`,
       },
     ],
   },
