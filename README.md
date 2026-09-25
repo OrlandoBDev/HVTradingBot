@@ -168,11 +168,11 @@ See the `docs/` folder:
 
 ## Status
 
-MVP running against a Deriv **demo** account (see ADR-008). Real-money trading, approval mode, authentication and
-Interactive Brokers remain on the roadmap.
+MVP running against a Deriv **demo** account (see ADR-008). Real-money trading, approval mode and Interactive Brokers remain on the
+roadmap.
 
 Known gaps:
 
-- No user authentication yet (docs/SECURITY.md); the API listens on localhost only.
+- A single dashboard login, no user roles; the API listens on localhost only (docs/SECURITY.md).
 - Redis and RabbitMQ are not used yet; the modular monolith does not need them at this stage.
 - Learning starts empty and needs weeks of setups before its adjustments carry weight.
