@@ -87,7 +87,8 @@ public sealed record PositionDto(
     decimal? MaePips,
     decimal? MfePips,
     string? CloseStatus = null,
-    string? CloseMessage = null);
+    string? CloseMessage = null,
+    decimal? Commission = null);
 
 public sealed record RiskLimitStatusDto(string Name, string Current, string Limit, bool Breached);
 

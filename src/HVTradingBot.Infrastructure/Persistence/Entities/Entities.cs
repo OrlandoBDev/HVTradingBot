@@ -85,6 +85,8 @@ public sealed class PositionEntity
     public decimal? ExitPrice { get; set; }
     public string? ExitReason { get; set; }
     public decimal? RealizedPnl { get; set; }
+    /// <summary>What the broker charged for the trade (round trip, account currency); already included in <see cref="RealizedPnl"/>.</summary>
+    public decimal? Commission { get; set; }
     public decimal? RMultiple { get; set; }
     public decimal? MaePips { get; set; }
     public decimal? MfePips { get; set; }

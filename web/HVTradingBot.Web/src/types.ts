@@ -103,6 +103,8 @@ export interface Position {
   mfePips: number | null;
   closeStatus: "Pending" | "Closing" | "Failed" | null;
   closeMessage: string | null;
+  /** What the broker charged for the trade; already included in the P&L. */
+  commission: number | null;
 }
 
 export interface RiskStatus {

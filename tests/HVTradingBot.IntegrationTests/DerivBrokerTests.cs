@@ -214,11 +214,15 @@ public class DerivBrokerTests(PostgresFixture fixture) : IAsyncLifetime
         AcceptProposalAndBuy();
         var broker = await ReadyBrokerAsync();
         await broker.PlaceOrderAsync(Order(), CancellationToken.None);
+        await using (var opened = await fixture.DbFactory.CreateDbContextAsync())
+        {
+            Assert.Equal(6.3m, (await opened.Positions.SingleAsync()).Commission); // quoted when the contract was bought
+        }
 
         // Portfolio no longer lists the contract; Deriv reports it sold at the take-profit level.
         _socket.Handlers["proposal_open_contract"] = _ => new
         {
-            proposal_open_contract = new { contract_id = 991, is_sold = 1, status = "sold", profit = 102.4m, exit_tick = 1.10412m, sell_time = 1767609000 }
+            proposal_open_contract = new { contract_id = 991, is_sold = 1, status = "sold", profit = 102.4m, commission = "6.35", exit_tick = 1.10412m, sell_time = 1767609000 }
         };
         var closed = await broker.ProcessBarAsync(Instruments.EurUsd, Bar(T0.AddMinutes(5), high: 1.1045m, close: 1.1042m), Converter, CancellationToken.None);
 
@@ -226,6 +230,8 @@ public class DerivBrokerTests(PostgresFixture fixture) : IAsyncLifetime
         Assert.Equal(ExitReason.TakeProfit, trade.Reason);
         Assert.Equal(102.4m, trade.RealizedPnl);
         Assert.Empty(await broker.GetPositionsAsync(CancellationToken.None));
+        await using var db = await fixture.DbFactory.CreateDbContextAsync();
+        Assert.Equal(6.35m, (await db.Positions.SingleAsync()).Commission); // what Deriv finally charged
     }
 
     [Fact]

@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using HVTradingBot.Domain.Common;
 using HVTradingBot.Domain.Execution;
 using HVTradingBot.Domain.MarketData;
@@ -58,6 +59,8 @@ public class PaperTradingPersistenceTests(PostgresFixture fixture) : IAsyncLifet
         Assert.Empty(await after.GetPositionsAsync(CancellationToken.None));
         var account = await after.GetAccountAsync(CancellationToken.None);
         Assert.Equal(account.StartingBalance + trade.RealizedPnl, account.Balance);
+        await using var db = await fixture.DbFactory.CreateDbContextAsync();
+        Assert.True((await db.Positions.SingleAsync()).Commission > 0);
     }
 
     [Fact]

@@ -128,7 +128,9 @@ export function TradeHistory({ refreshKey }: { refreshKey: unknown }) {
             <thead>
               <tr>
                 <th>Closed</th><th>Market</th><th>Side</th><th>Strategy</th><th className="num">Entry</th><th className="num">Exit</th>
-                <th>Exit</th><th className="num">P&L</th><th className="num">R</th><th className="num">MAE / MFE</th>
+                <th>Exit</th><th className="num">P&L</th>
+                <th className="num" title="Commission the broker charged for this trade. It is already taken out of the P&L.">Broker fee</th>
+                <th className="num">R</th><th className="num">MAE / MFE</th>
               </tr>
             </thead>
             <tbody>
@@ -142,6 +144,7 @@ export function TradeHistory({ refreshKey }: { refreshKey: unknown }) {
                   <td className="num mono">{price(p.exitPrice, p.instrument)}</td>
                   <td><Badge tone={p.exitReason === "TakeProfit" ? "good" : p.exitReason === "StopLoss" ? "bad" : "neutral"}>{p.exitReason}</Badge></td>
                   <td className={`num ${signClass(p.realizedPnl)}`}>{money(p.realizedPnl)}</td>
+                  <td className="num muted">{p.commission == null ? "—" : money(p.commission)}</td>
                   <td className={`num ${signClass(p.rMultiple)}`}>{num(p.rMultiple)}</td>
                   <td className="num">{num(p.maePips, 1)} / {num(p.mfePips, 1)}</td>
                 </tr>

@@ -193,13 +193,16 @@ public sealed class PaperTradingBroker(
                 continue;
             }
 
-            var pnl = PaperExecutionModel.RealizedPnl(tracked, exit.Price, converter.QuoteToAccountRate(instrument), risk.Current.AssumedCommissionPercent);
+            var rate = converter.QuoteToAccountRate(instrument);
+            var commissionPercent = risk.Current.AssumedCommissionPercent;
+            var pnl = PaperExecutionModel.RealizedPnl(tracked, exit.Price, rate, commissionPercent);
             var r = PaperExecutionModel.RMultiple(tracked, pnl);
             entity.IsOpen = false;
             entity.ClosedAtUtc = bar.CloseTimeUtc;
             entity.ExitPrice = exit.Price;
             entity.ExitReason = exit.Reason.ToString();
             entity.RealizedPnl = pnl;
+            entity.Commission = Math.Round(PaperExecutionModel.Commission(tracked, rate, commissionPercent), 2);
             entity.RMultiple = r;
             entity.MaePips = Math.Round(instrument.ToPips(tracked.MaxAdverseExcursion), 1);
             entity.MfePips = Math.Round(instrument.ToPips(tracked.MaxFavorableExcursion), 1);

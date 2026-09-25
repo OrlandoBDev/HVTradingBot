@@ -52,7 +52,14 @@ try
     app.UseExceptionHandler();
     app.UseStatusCodePages();
     app.UseDefaultFiles();
-    app.UseStaticFiles();
+    // index.html is always revalidated so a rebuilt dashboard shows up on the next load; the hashed assets it points
+    // to never change and may be cached for good.
+    var dashboardFiles = new StaticFileOptions
+    {
+        OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl =
+            ctx.File.Name == "index.html" ? "no-cache" : ctx.Context.Request.Path.StartsWithSegments("/assets") ? "public, max-age=31536000, immutable" : "no-cache"
+    };
+    app.UseStaticFiles(dashboardFiles);
 
     app.MapTradingEndpoints();
     app.MapSettingsEndpoints();
@@ -71,7 +78,7 @@ try
             });
         }
     });
-    app.MapFallbackToFile("index.html");
+    app.MapFallbackToFile("index.html", dashboardFiles);
 
     await app.RunAsync();
     return 0;

@@ -35,6 +35,7 @@ public sealed class DerivBroker(
     private readonly Dictionary<Instrument, IReadOnlyList<int>> _multipliers = new();
     private readonly Dictionary<Instrument, Quote> _quotes = new();
     private (DateTime BarClose, IReadOnlyList<PortfolioContract> Contracts)? _portfolioCache;
+    private bool _commissionsBackfilled;
 
     public void UpdateQuotes(IEnumerable<Quote> quotes)
     {
@@ -72,7 +73,45 @@ public sealed class DerivBroker(
         row.LastBalance = amount;
         row.UpdatedAtUtc = clock.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
+
+        if (!_commissionsBackfilled)
+        {
+            _commissionsBackfilled = true;
+            await BackfillCommissionsAsync(socket, cancellationToken);
+        }
+
         return new BrokerAccount(currency, amount, row.StartingBalance);
+    }
+
+    /// <summary>
+    /// Trades recorded before commissions were stored get theirs from Deriv once per start. Best effort: a failure
+    /// only leaves the fee blank in the trade history.
+    /// </summary>
+    private async Task BackfillCommissionsAsync(IDerivSocket socket, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+            var accountId = AccountId;
+            var missing = await db.Positions
+                .Where(p => p.Broker == BrokerName && p.BrokerAccountId == accountId && p.BrokerContractId != null && p.Commission == null)
+                .OrderByDescending(p => p.OpenedAtUtc).Take(100).ToListAsync(cancellationToken);
+            foreach (var position in missing)
+            {
+                var contract = (await socket.SendAsync(new JsonObject
+                {
+                    ["proposal_open_contract"] = 1,
+                    ["contract_id"] = long.Parse(position.BrokerContractId!, CultureInfo.InvariantCulture)
+                }, cancellationToken)).GetProperty("proposal_open_contract");
+                position.Commission = ContractCommission(contract);
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is DerivApiException or DerivConnectionException or KeyNotFoundException or FormatException)
+        {
+            logger.LogWarning(ex, "Could not load past Deriv commissions");
+        }
     }
 
     public async Task<IReadOnlyCollection<OpenPosition>> GetPositionsAsync(CancellationToken cancellationToken)
@@ -201,7 +240,9 @@ public sealed class DerivBroker(
         }
 
         var contractId = ReadId(buy, "contract_id");
-        var position = await RecordFillAsync(entity.Id, order, contractId, spot, brokerStop, brokerTarget, plan, submittedAt, cancellationToken);
+        var chargedCommission = proposal.TryGetProperty("commission", out var fee) ? Dec(fee) : (decimal?)null;
+        var position = await RecordFillAsync(entity.Id, order, contractId, spot, brokerStop, brokerTarget, plan, chargedCommission, submittedAt,
+            cancellationToken);
         logger.LogInformation("Deriv contract {ContractId} bought: {Type} x{Multiplier} stake {Stake} SL {StopLoss} TP {TakeProfit}",
             contractId, plan.ContractType, plan.Multiplier, plan.Stake, plan.StopLossAmount, plan.TakeProfitAmount);
         return new OrderResult(order.ClientOrderId, OrderStatus.Filled, entity.Id, position.Id, spot, null);
@@ -307,6 +348,7 @@ public sealed class DerivBroker(
             entity.ExitPrice = exitPrice;
             entity.ExitReason = reason.ToString();
             entity.RealizedPnl = profit;
+            entity.Commission = ContractCommission(contract) ?? entity.Commission;
             entity.RMultiple = r;
             entity.MaePips = Math.Round(instrument.ToPips(tracked.MaxAdverseExcursion), 1);
             entity.MfePips = Math.Round(instrument.ToPips(tracked.MaxFavorableExcursion), 1);
@@ -421,12 +463,12 @@ public sealed class DerivBroker(
             order.TakeProfit, 0, "Recovered", 0, order.DecisionId, order.CorrelationId);
         var plan = new MultiplierContractPlan(direction == Direction.Long ? "MULTUP" : "MULTDOWN", 0, match.BuyPrice, 0, 0, 0);
         var position = await RecordFillAsync(order.Id, tradeOrder, match.ContractId, order.RequestedPrice, order.StopLoss, order.TakeProfit, plan,
-            match.PurchaseTimeUtc, cancellationToken);
+            null, match.PurchaseTimeUtc, cancellationToken);
         return new OrderResult(order.ClientOrderId, OrderStatus.Filled, order.Id, position.Id, order.RequestedPrice, null);
     }
 
     private async Task<PositionEntity> RecordFillAsync(Guid orderId, TradeOrder order, string contractId, decimal entry, decimal stop,
-        decimal target, MultiplierContractPlan plan, DateTime openedAt, CancellationToken cancellationToken)
+        decimal target, MultiplierContractPlan plan, decimal? commission, DateTime openedAt, CancellationToken cancellationToken)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var entity = await db.Orders.SingleAsync(o => o.Id == orderId, cancellationToken);
@@ -455,6 +497,7 @@ public sealed class DerivBroker(
             OpenedAtUtc = _quotes.TryGetValue(order.Instrument, out var q) ? q.TimestampUtc : openedAt,
             Strategy = order.Strategy,
             Score = order.Score,
+            Commission = commission,
             IsOpen = true
         };
         db.Positions.Add(position);
@@ -568,6 +611,10 @@ public sealed class DerivBroker(
             _ => false
         })
         || (contract.TryGetProperty("status", out var status) && status.ValueKind == JsonValueKind.String && status.GetString() is "sold" or "won" or "lost");
+
+    /// <summary>Commission Deriv charged on a contract, when it reports one.</summary>
+    private static decimal? ContractCommission(JsonElement contract) =>
+        contract.TryGetProperty("commission", out var c) && c.ValueKind is JsonValueKind.Number or JsonValueKind.String ? Dec(c) : null;
 
     /// <summary>Deriv sends some numbers as JSON strings (e.g. "profit": "0.87"); accept both.</summary>
     internal static decimal Dec(JsonElement value) => value.ValueKind switch

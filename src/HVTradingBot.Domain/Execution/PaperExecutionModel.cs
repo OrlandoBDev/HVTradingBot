@@ -71,11 +71,14 @@ public static class PaperExecutionModel
     /// Profit in account currency, net of round-trip commission charged as <paramref name="commissionPercent"/> % of the
     /// position value (units x entry price, in account currency).
     /// </summary>
+    /// <summary>Round-trip commission: <paramref name="commissionPercent"/> % of the position value in account currency.</summary>
+    public static decimal Commission(OpenPosition position, decimal quoteToAccountRate, decimal commissionPercent) =>
+        commissionPercent / 100m * position.Units * position.EntryPrice * quoteToAccountRate;
+
     public static decimal RealizedPnl(OpenPosition position, decimal exitPrice, decimal quoteToAccountRate, decimal commissionPercent)
     {
         var gross = position.Direction.Sign() * (exitPrice - position.EntryPrice) * position.Units * quoteToAccountRate;
-        var commission = commissionPercent / 100m * position.Units * position.EntryPrice * quoteToAccountRate;
-        return Math.Round(gross - commission, 2, MidpointRounding.ToEven);
+        return Math.Round(gross - Commission(position, quoteToAccountRate, commissionPercent), 2, MidpointRounding.ToEven);
     }
 
     public static decimal UnrealizedPnl(OpenPosition position, Quote quote, decimal quoteToAccountRate)

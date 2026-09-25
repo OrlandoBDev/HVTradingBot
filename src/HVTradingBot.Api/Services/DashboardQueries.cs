@@ -353,7 +353,7 @@ public sealed class DashboardQueries(
     private static PositionDto ToDto(PositionEntity p, decimal? currentPrice, decimal? unrealized) => new(
         p.Id, p.ClientOrderId, p.Instrument, p.Direction, p.Units, p.EntryPrice, p.StopLoss, p.TakeProfit, p.InitialRiskAmount,
         p.OpenedAtUtc, p.Strategy, p.Score, currentPrice, unrealized, p.ClosedAtUtc, p.ExitPrice, p.ExitReason, p.RealizedPnl,
-        p.RMultiple, p.MaePips, p.MfePips);
+        p.RMultiple, p.MaePips, p.MfePips, Commission: p.Commission);
 
     private static DecisionDto ToDto(TradeDecisionEntity d) => new(
         d.Id, d.MarketTimeUtc, d.Instrument, d.State, d.Regime, d.Strategy, d.Direction, d.Score, d.Entry, d.StopLoss,
