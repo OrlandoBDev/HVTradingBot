@@ -89,6 +89,49 @@ public sealed class WorkerInstanceLock(string connectionString, ILogger<WorkerIn
             : "Acquired the trading worker single-instance lock");
     }
 
+    /// <summary>
+    /// Checks that the lock is still held. A session-level advisory lock lives as long as its connection, so a lost
+    /// connection (e.g. PostgreSQL restarted) means the lock is gone and another worker may already hold it. Returns
+    /// false, and forgets the dead connection, when the lock is no longer held.
+    /// </summary>
+    public async Task<bool> IsStillHeldAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            if (_connection is not { } connection)
+            {
+                return false;
+            }
+
+            try
+            {
+                await using var command = new NpgsqlCommand(
+                    "SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid() AND granted " +
+                    "AND ((classid::bigint << 32) | objid::bigint) = @key)", connection);
+                command.Parameters.AddWithValue("key", LockKey);
+                if (await command.ExecuteScalarAsync(cancellationToken) is true)
+                {
+                    return true;
+                }
+
+                logger.LogCritical("The trading worker single-instance lock is no longer held by this worker");
+            }
+            catch (Exception ex) when (ex is NpgsqlException or InvalidOperationException)
+            {
+                logger.LogCritical(ex, "Lost the connection holding the trading worker single-instance lock");
+            }
+
+            _connection = null;
+            await connection.DisposeAsync();
+            return false;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     /// <summary>Releases the lock by closing its connection.</summary>
     public async ValueTask DisposeAsync()
     {

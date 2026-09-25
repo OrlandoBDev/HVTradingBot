@@ -1,5 +1,6 @@
 using HVTradingBot.Infrastructure.Persistence;
 using Microsoft.Extensions.Logging.Abstractions;
+using Npgsql;
 
 namespace HVTradingBot.IntegrationTests;
 
@@ -43,5 +44,27 @@ public class WorkerInstanceLockTests(PostgresFixture fixture)
         await first.DisposeAsync();
         await waiting;
         Assert.True(second.IsAcquired);
+    }
+
+    [Fact]
+    public async Task Lock_is_reported_lost_when_its_connection_is_terminated()
+    {
+        await using var holder = NewLock();
+        Assert.True(await holder.TryAcquireAsync(CancellationToken.None));
+        Assert.True(await holder.IsStillHeldAsync(CancellationToken.None));
+
+        await using (var admin = new NpgsqlConnection(fixture.ConnectionString))
+        {
+            await admin.OpenAsync();
+            await using var kill = new NpgsqlCommand(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name = 'HVTradingBot.Worker lock'", admin);
+            await kill.ExecuteNonQueryAsync();
+        }
+
+        Assert.False(await holder.IsStillHeldAsync(CancellationToken.None));
+        Assert.False(holder.IsAcquired);
+
+        await using var next = NewLock();
+        Assert.True(await next.TryAcquireAsync(CancellationToken.None));
     }
 }

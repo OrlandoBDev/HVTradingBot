@@ -50,6 +50,14 @@ public sealed class BrokerSettingsWatcher(
                 continue;
             }
 
+            if (!await instanceLock.IsStillHeldAsync(stoppingToken))
+            {
+                // Without the lock a second worker could start trading the same account: restart and wait for the lock.
+                Environment.ExitCode = RestartExitCode;
+                lifetime.StopApplication();
+                return;
+            }
+
             if (!engine.IsReady)
             {
                 // Starting up (loading history, waiting for the broker): keep liveness and live tick freshness visible.
