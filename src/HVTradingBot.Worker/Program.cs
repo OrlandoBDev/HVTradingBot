@@ -1,6 +1,7 @@
 using HVTradingBot.Infrastructure;
 using HVTradingBot.Infrastructure.Configuration;
 using HVTradingBot.Infrastructure.Observability;
+using HVTradingBot.Infrastructure.Persistence;
 using HVTradingBot.Worker;
 using Serilog;
 
@@ -15,6 +16,9 @@ try
     builder.Services.AddSerilog((_, logger) => logger.ConfigureHvLogging(builder.Configuration, serviceName));
     builder.Services.AddHvTelemetry(builder.Configuration, serviceName);
     builder.Services.AddTradingCore(builder.Configuration).AddLiveTrading(builder.Configuration);
+    // Only one worker per database may trade (TradingWorker takes the lock before anything else).
+    builder.Services.AddSingleton(sp => new WorkerInstanceLock(
+        builder.Configuration.GetConnectionString(DatabaseSetup.ConnectionStringName)!, sp.GetRequiredService<ILogger<WorkerInstanceLock>>()));
     builder.Services.AddHostedService<TradingWorker>();
     builder.Services.AddHostedService<BrokerSettingsWatcher>();
     builder.Services.AddHostedService<TestTradeService>();

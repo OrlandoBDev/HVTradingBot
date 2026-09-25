@@ -20,8 +20,9 @@ Use:
 
 ## Current Limitations
 
-- JWT authentication and roles below are not implemented yet. The API binds to 127.0.0.1, restricts allowed host
-  names, and accepts JSON bodies only (blocking cross-site form posts), but any local process can call it.
+- The dashboard and API require a single login (HttpOnly, SameSite=Strict session cookie; first login created with a
+  one-time setup code). JWT authentication and the roles below are not implemented yet. The API binds to 127.0.0.1,
+  restricts allowed host names, and accepts JSON bodies only (blocking cross-site form posts).
 
 ## Authentication
 

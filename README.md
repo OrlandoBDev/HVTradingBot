@@ -15,13 +15,15 @@ AI/LLM components are advisory only and must never bypass deterministic risk con
 Requirements: Docker Desktop, .NET 10 SDK, Node.js 22 (`brew install --cask dotnet-sdk docker && brew install node@22`).
 
 ```bash
-./run.sh          # PostgreSQL in Docker, API + worker natively -> http://localhost:5080
+./run.sh          # PostgreSQL in Docker, API + worker natively -> http://localhost:5080 (same as ./run.sh local)
 ./run.sh docker   # everything in Docker
+./run.sh dev      # .NET development next to the Docker stack: http://localhost:5081, simulated data, paper broker
 ./run.sh test     # all automated tests (integration tests need Docker)
 ./run.sh stop     # stop PostgreSQL
 ./run.sh reset    # delete the local database (all trading history)
 ./run.sh setup-code   # show the one-time code for creating the dashboard login
 ./run.sh reset-login  # forgotten password: delete the login and print a new setup code
+./run.sh migrate-keys # copy encryption keys from the old `dpkeys` Docker volume (./run.sh docker does this itself)
 ```
 
 **Dashboard login.** On first start the dashboard asks you to create a username and password. This needs a
@@ -37,6 +39,59 @@ Choose markets under **Settings → Markets**.
 
 Set `BROKER_PROVIDER=Paper` in `.env` to trade on real Deriv prices with local simulated fills, and additionally
 `MARKET_DATA_PROVIDER=Simulated` to run fully offline.
+
+### Docker and native runs
+
+- **Never two workers on one account.** `./run.sh` (native) refuses to start while the `api` or `worker` container
+  runs, and `./run.sh docker` refuses while a native `HVTradingBot.Api`/`HVTradingBot.Worker` process runs
+  (`./run.sh local`, `dotnet run`, an IDE). The worker also holds a PostgreSQL advisory lock: a second worker on the
+  same database logs a warning and waits until the first one stops.
+- **`./run.sh dev`** is for changing .NET code while the Docker stack (or the Mac app) keeps trading: a native API on
+  port **5081** and a native worker with `MARKET_DATA_PROVIDER=Simulated` and `BROKER_PROVIDER=Paper`, on a separate
+  database `hvtradingbot_dev` that is created in the same PostgreSQL container if missing. No Deriv orders and no
+  emails; it has its own dashboard login (setup code printed on start). Logs: `.run/dev-api.log`,
+  `.run/dev-worker.log`. It uses a Debug build, so it never overwrites the binaries of a running `./run.sh local`.
+- `./run.sh docker` runs PostgreSQL, the API and the worker as the Compose project `hvtradingbot`
+  (`docker-compose.yml`); `./run.sh stop` stops it. Worker logs: `docker compose logs -f worker`.
+- **Encryption keys are shared with native runs.** Deriv and email credentials are stored encrypted in PostgreSQL;
+  the keys that decrypt them live in `~/Library/Application Support/HVTradingBot/keys`, which is bind-mounted into
+  the `api` and `worker` containers at `/keys`. Credentials entered in a native run therefore also work in Docker and
+  the other way round. `./run.sh docker` creates the folder before `docker compose up` (otherwise Docker would create
+  it owned by root) and copies keys from the old `hvtradingbot_dpkeys` volume, if present, via
+  `./run.sh migrate-keys` (existing files are never overwritten). After checking that the dashboard still shows your
+  Deriv settings, the old volume can be removed: `docker volume rm hvtradingbot_dpkeys`.
+- The containers run as a non-root user. Docker Desktop on macOS maps file ownership of bind mounts, so that user can
+  read and write the key folder. On a Linux Docker host, make the folder writable for the container user (UID 1654,
+  `APP_UID` of the .NET images), e.g. `sudo chown 1654 "$HOME/Library/Application Support/HVTradingBot/keys"`.
+
+## Mac app
+
+A native macOS app (`apps/HVTradingBot.App`, .NET MAUI / Mac Catalyst) that starts PostgreSQL, the API and the worker
+in Docker and shows the dashboard in its own window, so everyday use needs no terminal. Design: [docs/MACOS_APP.md](docs/MACOS_APP.md).
+
+**Install** (needs Xcode and the MAUI workload: `sudo dotnet workload install maui`):
+
+```bash
+apps/HVTradingBot.App/build-app.sh               # builds, ad-hoc signs and copies HVTradingBot.app to /Applications
+apps/HVTradingBot.App/build-app.sh --no-install  # build only
+```
+
+The app is not signed by Apple; a copy built on another Mac needs right-click → **Open** the first time.
+
+**First run.** The app expects the repository checkout in `~/HVTradingBot` (change it under **Settings** in the app).
+It finds Docker (starting Docker Desktop if needed), creates `.env` with a random database password if missing,
+creates the encryption key folder, refuses to start while a native API/worker runs (`./run.sh local`, `dotnet run`,
+an IDE; `./run.sh dev` is allowed), then runs `docker compose up -d --build` with live output. The first build takes
+several minutes, later starts seconds. The dashboard then opens in the app; create the login with the setup code as
+described above (`./run.sh setup-code` prints it; the app's WebView has its own cookies, separate from the browser).
+
+**Using it.** The status bar shows the worker state from `/health/ready` every 15 s (running, data stale, kill switch
+active, offline). Controls: **Stop trading** (`docker compose stop`), **Start**, **Restart worker**, **Logs** and
+**Open in browser**. **Quitting the app leaves the stack running** so trading continues; enable **Stop trading when
+the app quits** in the app's Settings to change that. The browser at `http://localhost:5080` works at the same time.
+
+**Logs.** The startup screen keeps the `docker compose` output (expand **Log**); the **Logs** page shows the last 200
+lines of the `worker` or `api` container, the same as `docker compose logs --tail 200 worker` in the checkout.
 
 ## What Is Implemented
 
@@ -123,6 +178,7 @@ See the `docs/` folder:
 - [Backtesting](docs/BACKTESTING.md)
 - [Security](docs/SECURITY.md)
 - [Roadmap](docs/ROADMAP.md)
+- [macOS App](docs/MACOS_APP.md)
 - [Agent Build Guide](docs/AGENTS.md)
 - [ADRs](docs/ADR.md)
 
@@ -141,11 +197,11 @@ See the `docs/` folder:
 
 ## Status
 
-MVP running against a Deriv **demo** account (see ADR-008). Real-money trading, approval mode, authentication and
-Interactive Brokers remain on the roadmap.
+MVP running against a Deriv **demo** account (see ADR-008). Real-money trading, approval mode and Interactive Brokers remain on the
+roadmap.
 
 Known gaps:
 
-- No user authentication yet (docs/SECURITY.md); the API listens on localhost only.
+- A single dashboard login, no user roles; the API listens on localhost only (docs/SECURITY.md).
 - Redis and RabbitMQ are not used yet; the modular monolith does not need them at this stage.
 - Learning starts empty and needs weeks of setups before its adjustments carry weight.

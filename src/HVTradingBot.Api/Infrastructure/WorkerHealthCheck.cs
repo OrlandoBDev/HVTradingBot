@@ -23,6 +23,7 @@ public sealed class WorkerHealthCheck(ITradingStateStore state, IClock clock, Ri
             return HealthCheckResult.Degraded("Market data is stale; new trades are blocked.");
         }
 
+        // The Mac app recognises the kill switch by this prefix (ReadyResponseParser.KillSwitchPrefix in App.Core).
         return s.KillSwitchActive
             ? HealthCheckResult.Degraded($"Kill switch active: {s.KillSwitchReason}")
             : HealthCheckResult.Healthy("Worker running, data fresh.");

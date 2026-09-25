@@ -7,7 +7,8 @@ RUN dotnet publish src/HVTradingBot.Worker/HVTradingBot.Worker.csproj -c Release
 FROM mcr.microsoft.com/dotnet/runtime:10.0
 WORKDIR /app
 COPY --from=build /app ./
-# Key directory for the shared Data Protection key ring (mounted as a volume; ownership is copied on first use).
+# Key directory for the shared Data Protection key ring. docker-compose.yml bind-mounts the host folder here; Docker
+# Desktop on macOS maps file ownership, so the non-root user can read and write it.
 RUN mkdir -p /keys && chown $APP_UID /keys
 USER $APP_UID
 ENTRYPOINT ["dotnet", "HVTradingBot.Worker.dll"]

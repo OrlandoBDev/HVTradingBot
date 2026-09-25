@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:HVTradingBot.App.ViewModels"
+             x:Class="HVTradingBot.App.Pages.SettingsPage"
+             x:DataType="vm:SettingsViewModel"
+             Title="Settings">
+
+    <VerticalStackLayout Padding="24" Spacing="20" MaximumWidthRequest="700" HorizontalOptions="Start">
+
+        <VerticalStackLayout Spacing="6">
+            <Label Text="Repository folder" FontAttributes="Bold" />
+            <Entry Text="{Binding RepositoryPath}" Placeholder="~/HVTradingBot" />
+            <Label Text="The HVTradingBot checkout with docker-compose.yml. The Docker images are built from it."
+                   FontSize="12" TextColor="Gray" />
+        </VerticalStackLayout>
+
+        <VerticalStackLayout Spacing="6">
+            <HorizontalStackLayout Spacing="12">
+                <Switch IsToggled="{Binding StopTradingOnQuit}" VerticalOptions="Center" />
+                <Label Text="Stop trading when the app quits" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+            <Label Text="Off: quitting the app leaves the containers running and the bot keeps trading. On: quitting runs docker compose stop."
+                   FontSize="12" TextColor="Gray" />
+        </VerticalStackLayout>
+
+        <Button Text="Save" Command="{Binding SaveCommand}" HorizontalOptions="Start" />
+    </VerticalStackLayout>
+</ContentPage>

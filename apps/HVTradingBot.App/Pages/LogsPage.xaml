@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:HVTradingBot.App.ViewModels"
+             x:Class="HVTradingBot.App.Pages.LogsPage"
+             x:DataType="vm:LogsViewModel"
+             Title="Logs">
+
+    <Grid RowDefinitions="Auto,*" Padding="16" RowSpacing="12">
+        <HorizontalStackLayout Grid.Row="0" Spacing="12">
+            <Picker Title="Service" ItemsSource="{Binding Services}" SelectedItem="{Binding SelectedService}" WidthRequest="160" />
+            <Button Text="Refresh" Command="{Binding RefreshCommand}" />
+            <ActivityIndicator IsRunning="{Binding IsLoading}" IsVisible="{Binding IsLoading}" VerticalOptions="Center" />
+            <Label Text="Last 200 lines of docker compose logs" TextColor="Gray" VerticalOptions="Center" />
+        </HorizontalStackLayout>
+
+        <Border Grid.Row="1" Stroke="#334155" Padding="8">
+            <ScrollView>
+                <Label Text="{Binding LogText}" FontFamily="Menlo" FontSize="11" LineBreakMode="CharacterWrap" />
+            </ScrollView>
+        </Border>
+    </Grid>
+</ContentPage>

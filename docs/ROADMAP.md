@@ -1,5 +1,41 @@
 # Product Roadmap
 
+## Current: macOS app MVP (Docker-based)
+
+A native macOS app (.NET MAUI) that starts PostgreSQL, the API and the worker in Docker and shows the existing
+dashboard in a WebView; it replaces `./run.sh` for everyday use until the bot moves to an external server.
+Design and implementation tasks: [MACOS_APP.md](MACOS_APP.md).
+
+Status: implemented on `feature/macos-app` (shared encryption keys, single-worker database lock, `run.sh` guards and
+`./run.sh dev`, `HVTradingBot.App.Core` with tests, the Mac Catalyst app, CI). Remaining: the manual acceptance test
+on a Mac.
+
+## Next: learn Kubernetes with this application
+
+After the macOS MVP. A step-by-step guide (`docs/KUBERNETES_GUIDE.md`, written when this phase starts) that moves
+the same Docker stack onto Kubernetes, one concept at a time:
+
+1. Local cluster: Docker Desktop's built-in Kubernetes (kind as an alternative); `kubectl` basics.
+2. Images: build the `api` and `worker` images locally and use them from the cluster.
+3. Namespace `hvtradingbot`; a Secret created from `.env`; a ConfigMap for non-secret settings.
+4. PostgreSQL as a StatefulSet with a PersistentVolumeClaim and a headless Service; move the data over with
+   `pg_dump`/`pg_restore`.
+5. Data Protection keys on a PersistentVolumeClaim mounted by the API and worker (single node; multi-node needs a
+   ReadWriteMany volume or a different key store).
+6. API Deployment + Service with liveness (`/health/live`) and readiness probes. `/health/ready` includes the worker's
+   health, so the API's readiness probe needs its own check.
+7. Worker Deployment: `replicas: 1`, `strategy: Recreate`, backed by the worker's database lock, so a rollout
+   never runs two workers.
+8. Access: `kubectl port-forward` first, then an Ingress (ingress-nginx) on `hvtradingbot.localhost`.
+9. Kustomize base and overlays (local vs server); optionally Helm.
+10. Operating it: logs, events, rollouts and rollbacks, resource requests/limits.
+11. When a domain and server exist: k3s on a VPS or a managed cluster, TLS with cert-manager.
+
+## Later: mobile and Windows apps
+
+The MAUI project from the macOS MVP, targeting iOS, Android and Windows, pointed at the external server once one
+exists (needs remote access over HTTPS; Tailscale is an option before a domain is bought).
+
 ## Backlog
 
 Ideas agreed for later, not yet scheduled into a phase.

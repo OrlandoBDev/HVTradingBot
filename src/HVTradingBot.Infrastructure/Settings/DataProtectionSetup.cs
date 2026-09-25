@@ -9,7 +9,8 @@ public static class DataProtectionSetup
     /// <summary>
     /// Shared key ring for the API (encrypts the Deriv token) and the worker (decrypts it). Keys are kept on disk,
     /// outside PostgreSQL, so a database backup alone does not reveal the token.
-    /// Default: ~/Library/Application Support/HVTradingBot/keys on macOS; /keys volume in Docker.
+    /// Default: ~/Library/Application Support/HVTradingBot/keys on macOS; in Docker the same host folder is bind-mounted
+    /// at /keys, so native and Docker runs share one key ring.
     /// </summary>
     public static IServiceCollection AddHvDataProtection(this IServiceCollection services, IConfiguration configuration)
     {

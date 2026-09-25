@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:HVTradingBot.App.ViewModels"
+             xmlns:pages="clr-namespace:HVTradingBot.App.Pages"
+             xmlns:core="clr-namespace:HVTradingBot.App.Core.Startup;assembly=HVTradingBot.App.Core"
+             x:Class="HVTradingBot.App.Pages.StartupPage"
+             x:DataType="vm:StartupViewModel"
+             NavigationPage.HasNavigationBar="False"
+             Title="HVTradingBot">
+
+    <ContentPage.Resources>
+        <pages:StepStateToSymbolConverter x:Key="StateSymbol" />
+        <pages:StepStateToColorConverter x:Key="StateColor" />
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" Padding="32,24" RowSpacing="16" MaximumWidthRequest="900">
+
+        <VerticalStackLayout Grid.Row="0" Spacing="4">
+            <Label Text="Starting HVTradingBot" FontSize="24" FontAttributes="Bold" />
+            <Label FontSize="13" TextColor="Gray">
+                <Label.FormattedText>
+                    <FormattedString>
+                        <Span Text="Repository: " />
+                        <Span Text="{Binding RepositoryPath}" />
+                    </FormattedString>
+                </Label.FormattedText>
+            </Label>
+        </VerticalStackLayout>
+
+        <!-- The seven startup steps with their state. -->
+        <VerticalStackLayout Grid.Row="1" Spacing="10" BindableLayout.ItemsSource="{Binding Steps}">
+            <BindableLayout.ItemTemplate>
+                <DataTemplate x:DataType="core:StartupStep">
+                    <Grid ColumnDefinitions="28,*" ColumnSpacing="8">
+                        <Label Grid.Column="0" FontSize="18" HorizontalTextAlignment="Center"
+                               Text="{Binding State, Converter={StaticResource StateSymbol}}"
+                               TextColor="{Binding State, Converter={StaticResource StateColor}}" />
+                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                            <Label Text="{Binding Title}" FontSize="15" />
+                            <Label Text="{Binding Message}" FontSize="12" TextColor="Gray" LineBreakMode="WordWrap" />
+                        </VerticalStackLayout>
+                    </Grid>
+                </DataTemplate>
+            </BindableLayout.ItemTemplate>
+        </VerticalStackLayout>
+
+        <!-- Failure: the reason plus retry, settings and (for a missing Docker) the download page. -->
+        <Border Grid.Row="2" IsVisible="{Binding HasFailed}" Stroke="#EF4444" StrokeThickness="1" Padding="16">
+            <VerticalStackLayout Spacing="12">
+                <Label Text="{Binding FailureMessage}" LineBreakMode="WordWrap" />
+                <HorizontalStackLayout Spacing="12">
+                    <Button Text="Retry" Command="{Binding RetryCommand}" />
+                    <Button Text="Install Docker Desktop" Command="{Binding OpenHelpCommand}" IsVisible="{Binding HasHelp}" />
+                    <Button Text="Settings" Command="{Binding OpenSettingsCommand}" />
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+
+        <HorizontalStackLayout Grid.Row="3" Spacing="12">
+            <Button Text="{Binding LogToggleText}" Command="{Binding ToggleLogCommand}" />
+            <ActivityIndicator IsRunning="{Binding IsRunning}" IsVisible="{Binding IsRunning}" VerticalOptions="Center" />
+        </HorizontalStackLayout>
+
+        <!-- Expandable docker compose output. -->
+        <Border Grid.Row="4" IsVisible="{Binding IsLogExpanded}" Stroke="#334155" Padding="8">
+            <ScrollView x:Name="LogScroll">
+                <Label x:Name="LogLabel" Text="{Binding LogText}" FontFamily="Menlo" FontSize="11" LineBreakMode="CharacterWrap" />
+            </ScrollView>
+        </Border>
+    </Grid>
+</ContentPage>

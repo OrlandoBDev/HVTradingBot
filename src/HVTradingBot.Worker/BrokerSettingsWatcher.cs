@@ -4,6 +4,7 @@ using HVTradingBot.Application.Trading;
 using HVTradingBot.Infrastructure.Brokers.Deriv;
 using HVTradingBot.Infrastructure.MarketData;
 using HVTradingBot.Infrastructure.Markets;
+using HVTradingBot.Infrastructure.Persistence;
 using HVTradingBot.Infrastructure.Settings;
 
 namespace HVTradingBot.Worker;
@@ -27,6 +28,7 @@ public sealed class BrokerSettingsWatcher(
     IEmailSettingsProvider emailSettings,
     ITradeDecisionNotifier notifier,
     TradingEngineOptions engineOptions,
+    WorkerInstanceLock instanceLock,
     IHostApplicationLifetime lifetime,
     ILogger<BrokerSettingsWatcher> logger) : BackgroundService
 {
@@ -42,6 +44,20 @@ public sealed class BrokerSettingsWatcher(
         using var timer = new PeriodicTimer(Interval);
         while (await timer.WaitForNextTickAsync(stoppingToken))
         {
+            if (!instanceLock.IsAcquired)
+            {
+                // Another worker runs on this database (TradingWorker is waiting for it): its heartbeat is the real one.
+                continue;
+            }
+
+            if (!await instanceLock.IsStillHeldAsync(stoppingToken))
+            {
+                // Without the lock a second worker could start trading the same account: restart and wait for the lock.
+                Environment.ExitCode = RestartExitCode;
+                lifetime.StopApplication();
+                return;
+            }
+
             if (!engine.IsReady)
             {
                 // Starting up (loading history, waiting for the broker): keep liveness and live tick freshness visible.
