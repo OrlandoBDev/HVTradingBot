@@ -44,7 +44,7 @@ public static class DependencyInjection
         {
             throw new InvalidOperationException(
                 $"Connection string '{DatabaseSetup.ConnectionStringName}' is not configured. " +
-                "Set ConnectionStrings__TradingDb (./run.sh does this from .env), or use dotnet user-secrets.");
+                "Set ConnectionStrings__TradingDb (./run.sh does this from .env; IDE runs in Development read .env directly - run ./run.sh once to create it), or use dotnet user-secrets.");
         }
 
         services.AddDbContextFactory<TradingDbContext>(o => DatabaseSetup.Configure(o, connectionString));
