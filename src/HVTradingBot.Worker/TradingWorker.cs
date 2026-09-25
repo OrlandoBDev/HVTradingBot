@@ -44,7 +44,7 @@ public sealed class TradingWorker(
             await EnsureSingleMarketDataSourceAsync(stoppingToken);
             await riskSource.RefreshAsync(stoppingToken);
             var selectionVersion = await ConfigureUniverseAsync(stoppingToken);
-            var history = await feed.LoadHistoryAsync(stoppingToken);
+            var history = await LoadHistoryAsync(stoppingToken);
             await stateStore.UpdateAsync(s => s with { MarketDataSource = marketDataOptions.Provider.ToString() }, stoppingToken);
             await WaitForBrokerAsync(stoppingToken);
             await engine.InitializeAsync(history, stoppingToken);
@@ -99,6 +99,26 @@ public sealed class TradingWorker(
         }
 
         logger.LogInformation("Trading worker stopped");
+    }
+
+    /// <summary>
+    /// Deriv regularly lets a single request go unanswered; retry the warm-up with a growing delay instead of stopping
+    /// the worker on the first timeout.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<Instrument, IReadOnlyList<Candle>>> LoadHistoryAsync(CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await feed.LoadHistoryAsync(cancellationToken);
+            }
+            catch (DerivConnectionException ex) when (attempt < MaxConsecutiveFailures)
+            {
+                logger.LogWarning("Loading market data failed ({Attempt}/{Max}): {Message}; retrying", attempt, MaxConsecutiveFailures, ex.Message);
+                await Task.Delay(TimeSpan.FromSeconds(5 * attempt), cancellationToken);
+            }
+        }
     }
 
     /// <summary>
