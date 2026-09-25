@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
 
-export function Card({ title, children, actions }: { title?: string; children: ReactNode; actions?: ReactNode }) {
+export function Card({ title, children, actions }: { title?: ReactNode; children: ReactNode; actions?: ReactNode }) {
   return (
     <section className="card">
       {(title || actions) && (
         <header className="card-head">
-          {title && <h2>{title}</h2>}
+          {title && (typeof title === "string" ? <h2>{title}</h2> : title)}
           {actions}
         </header>
       )}

@@ -292,3 +292,9 @@ textarea { background: var(--panel-2); color: var(--text); border: 1px solid var
 td.actions { text-align: right; }
 .small-button { background: transparent; border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
 .small-button:hover { border-color: var(--bad); color: var(--bad); }
+
+.pagination { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.pagination-controls { display: flex; align-items: center; gap: 6px; }
+.pagination-controls select { padding: 3px 6px; }
+.small-button:disabled { opacity: 0.4; cursor: default; }
+.small-button:disabled:hover { border-color: var(--border); color: var(--text); }

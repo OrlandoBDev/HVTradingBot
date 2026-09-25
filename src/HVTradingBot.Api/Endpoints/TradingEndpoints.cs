@@ -19,6 +19,12 @@ public static class TradingEndpoints
         api.MapGet("/markets", (DashboardQueries q, CancellationToken ct) => q.GetMarketsAsync(ct));
         api.MapGet("/decisions", (DashboardQueries q, string? state, string? instrument, int? limit, CancellationToken ct) =>
             q.GetDecisionsAsync(state, instrument, limit ?? 100, ct));
+        // Paged variants (the unpaged endpoints above stay for existing clients).
+        api.MapGet("/decisions/paged", (DashboardQueries q, string? state, string? instrument, int? page, int? pageSize, CancellationToken ct) =>
+            q.GetDecisionsPageAsync(state, instrument, page, pageSize, ct));
+        api.MapGet("/trades/paged", (DashboardQueries q, int? page, int? pageSize, CancellationToken ct) => q.GetTradeHistoryPageAsync(page, pageSize, ct));
+        api.MapGet("/audit/paged", (DashboardQueries q, int? page, int? pageSize, CancellationToken ct) => q.GetAuditPageAsync(page, pageSize, ct));
+
         api.MapGet("/decisions/{id:guid}", async (Guid id, DashboardQueries q, CancellationToken ct) =>
             await q.GetDecisionAsync(id, ct) is { } d ? Results.Ok(d) : Results.NotFound());
         api.MapGet("/positions/open", (DashboardQueries q, CancellationToken ct) => q.GetOpenPositionsAsync(ct));

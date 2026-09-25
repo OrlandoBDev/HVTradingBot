@@ -145,6 +145,56 @@ public sealed class DashboardQueries(
         return rows.Select(ToDto).ToList();
     }
 
+    public const int MaxPageSize = 200;
+
+    private static (int Page, int Size) Paging(int? page, int? pageSize) =>
+        (Math.Max(1, page ?? 1), Math.Clamp(pageSize ?? 50, 1, MaxPageSize));
+
+    public async Task<PagedResult<DecisionDto>> GetDecisionsPageAsync(string? state, string? instrument, int? page, int? pageSize,
+        CancellationToken cancellationToken)
+    {
+        var (p, size) = Paging(page, pageSize);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var query = db.TradeDecisions.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(state))
+        {
+            var states = state.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            query = query.Where(d => states.Contains(d.State));
+        }
+
+        if (!string.IsNullOrWhiteSpace(instrument))
+        {
+            query = query.Where(d => d.Instrument == instrument);
+        }
+
+        var total = await query.CountAsync(cancellationToken);
+        var rows = await query.OrderByDescending(d => d.MarketTimeUtc).ThenBy(d => d.Instrument).ThenBy(d => d.Id)
+            .Skip((p - 1) * size).Take(size).ToListAsync(cancellationToken);
+        return new PagedResult<DecisionDto>(rows.Select(ToDto).ToList(), total, p, size);
+    }
+
+    public async Task<PagedResult<PositionDto>> GetTradeHistoryPageAsync(int? page, int? pageSize, CancellationToken cancellationToken)
+    {
+        var (p, size) = Paging(page, pageSize);
+        var broker = BrokerOf(await stateStore.GetAsync(cancellationToken));
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var query = db.Positions.AsNoTracking().Where(x => !x.IsOpen && x.Broker == broker);
+        var total = await query.CountAsync(cancellationToken);
+        var rows = await query.OrderByDescending(x => x.ClosedAtUtc).ThenBy(x => x.Id).Skip((p - 1) * size).Take(size).ToListAsync(cancellationToken);
+        return new PagedResult<PositionDto>(rows.Select(x => ToDto(x, null, null)).ToList(), total, p, size);
+    }
+
+    public async Task<PagedResult<AuditEntryDto>> GetAuditPageAsync(int? page, int? pageSize, CancellationToken cancellationToken)
+    {
+        var (p, size) = Paging(page, pageSize);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var total = await db.AuditLogs.CountAsync(cancellationToken);
+        var rows = await db.AuditLogs.AsNoTracking().OrderByDescending(a => a.Id).Skip((p - 1) * size).Take(size)
+            .Select(a => new AuditEntryDto(a.Id, a.TimestampUtc, a.Actor, a.Action, a.Details, a.CorrelationId))
+            .ToListAsync(cancellationToken);
+        return new PagedResult<AuditEntryDto>(rows, total, p, size);
+    }
+
     public async Task<DecisionDetailDto?> GetDecisionAsync(Guid id, CancellationToken cancellationToken)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);

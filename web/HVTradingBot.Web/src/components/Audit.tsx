@@ -1,12 +1,17 @@
+import { useState } from "react";
 import type { AuditEntry } from "../types";
+import { Pagination, type Paged } from "./Pagination";
 import { time } from "../format";
 import { useData } from "../useData";
 import { Card, Empty, ErrorNote } from "./Ui";
 
 export function Audit({ refreshKey }: { refreshKey: unknown }) {
-  const { data, error } = useData<AuditEntry[]>("/api/audit?limit=200", refreshKey);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const { data: paged, error } = useData<Paged<AuditEntry>>(`/api/audit/paged?page=${page}&pageSize=${pageSize}`, refreshKey);
+  const data = paged?.items;
   return (
-    <Card title="Audit log">
+    <Card>
       <ErrorNote error={error} />
       {data && data.length === 0 && <Empty>No audit events yet.</Empty>}
       {data && data.length > 0 && (
@@ -25,6 +30,10 @@ export function Audit({ refreshKey }: { refreshKey: unknown }) {
             </tbody>
           </table>
         </div>
+      )}
+      {paged && paged.total > 0 && (
+        <Pagination page={paged.page} pageSize={paged.pageSize} total={paged.total} onPage={setPage}
+          onPageSize={(size) => { setPageSize(size); setPage(1); }} />
       )}
     </Card>
   );

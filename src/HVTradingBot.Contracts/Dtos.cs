@@ -240,3 +240,6 @@ public sealed record TestTradeDto(
     decimal? ExitPrice,
     decimal? RealizedPnl,
     int HoldSeconds);
+
+/// <summary>One page of a larger result. <see cref="Page"/> starts at 1.</summary>
+public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int PageSize);

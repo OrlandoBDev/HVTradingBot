@@ -6,6 +6,7 @@ import { money, num, price, signClass, time } from "../format";
 import { useData } from "../useData";
 import { Badge, Card, Empty, ErrorNote, Segmented } from "./Ui";
 import { TestTrade } from "./TestTrade";
+import { Pagination, type Paged } from "./Pagination";
 
 type Navigate = (page: PageId, section?: string) => void;
 
@@ -111,7 +112,10 @@ export function OpenPositions({ refreshKey, compact = false, onMore }: { refresh
 }
 
 export function TradeHistory({ refreshKey }: { refreshKey: unknown }) {
-  const { data, error } = useData<Position[]>("/api/trades?limit=200", refreshKey);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const { data: paged, error } = useData<Paged<Position>>(`/api/trades/paged?page=${page}&pageSize=${pageSize}`, refreshKey);
+  const data = paged?.items;
   return (
     <Card>
       <ErrorNote error={error} />
@@ -143,6 +147,10 @@ export function TradeHistory({ refreshKey }: { refreshKey: unknown }) {
             </tbody>
           </table>
         </div>
+      )}
+      {paged && paged.total > 0 && (
+        <Pagination page={paged.page} pageSize={paged.pageSize} total={paged.total} onPage={setPage}
+          onPageSize={(size) => { setPageSize(size); setPage(1); }} />
       )}
     </Card>
   );

@@ -1,5 +1,6 @@
 import { Fragment, useState } from "react";
-import type { Decision } from "../types";
+import type { Decision, Market } from "../types";
+import { Pagination, type Paged } from "./Pagination";
 import { api } from "../api";
 import { price, time } from "../format";
 import { useData } from "../useData";
@@ -14,9 +15,15 @@ const FILTERS: Record<string, string> = {
 
 export function Decisions({ refreshKey }: { refreshKey: unknown }) {
   const [filter, setFilter] = useState(Object.keys(FILTERS)[0]);
+  const [instrument, setInstrument] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [detail, setDetail] = useState<unknown>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const { data, error } = useData<Decision[]>(`/api/decisions?limit=200&state=${encodeURIComponent(FILTERS[filter])}`, refreshKey);
+  const { data: markets } = useData<Market[]>("/api/markets", "once");
+  const query = `state=${encodeURIComponent(FILTERS[filter])}&instrument=${encodeURIComponent(instrument)}&page=${page}&pageSize=${pageSize}`;
+  const { data: paged, error } = useData<Paged<Decision>>(`/api/decisions/paged?${query}`, refreshKey);
+  const data = paged?.items;
 
   const open = async (id: string) => {
     if (selected === id) {
@@ -30,10 +37,16 @@ export function Decisions({ refreshKey }: { refreshKey: unknown }) {
 
   return (
     <Card
+      title={
+        <select value={instrument} onChange={(e) => { setInstrument(e.target.value); setPage(1); }} aria-label="Market">
+          <option value="">All markets</option>
+          {markets?.map((m) => <option key={m.instrument} value={m.instrument}>{m.displayName}</option>)}
+        </select>
+      }
       actions={
         <div className="segmented">
           {Object.keys(FILTERS).map((f) => (
-            <button key={f} className={f === filter ? "active" : ""} onClick={() => setFilter(f)}>{f}</button>
+            <button key={f} className={f === filter ? "active" : ""} onClick={() => { setFilter(f); setPage(1); }}>{f}</button>
           ))}
         </div>
       }
@@ -76,6 +89,10 @@ export function Decisions({ refreshKey }: { refreshKey: unknown }) {
             </tbody>
           </table>
         </div>
+      )}
+      {paged && paged.total > 0 && (
+        <Pagination page={paged.page} pageSize={paged.pageSize} total={paged.total} onPage={setPage}
+          onPageSize={(size) => { setPageSize(size); setPage(1); }} />
       )}
     </Card>
   );
