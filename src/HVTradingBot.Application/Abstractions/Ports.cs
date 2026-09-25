@@ -47,3 +47,13 @@ public interface IMarketDataFeed
 }
 
 public sealed record InstrumentBar(Instrument Instrument, Candle Bar);
+
+/// <summary>Read access to the stored 5-minute bars (the only timeframe the market data feeds persist).</summary>
+public interface ICandleStore
+{
+    /// <summary>
+    /// The newest <paramref name="limit"/> 5m bars of <paramref name="symbol"/> opening at or after <paramref name="fromUtc"/>
+    /// and before <paramref name="toUtc"/> (either bound optional), oldest first.
+    /// </summary>
+    Task<IReadOnlyList<Candle>> GetM5Async(string symbol, DateTime? fromUtc, DateTime? toUtc, int limit, CancellationToken cancellationToken);
+}

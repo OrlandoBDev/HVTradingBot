@@ -245,6 +245,12 @@ public sealed record TestTradeDto(
     decimal? RealizedPnl,
     int HoldSeconds);
 
+/// <summary>Mid-price OHLC bar; <see cref="Spread"/> is the bid/ask spread at the close.</summary>
+public sealed record CandleDto(DateTime OpenTimeUtc, decimal Open, decimal High, decimal Low, decimal Close, decimal Spread, long Volume);
+
+/// <summary>Candles for one market and timeframe, oldest first.</summary>
+public sealed record CandleSeriesDto(string Instrument, string TimeFrame, IReadOnlyList<CandleDto> Candles);
+
 /// <summary>One page of a larger result. <see cref="Page"/> starts at 1.</summary>
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int PageSize);
 
