@@ -25,7 +25,7 @@ public static class TradingEndpoints
         api.MapGet("/candles", async (CandleQueryService candles, string? instrument, string? timeframe, DateTime? from, DateTime? to, int? limit,
             CancellationToken ct) =>
         {
-            if (CandleQueryService.TryParse(instrument, timeframe, from, to, limit, out var errors) is not { } query)
+            if (CandleQueryService.ParseQuery(instrument, timeframe, from, to, limit, out var errors) is not { } query)
             {
                 return Results.ValidationProblem(errors);
             }

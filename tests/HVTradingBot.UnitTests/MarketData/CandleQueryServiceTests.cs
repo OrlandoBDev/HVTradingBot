@@ -29,7 +29,7 @@ public class CandleQueryServiceTests
 
     private static CandleQuery Parse(string? instrument = "EUR/USD", string? timeframe = null, DateTime? from = null, DateTime? to = null, int? limit = null)
     {
-        var query = CandleQueryService.TryParse(instrument, timeframe, from, to, limit, out var errors);
+        var query = CandleQueryService.ParseQuery(instrument, timeframe, from, to, limit, out var errors);
         Assert.Empty(errors);
         return query!;
     }
@@ -65,7 +65,7 @@ public class CandleQueryServiceTests
     [InlineData("EUR/USD", null, CandleQueryService.MaxLimit + 1, "limit")]
     public void Parse_rejects_invalid_values(string? instrument, string? timeframe, int? limit, string key)
     {
-        var query = CandleQueryService.TryParse(instrument, timeframe, null, null, limit, out var errors);
+        var query = CandleQueryService.ParseQuery(instrument, timeframe, null, null, limit, out var errors);
 
         Assert.Null(query);
         Assert.Contains(key, errors.Keys);
@@ -74,7 +74,7 @@ public class CandleQueryServiceTests
     [Fact]
     public void Parse_rejects_from_not_before_to()
     {
-        var query = CandleQueryService.TryParse("EUR/USD", null, Bars.Start, Bars.Start, null, out var errors);
+        var query = CandleQueryService.ParseQuery("EUR/USD", null, Bars.Start, Bars.Start, null, out var errors);
 
         Assert.Null(query);
         Assert.Contains("from", errors.Keys);

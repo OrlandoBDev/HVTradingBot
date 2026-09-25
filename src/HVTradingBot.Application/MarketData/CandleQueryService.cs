@@ -15,8 +15,11 @@ public sealed class CandleQueryService(ICandleStore store)
     public const int DefaultLimit = 300;
     public const int MaxLimit = 2000;
 
-    /// <summary>Parses query-string values. Returns null and fills <paramref name="errors"/> (keyed by parameter) when invalid.</summary>
-    public static CandleQuery? TryParse(string? instrument, string? timeframe, DateTime? from, DateTime? to, int? limit,
+    /// <summary>
+    /// Parses query-string values. Returns null and fills <paramref name="errors"/> (keyed by parameter) when invalid.
+    /// Not named TryParse: minimal APIs would then try to bind this service from the request and refuse to start.
+    /// </summary>
+    public static CandleQuery? ParseQuery(string? instrument, string? timeframe, DateTime? from, DateTime? to, int? limit,
         out Dictionary<string, string[]> errors)
     {
         errors = new Dictionary<string, string[]>();
