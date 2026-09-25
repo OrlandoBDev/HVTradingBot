@@ -257,3 +257,17 @@ public sealed record LoginRequest(string Username, string Password, bool Remembe
 public sealed record SetupRequest(string SetupCode, string Username, string Password);
 
 public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
+
+/// <summary>A closed candle pushed to dashboards over the hub's "bar" message.</summary>
+public sealed record LiveBarDto(
+    string Instrument,
+    string TimeFrame,
+    DateTime OpenTimeUtc,
+    decimal Open,
+    decimal High,
+    decimal Low,
+    decimal Close,
+    long Volume);
+
+/// <summary>The latest quote for a market, pushed over the hub's "ticks" message when it changes.</summary>
+public sealed record LiveTickDto(string Instrument, DateTime TimeUtc, decimal Bid, decimal Ask, decimal SpreadPips);
