@@ -1,4 +1,5 @@
 using System.Reflection;
+using HVTradingBot.App.Core.Startup;
 using HVTradingBot.Application.Trading;
 using HVTradingBot.Domain.Risk;
 using HVTradingBot.Infrastructure.Persistence;
@@ -12,6 +13,7 @@ public class LayerTests
     private static readonly Assembly Application = typeof(TradingEngine).Assembly;
     private static readonly Assembly Infrastructure = typeof(TradingDbContext).Assembly;
     private static readonly Assembly Api = typeof(Program).Assembly;
+    private static readonly Assembly AppCore = typeof(StartupPipeline).Assembly;
 
     private static void AssertSuccess(TestResult result) =>
         Assert.True(result.IsSuccessful, "Violations: " + string.Join(", ", result.FailingTypeNames ?? []));
@@ -61,5 +63,16 @@ public class LayerTests
             .Where(n => n is not ("ExecutionService" or "TradingEngine" or "IExecutionBroker"));
 
         Assert.Empty(users);
+    }
+
+    [Fact]
+    public void App_core_only_orchestrates_docker_and_http()
+    {
+        // The macOS app talks to the stack through docker compose and the API's HTTP endpoints, never in-process, and
+        // App.Core stays free of MAUI so the solution builds and tests on Linux.
+        AssertSuccess(Types.InAssembly(AppCore).ShouldNot()
+            .HaveDependencyOnAny("HVTradingBot.Domain", "HVTradingBot.Application", "HVTradingBot.Infrastructure",
+                "HVTradingBot.Api", "HVTradingBot.Worker", "HVTradingBot.Contracts", "Microsoft.Maui")
+            .GetResult());
     }
 }
