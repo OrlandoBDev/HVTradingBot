@@ -31,7 +31,8 @@ dotnet workload list 2>/dev/null | grep -qE '^maui|^maui-maccatalyst' || fail "T
 
 info "Publishing ${APP_NAME} (Release, ${FRAMEWORK})"
 rm -rf "$OUT_DIR"
-dotnet publish "${PROJECT_DIR}/HVTradingBot.App.csproj" -f "$FRAMEWORK" -c Release -p:CreatePackage=false -nologo
+# ValidateXcodeVersion=false: the MAUI SDK pins an exact Xcode version; a newer minor Xcode builds fine.
+dotnet publish "${PROJECT_DIR}/HVTradingBot.App.csproj" -f "$FRAMEWORK" -c Release -p:CreatePackage=false -p:ValidateXcodeVersion=false -nologo
 
 # The universal bundle is the shallowest HVTradingBot.app under the output folder (per-architecture copies sit deeper).
 app="$(find "$OUT_DIR" -type d -name "$APP_NAME" -prune | awk '{ print length($0) "\t" $0 }' | sort -n | head -n 1 | cut -f 2-)"

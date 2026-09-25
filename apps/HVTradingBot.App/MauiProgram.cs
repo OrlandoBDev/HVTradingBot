@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.LifecycleEvents;
 using Microsoft.Maui.Storage;
+using IFileSystem = HVTradingBot.App.Core.IO.IFileSystem; // not Microsoft.Maui.Storage.IFileSystem
 
 namespace HVTradingBot.App;
 

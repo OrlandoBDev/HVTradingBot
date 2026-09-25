@@ -36,7 +36,8 @@ public class ProcessRunnerTests
 
         Assert.True(result.Succeeded);
         Assert.Equal("/custom/bin:/usr/bin:/bin", result.Output[0]);
-        Assert.Equal(new DirectoryInfo(directory).FullName.TrimEnd('/'), result.Output[1].TrimEnd('/'));
+        // Compare the unique folder name: on macOS the temp folder /var/... is reported by pwd as /private/var/...
+        Assert.EndsWith("/" + Path.GetFileName(directory.TrimEnd('/')), result.Output[1].TrimEnd('/'));
     }
 
     [Fact]

@@ -32,8 +32,8 @@ public sealed class Navigator(IServiceProvider services)
 
     public Task PopAsync() => CurrentPage.Navigation.PopAsync();
 
-    public Task AlertAsync(string title, string message) => CurrentPage.DisplayAlert(title, message, "OK");
+    public Task AlertAsync(string title, string message) => CurrentPage.DisplayAlertAsync(title, message, "OK");
 
     public Task<bool> ConfirmAsync(string title, string message, string accept) =>
-        CurrentPage.DisplayAlert(title, message, accept, "Cancel");
+        CurrentPage.DisplayAlertAsync(title, message, accept, "Cancel");
 }
