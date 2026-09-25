@@ -27,4 +27,10 @@ public interface IProcessRunner
     /// <see cref="OperationCanceledException"/>.
     /// </summary>
     Task<ProcessResult> RunAsync(ProcessCommand command, Action<string>? onOutput, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Starts <paramref name="command"/> without waiting or reading its output. On macOS the child keeps running after
+    /// the app exits, so this is how work that must outlive the app (stop on quit) is started.
+    /// </summary>
+    void StartDetached(ProcessCommand command);
 }

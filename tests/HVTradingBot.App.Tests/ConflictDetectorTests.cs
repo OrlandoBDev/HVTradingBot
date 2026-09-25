@@ -17,7 +17,7 @@ public class ConflictDetectorTests
     [Fact]
     public async Task Nothing_running_is_no_conflict()
     {
-        var runner = new FakeProcessRunner().On("-f -l", 1);
+        var runner = new FakeProcessRunner().On("-Ao", 0);
 
         Assert.Null(await Detector(runner).FindConflictAsync(Commands, 5080, CancellationToken.None));
         Assert.Single(runner.Calls); // the port is free, so docker ps is not needed
@@ -26,19 +26,19 @@ public class ConflictDetectorTests
     [Fact]
     public async Task Native_worker_is_a_conflict()
     {
-        var runner = new FakeProcessRunner().On("-f -l", 0, "4242 /Users/me/HVTradingBot/src/HVTradingBot.Worker/bin/Release/net10.0/HVTradingBot.Worker");
+        var runner = new FakeProcessRunner().On("-Ao", 0, "/Users/me/HVTradingBot/src/HVTradingBot.Worker/bin/Release/net10.0/HVTradingBot.Worker");
 
         var conflict = await Detector(runner).FindConflictAsync(Commands, 5080, CancellationToken.None);
 
         Assert.NotNull(conflict);
         Assert.Contains("already running outside Docker", conflict);
-        Assert.Contains("4242", conflict);
+        Assert.Contains("net10.0/HVTradingBot.Worker", conflict);
     }
 
     [Fact]
     public async Task Port_held_by_the_api_container_is_fine()
     {
-        var runner = new FakeProcessRunner().On("-f -l", 1).On("ps --filter publish=5080", 0, "hvtradingbot/api");
+        var runner = new FakeProcessRunner().On("-Ao", 0).On("ps --filter publish=5080", 0, "hvtradingbot/api");
 
         Assert.Null(await Detector(runner, 5080).FindConflictAsync(Commands, 5080, CancellationToken.None));
     }
@@ -46,7 +46,7 @@ public class ConflictDetectorTests
     [Fact]
     public async Task Port_held_by_another_program_is_a_conflict()
     {
-        var runner = new FakeProcessRunner().On("-f -l", 1).On("ps --filter publish=6000", 0);
+        var runner = new FakeProcessRunner().On("-Ao", 0).On("ps --filter publish=6000", 0);
 
         var conflict = await Detector(runner, 6000).FindConflictAsync(Commands, 6000, CancellationToken.None);
 
@@ -58,7 +58,7 @@ public class ConflictDetectorTests
     [InlineData("/", "a Docker container")]
     public async Task Port_held_by_another_container_is_a_conflict(string psLine, string owner)
     {
-        var runner = new FakeProcessRunner().On("-f -l", 1).On("ps --filter", 0, psLine);
+        var runner = new FakeProcessRunner().On("-Ao", 0).On("ps --filter", 0, psLine);
 
         var conflict = await Detector(runner, 5080).FindConflictAsync(Commands, 5080, CancellationToken.None);
 
@@ -66,9 +66,9 @@ public class ConflictDetectorTests
     }
 
     [Fact]
-    public async Task Failing_pgrep_is_an_error_not_a_pass()
+    public async Task Failing_ps_is_an_error_not_a_pass()
     {
-        var runner = new FakeProcessRunner().On("-f -l", 2, "pgrep: bad option");
+        var runner = new FakeProcessRunner().On("-Ao", 1, "ps: illegal option");
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => Detector(runner).FindConflictAsync(Commands, 5080, CancellationToken.None));
     }
@@ -81,9 +81,36 @@ public class ConflictDetectorTests
     [InlineData("tail -f /Users/me/HVTradingBot/src/HVTradingBot.Worker/obj/x", false)]
     [InlineData("/Applications/HVTradingBot.app/Contents/MacOS/HVTradingBot", false)]
     [InlineData("dotnet test tests/HVTradingBot.App.Tests", false)]
+    [InlineData("HVTradingBot.Worker", true)]
+    [InlineData("/x/MyHVTradingBot.Worker", false)]
     public void Native_process_pattern_matches_only_the_api_and_worker_executables(string commandLine, bool matches)
     {
         Assert.Equal(matches, Regex.IsMatch(commandLine, ConflictDetector.NativeProcessPattern));
+    }
+
+    [Fact]
+    public void Run_sh_dev_processes_are_not_conflicts()
+    {
+        var native = ConflictDetector.NativeProcesses(
+        [
+            "/sbin/launchd",
+            "  /Users/me/HVTradingBot/src/HVTradingBot.Api/bin/Debug/net10.0/HVTradingBot.Api --urls http://127.0.0.1:5081 --HVTradingBot:Instance=dev",
+            "/Users/me/HVTradingBot/src/HVTradingBot.Worker/bin/Debug/net10.0/HVTradingBot.Worker --HVTradingBot:Instance=dev",
+            "/Users/me/HVTradingBot/src/HVTradingBot.Worker/bin/Release/net10.0/HVTradingBot.Worker",
+            "ps -Ao args="
+        ]);
+
+        Assert.Equal(["/Users/me/HVTradingBot/src/HVTradingBot.Worker/bin/Release/net10.0/HVTradingBot.Worker"], native);
+    }
+
+    [Fact]
+    public async Task Only_dev_processes_running_is_no_conflict()
+    {
+        var runner = new FakeProcessRunner().On("-Ao", 0, "/r/HVTradingBot.Worker --HVTradingBot:Instance=dev", "/r/HVTradingBot.Api --HVTradingBot:Instance=dev");
+
+        Assert.Null(await Detector(runner).FindConflictAsync(Commands, 5080, CancellationToken.None));
+        Assert.Equal("/bin/ps", runner.Calls[0].FileName);
+        Assert.Equal(["-Ao", "args="], runner.Calls[0].Arguments);
     }
 
     [Fact]

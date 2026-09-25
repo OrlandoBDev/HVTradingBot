@@ -38,11 +38,11 @@ public class StartupPipelineTests
         time,
         NullLogger<StartupPipeline>.Instance);
 
-    private static StartupOptions Options => new(Repo) { InheritedPath = "/usr/bin:/bin" };
+    private static StartupOptions Options => new(Repo) { InheritedPath = "/usr/bin:/bin", HomeDirectory = "/Users/me" };
 
     private FakeProcessRunner HappyDocker() => runner
         .On("info", 0, "28.1.1")
-        .On("-f -l", 1)
+        .On("-Ao", 0)
         .On("compose --project-directory /Users/me/HVTradingBot up -d --build", 0, "Building api", "Container hvtradingbot-api-1 Started");
 
     [Fact]
@@ -64,6 +64,7 @@ public class StartupPipelineTests
         Assert.Contains("Building api", output);
         Assert.StartsWith("$ /usr/local/bin/docker compose", output[0]);
         Assert.Contains($"{Repo}/.env", files.PrivateFiles);
+        Assert.Contains("/Users/me/Library/Application Support/HVTradingBot/keys", files.Directories);
         Assert.All(runner.Calls, c => Assert.StartsWith("/usr/local/bin:/opt/homebrew/bin:", c.Environment!["PATH"]));
     }
 
@@ -130,6 +131,7 @@ public class StartupPipelineTests
 
         Assert.Equal(StartupStepId.Repository, result.FailedStep?.Id);
         Assert.Contains("docker-compose.yml", result.FailedStep?.Message);
+        Assert.Empty(files.Directories);
     }
 
     [Fact]
@@ -159,7 +161,7 @@ public class StartupPipelineTests
     [Fact]
     public async Task Native_run_stops_startup_before_compose()
     {
-        runner.On("info", 0).On("-f -l", 0, "99 dotnet HVTradingBot.Worker.dll");
+        runner.On("info", 0).On("-Ao", 0, "dotnet HVTradingBot.Worker.dll");
 
         var result = await Create().RunAsync(Options, CancellationToken.None);
 
@@ -180,7 +182,7 @@ public class StartupPipelineTests
     [Fact]
     public async Task Failed_compose_up_shows_the_last_output_line()
     {
-        runner.On("info", 0).On("-f -l", 1).On("compose", 17, "failed to solve: npm ci exited with 1");
+        runner.On("info", 0).On("-Ao", 0).On("compose", 17, "failed to solve: npm ci exited with 1");
 
         var result = await Create().RunAsync(Options, CancellationToken.None);
 
@@ -255,7 +257,7 @@ public class StartupPipelineTests
     public async Task Cancellation_propagates_and_marks_the_step()
     {
         using var cts = new CancellationTokenSource();
-        runner.On("info", 0).On("-f -l", 1).On(c => c.Arguments.Contains("up"), _ =>
+        runner.On("info", 0).On("-Ao", 0).On(c => c.Arguments.Contains("up"), _ =>
         {
             cts.Cancel();
             throw new OperationCanceledException(cts.Token);

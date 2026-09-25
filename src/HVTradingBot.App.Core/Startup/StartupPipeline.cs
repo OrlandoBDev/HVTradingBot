@@ -19,6 +19,9 @@ public sealed record StartupOptions(string RepositoryPath)
 
     /// <summary>The app's own <c>PATH</c>; the child processes get the Docker directories in front of it.</summary>
     public string? InheritedPath { get; init; } = Environment.GetEnvironmentVariable("PATH");
+
+    /// <summary>The user's home, where the shared key folder lives (<c>${HOME}</c> in <c>docker-compose.yml</c>).</summary>
+    public string HomeDirectory { get; init; } = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 }
 
 /// <summary>Outcome of <see cref="StartupPipeline.RunAsync"/>.</summary>
@@ -47,7 +50,7 @@ public sealed class StartupPipeline(
     [
         new(StartupStepId.FindDocker, "Find Docker"),
         new(StartupStepId.DockerRunning, "Docker running"),
-        new(StartupStepId.Repository, "Repository and .env"),
+        new(StartupStepId.Repository, "Repository, .env and key folder"),
         new(StartupStepId.Conflicts, "No conflicting native run"),
         new(StartupStepId.StartStack, "Start containers"),
         new(StartupStepId.WaitForApi, "Wait for the API"),
@@ -97,6 +100,7 @@ public sealed class StartupPipeline(
             }
 
             var created = repository.EnsureEnvFile(options.RepositoryPath);
+            repository.EnsureKeysDirectory(options.HomeDirectory);
             var apiPort = repository.ReadApiPort(options.RepositoryPath);
             apiBaseUri = new Uri($"http://localhost:{apiPort}/");
             current.Update(StepState.Succeeded, (created ? "Created .env. " : "") + $"Dashboard port {apiPort}");

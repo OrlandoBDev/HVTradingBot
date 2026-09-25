@@ -19,6 +19,24 @@ public sealed class RepositoryEnvironment(IFileSystem files, ILogger<RepositoryE
     public static string DefaultRepositoryPath =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "HVTradingBot");
 
+    /// <summary>
+    /// The Data Protection key folder that <c>docker-compose.yml</c> bind-mounts into api and worker as <c>/keys</c>
+    /// (shared with native runs), relative to the home directory.
+    /// </summary>
+    public static readonly string KeysFolder = Path.Combine("Library", "Application Support", "HVTradingBot", "keys");
+
+    /// <summary>
+    /// Creates <c>~/Library/Application Support/HVTradingBot/keys</c> if missing. Without it Docker would create the
+    /// bind-mount source itself, owned by root, and the non-root containers could not write their keys.
+    /// </summary>
+    public string EnsureKeysDirectory(string homeDirectory)
+    {
+        var path = Path.Combine(homeDirectory, KeysFolder);
+        files.CreateDirectory(path);
+        logger.LogDebug("Key folder {KeysPath} is present", path);
+        return path;
+    }
+
     public bool HasComposeFile(string repositoryPath) => files.FileExists(Path.Combine(repositoryPath, ComposeFileName));
 
     /// <summary>

@@ -100,9 +100,30 @@ public class DockerTests
     }
 
     [Fact]
+    public void Stop_on_quit_does_not_wait_for_compose()
+    {
+        var runner = new FakeProcessRunner();
+
+        new StackController(runner, Commands, NullLogger<StackController>.Instance).StopInBackground();
+
+        Assert.Empty(runner.Calls);
+        Assert.Equal(Commands.Stop(), Assert.Single(runner.Detached), CommandComparer.Instance);
+    }
+
+    [Fact]
     public void Command_text_quotes_arguments_with_spaces()
     {
         Assert.Equal("docker compose --project-directory \"/Users/me/My Repo\" stop",
             new ProcessCommand("docker", ["compose", "--project-directory", "/Users/me/My Repo", "stop"]).ToString());
     }
+}
+
+internal sealed class CommandComparer : IEqualityComparer<ProcessCommand>
+{
+    public static readonly CommandComparer Instance = new();
+
+    public bool Equals(ProcessCommand? x, ProcessCommand? y) =>
+        x is not null && y is not null && x.ToString() == y.ToString() && x.WorkingDirectory == y.WorkingDirectory;
+
+    public int GetHashCode(ProcessCommand obj) => obj.ToString().GetHashCode(StringComparison.Ordinal);
 }

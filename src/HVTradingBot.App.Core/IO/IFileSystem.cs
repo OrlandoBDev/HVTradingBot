@@ -7,6 +7,9 @@ public interface IFileSystem
 
     string ReadAllText(string path);
 
+    /// <summary>Creates the directory and its parents if missing (<c>mkdir -p</c>).</summary>
+    void CreateDirectory(string path);
+
     /// <summary>Creates a new file readable and writable only by the current user (mode 600); fails if it exists.</summary>
     void CreatePrivateFile(string path, string contents);
 }
@@ -16,6 +19,8 @@ public sealed class PhysicalFileSystem : IFileSystem
     public bool FileExists(string path) => File.Exists(path);
 
     public string ReadAllText(string path) => File.ReadAllText(path);
+
+    public void CreateDirectory(string path) => Directory.CreateDirectory(path);
 
     public void CreatePrivateFile(string path, string contents)
     {

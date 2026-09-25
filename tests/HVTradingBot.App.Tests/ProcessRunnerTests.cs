@@ -50,4 +50,36 @@ public class ProcessRunnerTests
 
         Assert.True(watch.Elapsed < TimeSpan.FromSeconds(10));
     }
+
+    [Fact]
+    public async Task Detached_process_runs_without_being_awaited()
+    {
+        var marker = Path.Combine(Directory.CreateTempSubdirectory("hv-app-").FullName, "stopped");
+
+        runner.StartDetached(new ProcessCommand("/bin/sh", ["-c", $"echo done > '{marker}'"]));
+
+        for (var i = 0; i < 200 && !File.Exists(marker); i++)
+        {
+            await Task.Delay(25);
+        }
+
+        Assert.True(File.Exists(marker));
+    }
+
+    [Fact]
+    public void Output_log_keeps_the_last_lines()
+    {
+        var log = new OutputLog(capacity: 3);
+
+        foreach (var line in new[] { "1", "2", "3", "4" })
+        {
+            log.Append(line);
+        }
+
+        Assert.Equal("2\n3\n4", log.Text);
+        Assert.Equal(4, log.Version);
+        log.Clear();
+        Assert.Equal("", log.Text);
+        Assert.Equal(5, log.Version);
+    }
 }

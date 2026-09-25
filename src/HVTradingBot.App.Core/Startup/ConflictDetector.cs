@@ -1,4 +1,5 @@
 using System.Net.Sockets;
+using System.Text.RegularExpressions;
 using HVTradingBot.App.Core.Docker;
 using HVTradingBot.App.Core.Processes;
 using Microsoft.Extensions.Logging;
@@ -43,30 +44,46 @@ public sealed class TcpPortProbe(TimeProvider time) : IPortProbe
 public sealed class ConflictDetector(IProcessRunner runner, IPortProbe ports, ILogger<ConflictDetector> logger)
 {
     /// <summary>
-    /// Matches the apphost (<c>.../HVTradingBot.Worker</c>) and <c>dotnet HVTradingBot.Worker.dll</c>, not directory
-    /// names such as <c>src/HVTradingBot.Worker/</c>. Containers run inside Docker Desktop's VM and never match.
+    /// Matches the apphost (<c>.../HVTradingBot.Worker</c>) and <c>dotnet [path/]HVTradingBot.Worker.dll</c>, not
+    /// directory names such as <c>src/HVTradingBot.Worker/</c>. The expression of <c>native_processes</c> in
+    /// <c>run.sh</c>, which also accepts a space before the name (<c>dotnet HVTradingBot.Worker.dll</c> run from its
+    /// folder). Containers run inside Docker Desktop's VM and never match.
     /// </summary>
-    public const string NativeProcessPattern = @"HVTradingBot\.(Worker|Api)(\.dll)?( |$)";
+    public const string NativeProcessPattern = @"(^|[/ ])HVTradingBot\.(Api|Worker)(\.dll)?( |$)";
 
-    public static ProcessCommand NativeProcessQuery(DockerInstallation docker) =>
-        new("/usr/bin/pgrep", ["-f", "-l", NativeProcessPattern], null, docker.Environment);
+    /// <summary>
+    /// <c>./run.sh dev</c> passes this argument to its API and worker. They use their own database, port and simulated
+    /// market data, so they may run next to the Docker stack.
+    /// </summary>
+    public const string DevInstanceMarker = "--HVTradingBot:Instance=dev";
+
+    private static readonly Regex NativeProcess = new(NativeProcessPattern, RegexOptions.CultureInvariant);
+
+    /// <summary>Command lines of all processes (<c>ps -Ao args=</c>, as in <c>run.sh</c>).</summary>
+    public static ProcessCommand ProcessListQuery(DockerInstallation docker) =>
+        new("/bin/ps", ["-Ao", "args="], null, docker.Environment);
+
+    /// <summary>The native API/worker command lines among <paramref name="commandLines"/>, without <c>./run.sh dev</c>.</summary>
+    public static IReadOnlyList<string> NativeProcesses(IEnumerable<string> commandLines) =>
+        [.. commandLines
+            .Select(l => l.Trim())
+            .Where(l => NativeProcess.IsMatch(l) && !l.Contains(DevInstanceMarker, StringComparison.Ordinal))];
 
     /// <summary>A message explaining the conflict, or null when it is safe to start the stack.</summary>
     public async Task<string?> FindConflictAsync(ComposeCommands commands, int apiPort, CancellationToken cancellationToken)
     {
-        var native = await runner.RunAsync(NativeProcessQuery(commands.Docker), null, cancellationToken);
-        switch (native.ExitCode)
+        var ps = await runner.RunAsync(ProcessListQuery(commands.Docker), null, cancellationToken);
+        if (!ps.Succeeded)
         {
-            case 0:
-                var processes = native.Output.Where(l => l.Length > 0).ToArray();
-                logger.LogWarning("Native HVTradingBot processes are running: {Processes}", string.Join("; ", processes));
-                return "HVTradingBot is already running outside Docker (./run.sh or dotnet run). Stop it first; two workers " +
-                       "would trade the same Deriv account.\n" + string.Join('\n', processes);
-            case 1: // pgrep: nothing matched
-                break;
-            default:
-                throw new InvalidOperationException(
-                    $"pgrep failed with exit code {native.ExitCode}: {string.Join(' ', native.Output)}");
+            throw new InvalidOperationException($"ps failed with exit code {ps.ExitCode}: {string.Join(' ', ps.Output)}");
+        }
+
+        var native = NativeProcesses(ps.Output);
+        if (native.Count > 0)
+        {
+            logger.LogWarning("Native HVTradingBot processes are running: {Processes}", string.Join("; ", native));
+            return "HVTradingBot is already running outside Docker (./run.sh or dotnet run). Stop it first; two workers " +
+                   "would trade the same Deriv account. (./run.sh dev may keep running.)\n" + string.Join('\n', native);
         }
 
         if (!await ports.IsInUseAsync(apiPort, cancellationToken))

@@ -74,6 +74,15 @@ public class RepositoryEnvironmentTests
     }
 
     [Fact]
+    public void Key_folder_is_created_under_application_support()
+    {
+        var path = Create().EnsureKeysDirectory("/Users/me");
+
+        Assert.Equal("/Users/me/Library/Application Support/HVTradingBot/keys", path);
+        Assert.Contains(path, files.Directories);
+    }
+
+    [Fact]
     public void Compose_file_marks_a_repository()
     {
         Assert.False(Create().HasComposeFile(Repo));

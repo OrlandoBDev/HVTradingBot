@@ -6,32 +6,17 @@ namespace HVTradingBot.App.Core.Processes;
 /// <summary><see cref="IProcessRunner"/> on top of <see cref="Process"/>, streaming stdout and stderr line by line.</summary>
 public sealed class ProcessRunner(ILogger<ProcessRunner> logger) : IProcessRunner
 {
+    public void StartDetached(ProcessCommand command)
+    {
+        using var process = Process.Start(CreateStartInfo(command, redirect: false))
+            ?? throw new InvalidOperationException($"{command} did not start.");
+        logger.LogInformation("Started {Command} (pid {Pid}) in the background", command, process.Id);
+    }
+
     public async Task<ProcessResult> RunAsync(ProcessCommand command, Action<string>? onOutput, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var startInfo = new ProcessStartInfo(command.FileName)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            RedirectStandardInput = false,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        foreach (var argument in command.Arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
-
-        if (command.WorkingDirectory is not null)
-        {
-            startInfo.WorkingDirectory = command.WorkingDirectory;
-        }
-
-        foreach (var (key, value) in command.Environment ?? new Dictionary<string, string>())
-        {
-            startInfo.Environment[key] = value;
-        }
-
+        var startInfo = CreateStartInfo(command, redirect: true);
         var output = new List<string>();
         using var process = new Process();
         process.StartInfo = startInfo;
@@ -79,5 +64,33 @@ public sealed class ProcessRunner(ILogger<ProcessRunner> logger) : IProcessRunne
 
             onOutput?.Invoke(line);
         }
+    }
+
+    private static ProcessStartInfo CreateStartInfo(ProcessCommand command, bool redirect)
+    {
+        var startInfo = new ProcessStartInfo(command.FileName)
+        {
+            RedirectStandardOutput = redirect,
+            RedirectStandardError = redirect,
+            RedirectStandardInput = false,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        foreach (var argument in command.Arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        if (command.WorkingDirectory is not null)
+        {
+            startInfo.WorkingDirectory = command.WorkingDirectory;
+        }
+
+        foreach (var (key, value) in command.Environment ?? new Dictionary<string, string>())
+        {
+            startInfo.Environment[key] = value;
+        }
+
+        return startInfo;
     }
 }

@@ -16,6 +16,16 @@ public sealed class StackController(IProcessRunner runner, ComposeCommands comma
     public Task<ProcessResult> LogsAsync(string service, CancellationToken cancellationToken) =>
         RunAsync(commands.Logs(service), cancellationToken);
 
+    /// <summary>
+    /// <c>docker compose stop</c> started in the background, for "Stop trading when the app quits": the app may exit
+    /// before the containers have stopped.
+    /// </summary>
+    public void StopInBackground()
+    {
+        logger.LogInformation("Stopping the stack because the app quits");
+        runner.StartDetached(commands.Stop());
+    }
+
     private async Task<ProcessResult> RunAsync(ProcessCommand command, CancellationToken cancellationToken)
     {
         logger.LogInformation("Running {Command}", command);

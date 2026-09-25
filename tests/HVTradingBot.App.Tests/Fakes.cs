@@ -12,6 +12,10 @@ internal sealed class FakeFileSystem : IFileSystem
 
     public HashSet<string> PrivateFiles { get; } = new(StringComparer.Ordinal);
 
+    public HashSet<string> Directories { get; } = new(StringComparer.Ordinal);
+
+    public void CreateDirectory(string path) => Directories.Add(path);
+
     public bool FileExists(string path) => Files.ContainsKey(path);
 
     public string ReadAllText(string path) =>
@@ -34,6 +38,10 @@ internal sealed class FakeProcessRunner : IProcessRunner
     private readonly List<(Func<ProcessCommand, bool> Match, Func<ProcessCommand, ProcessResult> Result)> rules = [];
 
     public List<ProcessCommand> Calls { get; } = [];
+
+    public List<ProcessCommand> Detached { get; } = [];
+
+    public void StartDetached(ProcessCommand command) => Detached.Add(command);
 
     public FakeProcessRunner On(Func<ProcessCommand, bool> match, Func<ProcessCommand, ProcessResult> result)
     {
