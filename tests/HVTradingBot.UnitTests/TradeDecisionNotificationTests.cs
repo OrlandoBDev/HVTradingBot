@@ -2,6 +2,7 @@ using System.Security.Cryptography.X509Certificates;
 using HVTradingBot.Application.Abstractions;
 using HVTradingBot.Application.Notifications;
 using HVTradingBot.Domain.Common;
+using HVTradingBot.Domain.MarketData;
 using HVTradingBot.Domain.Strategies;
 using HVTradingBot.Infrastructure.Notifications;
 using Microsoft.Extensions.Configuration;
@@ -50,6 +51,19 @@ public sealed class TradeDecisionNotificationTests
         Assert.Equal("[HV] Trade closed: SELL EUR/USD TakeProfit +24.50 USD (+2.0R)", message.Subject);
         Assert.Contains("Profit / loss: +24.50 USD", message.Body);
         Assert.Contains("Closed by: TakeProfit", message.Body);
+    }
+
+    [Fact]
+    public void Emails_show_the_market_name_instead_of_the_symbol()
+    {
+        Instruments.Register(new Instrument("1HZ75VX", "1HZ75VX", "USD", 0.01m, 2) { AssetClass = AssetClass.SyntheticIndex, Name = "Volatility 75X Index" });
+        var notification = CreateNotification(DecisionState.Executed) with { Instrument = "1HZ75VX" };
+
+        var message = TradeDecisionEmailFormatter.Format(notification, "[HV]");
+
+        Assert.Contains("Volatility 75X Index", message.Subject);
+        Assert.Contains("Instrument: Volatility 75X Index (1HZ75VX)", message.Body);
+        Assert.Contains("Volatility 75X Index (1HZ75VX)", message.HtmlBody);
     }
 
     [Fact]

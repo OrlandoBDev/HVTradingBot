@@ -20,7 +20,7 @@ public static class TradeDecisionEmailFormatter
         if (!string.IsNullOrWhiteSpace(notification.Broker)) AppendLine(body, "Broker", notification.Broker);
         if (notification.Kind != NotificationKind.KillSwitch)
         {
-            AppendLine(body, "Instrument", notification.Instrument);
+            AppendLine(body, "Instrument", TradeEmailTemplate.MarketWithSymbol(notification.Instrument));
             AppendLine(body, "Strategy", notification.Strategy ?? "-");
         }
 
@@ -73,12 +73,12 @@ public static class TradeDecisionEmailFormatter
         var side = n.Setup is { } s ? $"{Side(s.Direction)} " : n.Direction is { } d ? $"{Side(d)} " : string.Empty;
         return n.Kind switch
         {
-            NotificationKind.TradeOpened => $"Trade opened: {side}{n.Instrument}{(n.Setup is { } setup ? $" @ {FormatDecimal(setup.Entry)}" : "")}{strategy}",
-            NotificationKind.TradeClosed => $"Trade closed: {side}{n.Instrument} {n.ExitReason} {(n.RealizedPnl is { } p ? Money(p, n.Currency) : "")}"
+            NotificationKind.TradeOpened => $"Trade opened: {side}{TradeEmailTemplate.Market(n.Instrument)}{(n.Setup is { } setup ? $" @ {FormatDecimal(setup.Entry)}" : "")}{strategy}",
+            NotificationKind.TradeClosed => $"Trade closed: {side}{TradeEmailTemplate.Market(n.Instrument)} {n.ExitReason} {(n.RealizedPnl is { } p ? Money(p, n.Currency) : "")}"
                                             + (n.RMultiple is { } r ? $" ({r.ToString("+0.0;-0.0", CultureInfo.InvariantCulture)}R)" : ""),
             NotificationKind.KillSwitch => n.KillSwitchActive == false ? "Kill switch deactivated" : "Kill switch ACTIVATED",
             NotificationKind.Test => "Test email",
-            _ => $"{n.Status}: {side}{n.Instrument}{strategy}"
+            _ => $"{n.Status}: {side}{TradeEmailTemplate.Market(n.Instrument)}{strategy}"
         };
     }
 

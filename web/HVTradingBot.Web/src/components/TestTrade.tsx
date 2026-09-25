@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { Market } from "../types";
 import { api } from "../api";
 import { money, time } from "../format";
-import { Badge, Card, ErrorNote } from "./Ui";
+import { Badge, Card, ErrorNote, MarketName } from "./Ui";
 
 interface TestTradeData {
   id: string;
@@ -118,7 +118,7 @@ export function TestTrade() {
           </div>
           <p className="test-trade-message">
             <Badge tone={latest.status === "Closed" ? "good" : latest.status === "Failed" ? "bad" : "info"}>{latest.status}</Badge>{" "}
-            <span className="strong">{latest.instrument}</span> · {latest.message}
+            <MarketName symbol={latest.instrument} /> · {latest.message}
           </p>
           <p className="muted small">
             Requested {time(latest.requestedAtUtc)}

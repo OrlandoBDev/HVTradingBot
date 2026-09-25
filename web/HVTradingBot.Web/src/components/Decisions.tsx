@@ -4,7 +4,7 @@ import { Pagination, type Paged } from "./Pagination";
 import { api } from "../api";
 import { price, time } from "../format";
 import { useData } from "../useData";
-import { Badge, Card, Empty, ErrorNote, RegimeBadge, stateTone } from "./Ui";
+import { Badge, Card, Empty, ErrorNote, MarketName, RegimeBadge, stateTone } from "./Ui";
 
 const FILTERS: Record<string, string> = {
   "Candidates & trades": "Candidate,Observe,RejectedByRisk,Executed,Expired",
@@ -67,7 +67,7 @@ export function Decisions({ refreshKey }: { refreshKey: unknown }) {
                 <Fragment key={d.id}>
                   <tr className="clickable" onClick={() => open(d.id)}>
                     <td className="mono muted">{time(d.marketTimeUtc)}</td>
-                    <td className="strong">{d.instrument}</td>
+                    <td><MarketName symbol={d.instrument} /></td>
                     <td><Badge tone={stateTone(d.state)}>{d.state}</Badge></td>
                     <td><RegimeBadge regime={d.regime} /></td>
                     <td>{d.strategy ?? "—"}</td>

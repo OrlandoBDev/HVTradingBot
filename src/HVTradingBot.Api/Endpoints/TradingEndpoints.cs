@@ -3,6 +3,7 @@ using HVTradingBot.Api.Services;
 using HVTradingBot.Application.Abstractions;
 using HVTradingBot.Application.Learning;
 using HVTradingBot.Domain.Learning;
+using HVTradingBot.Domain.MarketData;
 using HVTradingBot.Infrastructure.TestTrades;
 using HVTradingBot.Infrastructure.Trades;
 using HVTradingBot.Contracts;
@@ -17,6 +18,8 @@ public static class TradingEndpoints
 
         api.MapGet("/status", (DashboardQueries q, CancellationToken ct) => q.GetStatusAsync(ct));
         api.MapGet("/markets", (DashboardQueries q, CancellationToken ct) => q.GetMarketsAsync(ct));
+        // Every known market (including ones no longer selected), so pages can show names for older trades too.
+        api.MapGet("/markets/names", () => Instruments.All.ToDictionary(i => i.Symbol, i => i.DisplayName));
         api.MapGet("/decisions", (DashboardQueries q, string? state, string? instrument, int? limit, CancellationToken ct) =>
             q.GetDecisionsAsync(state, instrument, limit ?? 100, ct));
         // Paged variants (the unpaged endpoints above stay for existing clients).

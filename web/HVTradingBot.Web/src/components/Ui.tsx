@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useMarketNames } from "../useMarketNames";
 
 export function Card({ title, children, actions }: { title?: ReactNode; children: ReactNode; actions?: ReactNode }) {
   return (
@@ -76,4 +77,10 @@ export function RegimeBadge({ regime }: { regime: string | null }) {
     : regime === "NewsEvent" ? ["warn", "News event"]
     : ["neutral", "? Uncertain"];
   return <Badge tone={tone}>{label}</Badge>;
+}
+
+/** A market's readable name (e.g. "Volatility 75 (1s) Index"), with its symbol on hover. */
+export function MarketName({ symbol, className = "strong" }: { symbol: string; className?: string }) {
+  const name = useMarketNames()(symbol);
+  return <span className={className} title={symbol}>{name}</span>;
 }

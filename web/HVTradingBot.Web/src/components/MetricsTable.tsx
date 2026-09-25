@@ -1,4 +1,5 @@
 import type { Metrics } from "../types";
+import { MarketName } from "./Ui";
 import { money, num, signClass } from "../format";
 
 export function MetricsSummary({ m }: { m: Metrics }) {
@@ -22,7 +23,7 @@ export function MetricsSummary({ m }: { m: Metrics }) {
   );
 }
 
-export function MetricsByGroup({ groups, label }: { groups: Record<string, Metrics>; label: string }) {
+export function MetricsByGroup({ groups, label, markets = false }: { groups: Record<string, Metrics>; label: string; markets?: boolean }) {
   const entries = Object.entries(groups);
   if (entries.length === 0) return <p className="empty">No closed trades yet.</p>;
   return (
@@ -37,7 +38,7 @@ export function MetricsByGroup({ groups, label }: { groups: Record<string, Metri
         <tbody>
           {entries.map(([name, m]) => (
             <tr key={name}>
-              <td className="strong">{name}</td>
+              <td>{markets ? <MarketName symbol={name} /> : <span className="strong">{name}</span>}</td>
               <td className="num">{m.totalTrades}</td>
               <td className="num">{num(m.winRate, 1)}</td>
               <td className={`num ${signClass(m.netPnl)}`}>{money(m.netPnl)}</td>

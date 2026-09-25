@@ -21,7 +21,7 @@ export function PerformanceView({ refreshKey }: { refreshKey: unknown }) {
             </Card>
           </div>
           <Card title="By strategy"><MetricsByGroup groups={data.byStrategy} label="Strategy" /></Card>
-          <Card title="By instrument"><MetricsByGroup groups={data.byInstrument} label="Instrument" /></Card>
+          <Card title="By market"><MetricsByGroup groups={data.byInstrument} label="Market" markets /></Card>
         </>
       )}
     </>

@@ -3,10 +3,12 @@ import type { BacktestRun } from "../types";
 import { api } from "../api";
 import { money, signClass, time } from "../format";
 import { useData } from "../useData";
+import { useMarketNames } from "../useMarketNames";
 import { Card, Empty, ErrorNote } from "./Ui";
 import { MetricsByGroup, MetricsSummary } from "./MetricsTable";
 
 export function Backtest() {
+  const marketName = useMarketNames();
   const [days, setDays] = useState(90);
   const [seed, setSeed] = useState("");
   const [source, setSource] = useState("simulated");
@@ -64,7 +66,7 @@ export function Backtest() {
       {shown && (
         <div className="two-col">
           <Card title={`Result: ${shown.parameters.source}, ${shown.parameters.days} days${shown.parameters.seed != null ? `, seed ${shown.parameters.seed}` : ""}`}>
-            <p className="muted">{time(shown.summary.fromUtc)} → {time(shown.summary.toUtc)} · {shown.summary.barsProcessed.toLocaleString()} bars · {shown.parameters.instruments.join(", ")}</p>
+            <p className="muted">{time(shown.summary.fromUtc)} → {time(shown.summary.toUtc)} · {shown.summary.barsProcessed.toLocaleString()} bars · {shown.parameters.instruments.map(marketName).join(", ")}</p>
             <MetricsSummary m={shown.summary.metrics} />
           </Card>
           <Card title="Decisions">

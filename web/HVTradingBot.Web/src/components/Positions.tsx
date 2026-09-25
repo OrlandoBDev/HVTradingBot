@@ -4,7 +4,8 @@ import { api } from "../api";
 import type { PageId } from "../pages";
 import { money, num, price, signClass, time } from "../format";
 import { useData } from "../useData";
-import { Badge, Card, Empty, ErrorNote, Segmented } from "./Ui";
+import { Badge, Card, Empty, ErrorNote, MarketName, Segmented } from "./Ui";
+import { useMarketNames } from "../useMarketNames";
 import { TestTrade } from "./TestTrade";
 import { Pagination, type Paged } from "./Pagination";
 
@@ -27,6 +28,7 @@ export function Trades({ refreshKey, view, navigate }: { refreshKey: unknown; vi
 }
 
 export function OpenPositions({ refreshKey, compact = false, onMore }: { refreshKey: unknown; compact?: boolean; onMore?: () => void }) {
+  const marketName = useMarketNames();
   const [tick, setTick] = useState(0);
   const [closeError, setCloseError] = useState<string | null>(null);
   const { data, error } = useData<Position[]>("/api/positions/open", `${refreshKey}|${tick}`);
@@ -41,7 +43,7 @@ export function OpenPositions({ refreshKey, compact = false, onMore }: { refresh
 
   const close = async (p: Position) => {
     const pnl = p.unrealizedPnl == null ? "" : `\nOpen P&L now: ${money(p.unrealizedPnl)}.`;
-    if (!window.confirm(`Close ${p.direction === "Long" ? "BUY" : "SELL"} ${p.instrument} now at the market price?${pnl}\n\nThis sells the position before its stop loss or take profit.`)) return;
+    if (!window.confirm(`Close ${p.direction === "Long" ? "BUY" : "SELL"} ${marketName(p.instrument)} now at the market price?${pnl}\n\nThis sells the position before its stop loss or take profit.`)) return;
     setCloseError(null);
     try {
       await api.post(`/api/positions/${p.id}/close`, {});
@@ -75,7 +77,7 @@ export function OpenPositions({ refreshKey, compact = false, onMore }: { refresh
             <tbody>
               {data.map((p) => (
                 <tr key={p.id}>
-                  <td className="strong">{p.instrument}</td>
+                  <td><MarketName symbol={p.instrument} /></td>
                   <td><Badge tone={p.direction === "Long" ? "good" : "bad"}>{p.direction === "Long" ? "Buy" : "Sell"}</Badge></td>
                   {!compact && <td className="num">{num(p.units, p.units < 10 ? 4 : 0)}</td>}
                   <td className="num mono">{price(p.entryPrice, p.instrument)}</td>
@@ -133,7 +135,7 @@ export function TradeHistory({ refreshKey }: { refreshKey: unknown }) {
               {data.map((p) => (
                 <tr key={p.id}>
                   <td className="mono muted">{time(p.closedAtUtc)}</td>
-                  <td className="strong">{p.instrument}</td>
+                  <td><MarketName symbol={p.instrument} /></td>
                   <td>{p.direction === "Long" ? "Buy" : "Sell"}</td>
                   <td>{p.strategy}</td>
                   <td className="num mono">{price(p.entryPrice, p.instrument)}</td>

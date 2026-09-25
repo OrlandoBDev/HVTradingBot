@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Text;
 using HVTradingBot.Domain.Common;
+using HVTradingBot.Domain.MarketData;
 
 namespace HVTradingBot.Application.Notifications;
 
@@ -143,12 +144,12 @@ Choose which emails you receive under <b>Settings › Notifications</b> in the H
 
     private static string Title(TradeDecisionNotification n, int decimals) => n.Kind switch
     {
-        NotificationKind.TradeOpened when n.Setup is { } s => $"{Side(s.Direction)} {n.Instrument} @ {Price(s.Entry, decimals)}",
-        NotificationKind.TradeClosed => $"{n.Instrument} · {Humanize(n.ExitReason ?? "Closed")}",
+        NotificationKind.TradeOpened when n.Setup is { } s => $"{Side(s.Direction)} {Market(n.Instrument)} @ {Price(s.Entry, decimals)}",
+        NotificationKind.TradeClosed => $"{Market(n.Instrument)} · {Humanize(n.ExitReason ?? "Closed")}",
         NotificationKind.KillSwitch => n.KillSwitchActive == false ? "Trading resumed" : "Trading stopped",
         NotificationKind.Test => "Your email settings work",
-        NotificationKind.ApprovalRequired => $"{n.Instrument} needs approval",
-        _ => $"{(n.Setup is { } setup ? Side(setup.Direction) + " " : "")}{n.Instrument} was not placed"
+        NotificationKind.ApprovalRequired => $"{Market(n.Instrument)} needs approval",
+        _ => $"{(n.Setup is { } setup ? Side(setup.Direction) + " " : "")}{Market(n.Instrument)} was not placed"
     };
 
     private static string Subtitle(TradeDecisionNotification n)
@@ -204,11 +205,11 @@ Choose which emails you receive under <b>Settings › Notifications</b> in the H
 
     private static string Preheader(TradeDecisionNotification n) => n.Kind switch
     {
-        NotificationKind.TradeClosed when n.RealizedPnl is { } p => $"{n.Instrument}: {Money(p, n.Currency)} ({n.ExitReason})",
-        NotificationKind.TradeOpened when n.Setup is { } s => $"{Side(s.Direction)} {n.Instrument} — stop {Num(s.StopLoss)}, target {Num(s.TakeProfit)}",
+        NotificationKind.TradeClosed when n.RealizedPnl is { } p => $"{Market(n.Instrument)}: {Money(p, n.Currency)} ({n.ExitReason})",
+        NotificationKind.TradeOpened when n.Setup is { } s => $"{Side(s.Direction)} {Market(n.Instrument)} — stop {Num(s.StopLoss)}, target {Num(s.TakeProfit)}",
         NotificationKind.KillSwitch => n.KillSwitchActive == false ? "New trades are allowed again." : "No new trades will be placed.",
         NotificationKind.Test => "Your email settings work.",
-        _ => $"{n.Instrument}: {string.Join(" ", n.Reasons.Take(1))}"
+        _ => $"{Market(n.Instrument)}: {string.Join(" ", n.Reasons.Take(1))}"
     };
 
     private static List<(string Label, string Value, string? Color)> Figures(TradeDecisionNotification n, int decimals)
@@ -239,7 +240,7 @@ Choose which emails you receive under <b>Settings › Notifications</b> in the H
         var rows = new List<(string, string)>();
         if (n.Kind is not (NotificationKind.KillSwitch or NotificationKind.Test))
         {
-            rows.Add(("Market", n.Instrument));
+            rows.Add(("Market", MarketWithSymbol(n.Instrument)));
             var direction = n.Setup?.Direction ?? n.Direction;
             if (direction is { } d) rows.Add(("Direction", Side(d)));
             if (n.Kind == NotificationKind.TradeClosed)
@@ -282,6 +283,12 @@ Choose which emails you receive under <b>Settings › Notifications</b> in the H
     }
 
     private static bool IsNumeric(string value) => value.Length > 0 && (char.IsDigit(value[0]) || value[0] is '+' or '-' or '−');
+
+    /// <summary>Readable market name, e.g. "Volatility 75 (1s) Index" for 1HZ75V.</summary>
+    public static string Market(string symbol) => Instruments.DisplayNameOf(symbol);
+
+    /// <summary>Market name with its symbol when they differ, e.g. "Volatility 75 (1s) Index (1HZ75V)".</summary>
+    public static string MarketWithSymbol(string symbol) => Market(symbol) is var name && name != symbol ? $"{name} ({symbol})" : symbol;
 
     private static string Side(Direction d) => d == Direction.Long ? "BUY" : "SELL";
 

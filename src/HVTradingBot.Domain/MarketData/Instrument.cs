@@ -93,6 +93,9 @@ public static class Instruments
 
     public static bool TryGet(string symbol, out Instrument instrument) => Registry.TryGetValue(symbol, out instrument!);
 
+    /// <summary>Readable market name for <paramref name="symbol"/>; the symbol itself when the market is unknown.</summary>
+    public static string DisplayNameOf(string symbol) => TryGet(symbol, out var instrument) ? instrument.DisplayName : symbol;
+
     public static Instrument Get(string symbol) =>
         TryGet(symbol, out var instrument)
             ? instrument
