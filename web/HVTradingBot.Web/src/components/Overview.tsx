@@ -5,6 +5,7 @@ import { Badge, Card, Stat } from "./Ui";
 import { useData } from "../useData";
 import { Markets } from "./Markets";
 import { OpenPositions } from "./Positions";
+import { inApp } from "../platform";
 
 type Navigate = (page: PageId, section?: string) => void;
 
@@ -15,6 +16,7 @@ export function Overview({ status, refreshKey, navigate }: { status: SystemStatu
   const scope = profit?.accountFromBroker ? "whole account" : "all trades";
   return (
     <div className="stack">
+      {inApp && <BackupReminder navigate={navigate} />}
       {/* The whole broker account: every contract, including ones opened outside this app. */}
       <div className="grid-stats">
         <Stat label="Equity" value={money(a.equity, a.currency)} sub={`balance ${money(a.balance, a.currency)}`} />
@@ -86,5 +88,17 @@ function SignalPnl({ signals, currency }: { signals: PnlPeriods; currency: strin
         <Stat label="Open" value={money(signals.open, currency)} tone={signClass(signals.open)} sub={`${signals.openTrades} open position(s)`} />
       </div>
     </Card>
+  );
+}
+
+/** Android app: everything is on the phone, so remind to save a backup when there is none from the last week. */
+function BackupReminder({ navigate }: { navigate: Navigate }) {
+  const { data } = useData<{ lastExportUtc: string | null }>("/api/app/backup", null);
+  if (!data || (data.lastExportUtc && Date.now() - Date.parse(data.lastExportUtc) < 7 * 86_400_000)) return null;
+  return (
+    <div className="banner">
+      <b>{data.lastExportUtc ? "No backup this week." : "Your data is not backed up."}</b> Trades and learning live only on this phone.{" "}
+      <a href="#/settings/engine" onClick={(e) => { e.preventDefault(); navigate("settings", "engine"); }}>Save a backup</a>
+    </div>
   );
 }

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using HVTradingBot.Application.Abstractions;
 using HVTradingBot.Application.Backtesting;
+using HVTradingBot.Application.Performance;
 using HVTradingBot.Application.Trading;
 using HVTradingBot.Contracts;
 using HVTradingBot.Domain.MarketData;
@@ -101,6 +102,8 @@ public sealed class BacktestService(
             result.ByStrategy,
             result.DecisionCounts,
             result.Costs,
+            // Walk-forward periods and Monte Carlo: is the result more than luck?
+            Robustness = RobustnessAnalysis.Analyze(result.Trades, result.FromUtc, result.ToUtc),
             Trades = result.Trades.OrderByDescending(t => t.ClosedAtUtc).Take(200)
         }, JsonDefaults.Options);
 

@@ -95,6 +95,21 @@ the installed app.
   different key, and the only way around that is uninstalling. Android backup is off (`allowBackup="false"`), so an
   uninstall cannot be undone.
 
+## Backup and restore
+
+Everything the app knows (trades, decisions, learning, signals, settings) is in one SQLite file on the phone. Settings ›
+Engine & backup › **Save backup…** writes a zip to a place you choose (Google Drive, Downloads); the Overview reminds you
+when there is no backup from the last 7 days. The copy is made while the engine keeps running.
+
+**Restore from backup…** checks the file first (it must be an HVTradingBot backup, intact, and not from a newer app
+version) and shows what it holds before replacing anything. The current data is first saved inside the app
+(`backups/before-restore-*.zip`, never deleted by the app), then trading restarts on the restored data.
+
+A backup leaves out the encryption keys, so the file never exposes the Deriv token or email password. Restoring on the
+same phone keeps them working; on a new phone, enter them again in Settings.
+
+The database is too large for Android's automatic Google backup (25 MB limit), which stays off.
+
 ## Build locally
 
 Needs .NET 10, Node.js 22, JDK 17+, the `android` workload and Android SDK platform 36:

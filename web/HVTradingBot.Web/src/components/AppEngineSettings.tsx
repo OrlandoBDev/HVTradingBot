@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { time } from "../format";
 import { Badge, Card, Empty, ErrorNote } from "./Ui";
+import { BackupCard } from "./BackupCard";
 
 interface EngineInfo {
   state: "Stopped" | "Starting" | "Running" | "Restarting";
@@ -61,6 +62,7 @@ export function AppEngineSettings() {
           their broker-side stop loss and take profit.
         </p>
       </Card>
+      <BackupCard />
       <Card title="Recent log">
         {log.length === 0 ? (
           <Empty>No log lines yet.</Empty>

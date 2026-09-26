@@ -28,7 +28,7 @@ public sealed partial class LocalApi
     private readonly ILogger<LocalApi> _logger;
 
     public LocalApi(DashboardQueries queries, DashboardActions actions, BacktestService backtests, CandleQueryService candles,
-        EngineSupervisor engine, AppLog log, ILogger<LocalApi> logger, NewsQueries news, SignalDashboard signals)
+        EngineSupervisor engine, AppLog log, ILogger<LocalApi> logger, NewsQueries news, SignalDashboard signals, DataBackup backup)
     {
         _logger = logger;
 
@@ -109,6 +109,7 @@ public sealed partial class LocalApi
 
         // App only: the engine's state (the web dashboard's equivalent is the Docker/Mac app status) and recent log lines.
         Get("/api/app/engine", _ => Ok(new { State = engine.State.ToString(), engine.LastError, engine.Restarts }));
+        Get("/api/app/backup", _ => Ok(backup.GetStatus()));
         Get("/api/app/logs", r => Ok(log.Recent(r.Int("count") ?? 200)));
     }
 
