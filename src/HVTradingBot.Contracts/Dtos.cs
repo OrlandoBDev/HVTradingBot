@@ -263,6 +263,12 @@ public sealed record TestTradeDto(
     decimal? RealizedPnl,
     int HoldSeconds);
 
+/// <summary>Mid-price OHLC bar; <see cref="Spread"/> is the bid/ask spread at the close.</summary>
+public sealed record CandleDto(DateTime OpenTimeUtc, decimal Open, decimal High, decimal Low, decimal Close, decimal Spread, long Volume);
+
+/// <summary>Candles for one market and timeframe, oldest first.</summary>
+public sealed record CandleSeriesDto(string Instrument, string TimeFrame, IReadOnlyList<CandleDto> Candles);
+
 /// <summary>One page of a larger result. <see cref="Page"/> starts at 1.</summary>
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int PageSize);
 
@@ -275,3 +281,17 @@ public sealed record LoginRequest(string Username, string Password, bool Remembe
 public sealed record SetupRequest(string SetupCode, string Username, string Password);
 
 public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
+
+/// <summary>A closed candle pushed to dashboards over the hub's "bar" message.</summary>
+public sealed record LiveBarDto(
+    string Instrument,
+    string TimeFrame,
+    DateTime OpenTimeUtc,
+    decimal Open,
+    decimal High,
+    decimal Low,
+    decimal Close,
+    long Volume);
+
+/// <summary>The latest quote for a market, pushed over the hub's "ticks" message when it changes.</summary>
+public sealed record LiveTickDto(string Instrument, DateTime TimeUtc, decimal Bid, decimal Ask, decimal SpreadPips);

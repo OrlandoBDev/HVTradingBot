@@ -3,6 +3,7 @@ using HVTradingBot.Api.Auth;
 using HVTradingBot.Api.Endpoints;
 using HVTradingBot.Api.Hubs;
 using HVTradingBot.Api.Infrastructure;
+using HVTradingBot.Api.Services;
 using HVTradingBot.Dashboard;
 using HVTradingBot.Infrastructure;
 using HVTradingBot.Infrastructure.Configuration;
@@ -28,6 +29,7 @@ try
 
     builder.Services.AddTradingCore(builder.Configuration);
     builder.Services.AddDashboard();
+    builder.Services.AddSingleton<LiveMarketStream>();
     builder.Services.AddHostedService<DashboardBroadcaster>();
     builder.Services.AddHostedService<MarketCatalogLoader>();
     builder.Services.AddDashboardAuth();

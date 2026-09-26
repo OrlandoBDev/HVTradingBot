@@ -1,4 +1,5 @@
 using HVTradingBot.Api.Infrastructure;
+using HVTradingBot.Application.MarketData;
 using HVTradingBot.Contracts;
 using HVTradingBot.Dashboard;
 
@@ -13,6 +14,19 @@ public static class TradingEndpoints
         api.MapGet("/status", (DashboardQueries q, CancellationToken ct) => q.GetStatusAsync(ct));
         api.MapGet("/markets", (DashboardQueries q, CancellationToken ct) => q.GetMarketsAsync(ct));
         api.MapGet("/markets/names", (DashboardActions actions, CancellationToken ct) => actions.GetMarketNamesAsync(ct));
+        // Stored candles for charts, e.g. /api/candles?instrument=EUR/USD&timeframe=H1&limit=200 (oldest first).
+        api.MapGet("/candles", async (CandleQueryService candles, string? instrument, string? timeframe, DateTime? from, DateTime? to, int? limit,
+            CancellationToken ct) =>
+        {
+            if (CandleQueryService.ParseQuery(instrument, timeframe, from, to, limit, out var errors) is not { } query)
+            {
+                return Results.ValidationProblem(errors);
+            }
+
+            var bars = await candles.GetAsync(query, ct);
+            return Results.Ok(new CandleSeriesDto(query.Symbol, query.TimeFrame.ToString(),
+                bars.Select(b => new CandleDto(b.OpenTimeUtc, b.Open, b.High, b.Low, b.Close, b.Spread, b.Volume)).ToList()));
+        });
         api.MapGet("/decisions", (DashboardQueries q, string? state, string? instrument, int? limit, CancellationToken ct) =>
             q.GetDecisionsAsync(state, instrument, limit ?? 100, ct));
         // Paged variants (the unpaged endpoints above stay for existing clients).

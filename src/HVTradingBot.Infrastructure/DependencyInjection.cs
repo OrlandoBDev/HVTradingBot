@@ -1,6 +1,7 @@
 using HVTradingBot.Application.Abstractions;
 using HVTradingBot.Application.Backtesting;
 using HVTradingBot.Application.Learning;
+using HVTradingBot.Application.MarketData;
 using HVTradingBot.Application.Trading;
 using HVTradingBot.Domain.Analysis;
 using HVTradingBot.Domain.Decisions;
@@ -55,6 +56,8 @@ public static class DependencyInjection
         services.AddSingleton<EfDecisionJournal>();
         services.AddSingleton<IDecisionJournal>(sp => sp.GetRequiredService<EfDecisionJournal>());
         services.AddSingleton<IMarketSnapshotSink>(sp => sp.GetRequiredService<EfDecisionJournal>());
+        services.AddSingleton<ICandleStore, EfCandleStore>();
+        services.AddSingleton<CandleQueryService>();
 
         // Deriv settings (Settings page) are shared by the API (writes) and the worker (reads).
         services.AddHvDataProtection(configuration);

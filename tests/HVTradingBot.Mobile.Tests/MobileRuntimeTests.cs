@@ -51,7 +51,7 @@ public sealed class MobileRuntimeTests : IAsyncLifetime
             "/api/decisions/paged?state=NoTrade&instrument=EUR%2FUSD", "/api/trades/paged?page=1&pageSize=10", "/api/audit/paged?page=1&pageSize=10",
             "/api/positions/open", "/api/trades", "/api/risk", "/api/performance", "/api/profit", "/api/audit", "/api/learning", "/api/test-trades",
             "/api/backtests?limit=20", "/api/settings/deriv", "/api/settings/risk", "/api/settings/notifications", "/api/settings/markets",
-            "/api/app/engine", "/api/app/logs?count=50"
+            "/api/app/engine", "/api/app/logs?count=50", "/api/candles?instrument=EUR%2FUSD&timeframe=M5&limit=50", "/api/candles?instrument=EUR/USD&timeframe=H1"
         ];
         foreach (var path in reads)
         {
@@ -69,6 +69,10 @@ public sealed class MobileRuntimeTests : IAsyncLifetime
         var first = decisions.RootElement.GetProperty("items")[0].GetProperty("id").GetString();
         Assert.Equal(200, (await _runtime.Api.HandleAsync("GET", $"/api/decisions/{first}", null, CancellationToken.None)).Status);
         Assert.Equal(404, (await _runtime.Api.HandleAsync("GET", $"/api/decisions/{Guid.NewGuid()}", null, CancellationToken.None)).Status);
+
+        using var candles = await GetJsonAsync("/api/candles?instrument=EUR%2FUSD&timeframe=M5&limit=50");
+        Assert.True(candles.RootElement.GetProperty("candles").GetArrayLength() > 0);
+        Assert.Equal(400, (await _runtime.Api.HandleAsync("GET", "/api/candles?instrument=EUR/USD&timeframe=Y9", null, CancellationToken.None)).Status);
     }
 
     [Fact]

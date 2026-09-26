@@ -332,3 +332,15 @@ td.actions { text-align: right; }
   .content { padding-bottom: calc(var(--account-bar-h) + 24px); }
   .scrim { bottom: var(--account-bar-h); }
 }
+
+/* ---------- Price chart ---------- */
+.price-chart { position: relative; height: 420px; }
+.price-chart-empty { position: absolute; inset: 0; display: grid; place-items: center; z-index: 3; pointer-events: none; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+.chart-legend span::before { content: ""; display: inline-block; width: 14px; margin-right: 5px; vertical-align: middle; border-top: 2px solid currentColor; }
+.chart-legend .entry { color: var(--accent); }
+.chart-legend .stop { color: var(--bad); }
+.chart-legend .stop::before, .chart-legend .target::before { border-top-style: dashed; }
+.chart-legend .target { color: var(--good); }
+tr.selected td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+@media (max-width: 900px) { .price-chart { height: 300px; } }

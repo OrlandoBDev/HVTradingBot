@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using HVTradingBot.Application.MarketData;
 using HVTradingBot.Contracts;
 using HVTradingBot.Dashboard;
 using Microsoft.Extensions.Logging;
@@ -26,8 +27,8 @@ public sealed partial class LocalApi
     private readonly List<Route> _routes = [];
     private readonly ILogger<LocalApi> _logger;
 
-    public LocalApi(DashboardQueries queries, DashboardActions actions, BacktestService backtests, EngineSupervisor engine, AppLog log,
-        ILogger<LocalApi> logger)
+    public LocalApi(DashboardQueries queries, DashboardActions actions, BacktestService backtests, CandleQueryService candles,
+        EngineSupervisor engine, AppLog log, ILogger<LocalApi> logger)
     {
         _logger = logger;
 
@@ -38,6 +39,25 @@ public sealed partial class LocalApi
         Get("/api/status", r => Ok(queries.GetStatusAsync(r.Ct)));
         Get("/api/markets", r => Ok(queries.GetMarketsAsync(r.Ct)));
         Get("/api/markets/names", r => Ok(actions.GetMarketNamesAsync(r.Ct)));
+        // Stored candles for the price chart, e.g. /api/candles?instrument=EUR/USD&timeframe=M5&limit=200 (oldest first).
+        Get("/api/candles", async r =>
+        {
+            DateTime? Date(string name) => r.Query(name) is { } v
+                ? DateTime.TryParse(v, System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var d)
+                    ? d
+                    : throw new BadRequestException($"'{name}' must be a date.")
+                : null;
+            if (CandleQueryService.ParseQuery(r.Query("instrument"), r.Query("timeframe"), Date("from"), Date("to"), r.Int("limit"), out var errors)
+                is not { } query)
+            {
+                return DashboardResult.Invalid(errors);
+            }
+
+            var bars = await candles.GetAsync(query, r.Ct);
+            return DashboardResult.Ok(new CandleSeriesDto(query.Symbol, query.TimeFrame.ToString(),
+                bars.Select(b => new CandleDto(b.OpenTimeUtc, b.Open, b.High, b.Low, b.Close, b.Spread, b.Volume)).ToList()));
+        });
         Get("/api/decisions", r => Ok(queries.GetDecisionsAsync(r.Query("state"), r.Query("instrument"), r.Int("limit") ?? 100, r.Ct)));
         Get("/api/decisions/paged", r => Ok(queries.GetDecisionsPageAsync(r.Query("state"), r.Query("instrument"), r.Int("page"), r.Int("pageSize"), r.Ct)));
         Get("/api/trades/paged", r => Ok(queries.GetTradeHistoryPageAsync(r.Int("page"), r.Int("pageSize"), r.Ct)));

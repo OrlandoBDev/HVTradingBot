@@ -248,3 +248,32 @@ export interface AuthStatus {
   username: string | null;
   setupRequired: boolean;
 }
+
+/** A stored bar from GET /api/candles (oldest first). */
+export interface CandleBar {
+  openTimeUtc: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  spread: number;
+  volume: number;
+}
+
+export interface CandleSeries {
+  instrument: string;
+  timeFrame: string;
+  candles: CandleBar[];
+}
+
+/** A newly closed candle pushed over the dashboard hub's "bar" message. */
+export interface LiveBar {
+  instrument: string;
+  timeFrame: string;
+  openTimeUtc: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}

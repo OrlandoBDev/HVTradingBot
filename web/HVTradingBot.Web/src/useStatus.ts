@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { HubConnectionBuilder, HubConnectionState, LogLevel } from "@microsoft/signalr";
+import { HubConnectionState } from "@microsoft/signalr";
 import { api } from "./api";
 import { inApp } from "./platform";
+import { createDashboardConnection, reloadCharts } from "./hub";
 import type { SystemStatus } from "./types";
 
 /** Changes whenever the learning model gains or resolves a setup (Android app only; the web refreshes per bar). */
@@ -30,11 +31,8 @@ export function useStatus() {
 }
 
 function connectSignalR(setStatus: (s: SystemStatus) => void, setConnected: (c: boolean) => void) {
-  const connection = new HubConnectionBuilder()
-    .withUrl("/hubs/dashboard")
-    .withAutomaticReconnect()
-    .configureLogging(LogLevel.Warning)
-    .build();
+  // The one dashboard connection; it also carries live bars for the price charts (see hub.ts).
+  const connection = createDashboardConnection();
   connection.on("status", (s: SystemStatus) => setStatus(s));
   connection.onreconnecting(() => setConnected(false));
   connection.onreconnected(() => setConnected(true));
@@ -62,13 +60,20 @@ function pollAppEvents(
 ) {
   let stopped = false;
   let after = 0;
+  let lastBar: string | null | undefined;
   void (async () => {
     while (!stopped) {
       try {
         const batch = await api.get<AppEvents>(`/api/app/events?after=${after}`);
         after = batch.sequence;
         for (const e of batch.events) {
-          if (e.name === "status") setStatus(e.data as SystemStatus);
+          if (e.name === "status") {
+            const status = e.data as SystemStatus;
+            setStatus(status);
+            // A new bar was processed: charts reload their candles (the browser gets bars over SignalR instead).
+            if (lastBar !== undefined && status.marketData.lastBarTimeUtc !== lastBar) reloadCharts();
+            lastBar = status.marketData.lastBarTimeUtc;
+          }
           if (e.name === "learning") setLearning(e.data as LearningPulse);
         }
         setConnected(true);
