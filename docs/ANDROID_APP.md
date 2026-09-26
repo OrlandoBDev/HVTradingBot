@@ -72,10 +72,28 @@ keytool -genkeypair -v -keystore hvtradingbot.keystore -alias hvtradingbot -keya
 base64 -w0 hvtradingbot.keystore   # macOS: base64 -i hvtradingbot.keystore
 ```
 
+**The key of the app already on your phone.** The builds sent during development are signed with the key in
+`hvtradingbot-signing.keystore` (alias `androiddebugkey`, password `android`, SHA-256 fingerprint
+`54:01:04:53:9B:FB:B5:1B:7F:01:1A:E8:39:88:87:D3:EB:59:A9:BF:47:C8:1C:12:2A:CE:7A:1F:BF:D8:EA:8C`). Use that key, not a new
+one, so updates install over that app and keep its database: `ANDROID_KEYSTORE_BASE64` = the file's base64 text,
+`ANDROID_KEYSTORE_PASSWORD` = `android`, `ANDROID_KEY_ALIAS` = `androiddebugkey`. A new key only makes sense for a fresh
+install.
+
 GitHub → Settings → Secrets and variables → Actions:
 `ANDROID_KEYSTORE_BASE64` (the base64 text), `ANDROID_KEYSTORE_PASSWORD` (store and key password), optionally
 `ANDROID_KEY_ALIAS` (default `hvtradingbot`). Keep the keystore file somewhere safe: without it no later build can update
 the installed app.
+
+### Your data across updates
+
+- An update signed with the same key installs over the app and keeps its private storage: the SQLite database
+  (trades, decisions, learning, settings) and the keys that decrypt the Deriv token.
+- New versions only add to the database: each migration runs once when the new version starts, and
+  `SqliteUpgradeTests` checks that a database from the first release keeps its data after every newer migration. Nothing
+  in the app deletes the database.
+- What does delete it: **uninstalling** the app, or Android's "Clear storage". Android refuses an update signed with a
+  different key, and the only way around that is uninstalling. Android backup is off (`allowBackup="false"`), so an
+  uninstall cannot be undone.
 
 ## Build locally
 
