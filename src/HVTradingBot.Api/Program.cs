@@ -28,6 +28,7 @@ try
 
     builder.Services.AddTradingCore(builder.Configuration);
     builder.Services.AddSingleton<DashboardQueries>();
+    builder.Services.AddSingleton<LiveMarketStream>();
     builder.Services.AddSingleton<BacktestService>();
     builder.Services.AddHostedService<DashboardBroadcaster>();
     builder.Services.AddHostedService<MarketCatalogLoader>();
