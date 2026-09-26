@@ -49,8 +49,31 @@ public sealed partial class DashboardActions(
     [GeneratedRegex("^[A-Za-z0-9]{1,32}$")]
     private static partial Regex AccountIdPattern();
 
-    /// <summary>Every known market (including ones no longer selected), so pages can show names for older trades too.</summary>
-    public static Dictionary<string, string> MarketNames() => Instruments.All.ToDictionary(i => i.Symbol, i => i.DisplayName);
+    /// <summary>
+    /// Readable names of every known market (including ones no longer selected, so older trades get names too), keyed by
+    /// our symbol and by the broker's own id (contracts opened outside the app may carry either). Read from the stored
+    /// catalog, so it is complete even before the trading worker has registered the catalog in this process.
+    /// </summary>
+    public async Task<Dictionary<string, string>> GetMarketNamesAsync(CancellationToken ct)
+    {
+        var names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var market in await catalog.GetCatalogAsync(ct))
+        {
+            names.TryAdd(market.Symbol, market.Name);
+            names.TryAdd(market.BrokerSymbol, market.Name);
+        }
+
+        foreach (var instrument in Instruments.All)
+        {
+            names.TryAdd(instrument.Symbol, instrument.DisplayName);
+            if (instrument.BrokerSymbol is { } brokerSymbol)
+            {
+                names.TryAdd(brokerSymbol, instrument.DisplayName);
+            }
+        }
+
+        return names;
+    }
 
     public async Task<DashboardResult> RequestCloseAsync(Guid positionId, DashboardCaller caller, CancellationToken ct)
     {

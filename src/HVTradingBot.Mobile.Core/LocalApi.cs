@@ -37,7 +37,7 @@ public sealed partial class LocalApi
 
         Get("/api/status", r => Ok(queries.GetStatusAsync(r.Ct)));
         Get("/api/markets", r => Ok(queries.GetMarketsAsync(r.Ct)));
-        Get("/api/markets/names", _ => Ok(DashboardActions.MarketNames()));
+        Get("/api/markets/names", r => Ok(actions.GetMarketNamesAsync(r.Ct)));
         Get("/api/decisions", r => Ok(queries.GetDecisionsAsync(r.Query("state"), r.Query("instrument"), r.Int("limit") ?? 100, r.Ct)));
         Get("/api/decisions/paged", r => Ok(queries.GetDecisionsPageAsync(r.Query("state"), r.Query("instrument"), r.Int("page"), r.Int("pageSize"), r.Ct)));
         Get("/api/trades/paged", r => Ok(queries.GetTradeHistoryPageAsync(r.Int("page"), r.Int("pageSize"), r.Ct)));

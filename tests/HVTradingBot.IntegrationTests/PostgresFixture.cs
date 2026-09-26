@@ -21,7 +21,7 @@ public abstract class DatabaseFixture : IAsyncLifetime
     protected static readonly string[] ResetTables =
     [
         "orders", "positions", "paper_accounts", "broker_accounts", "broker_settings", "broker_connection_status", "market_selection",
-        "risk_settings", "notification_settings", "system_state", "audit_logs", "trade_decisions", "app_users", "broker_contracts"
+        "risk_settings", "notification_settings", "system_state", "audit_logs", "trade_decisions", "app_users", "broker_contracts", "markets"
     ];
 
     public IDbContextFactory<TradingDbContext> DbFactory { get; private set; } = null!;

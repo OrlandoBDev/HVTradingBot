@@ -12,7 +12,7 @@ public static class TradingEndpoints
 
         api.MapGet("/status", (DashboardQueries q, CancellationToken ct) => q.GetStatusAsync(ct));
         api.MapGet("/markets", (DashboardQueries q, CancellationToken ct) => q.GetMarketsAsync(ct));
-        api.MapGet("/markets/names", DashboardActions.MarketNames);
+        api.MapGet("/markets/names", (DashboardActions actions, CancellationToken ct) => actions.GetMarketNamesAsync(ct));
         api.MapGet("/decisions", (DashboardQueries q, string? state, string? instrument, int? limit, CancellationToken ct) =>
             q.GetDecisionsAsync(state, instrument, limit ?? 100, ct));
         // Paged variants (the unpaged endpoints above stay for existing clients).

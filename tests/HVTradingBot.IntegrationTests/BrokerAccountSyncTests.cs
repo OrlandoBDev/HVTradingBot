@@ -39,6 +39,8 @@ public abstract class BrokerAccountSyncTests(DatabaseFixture fixture) : IAsyncLi
         db.Positions.AddRange(
             AppPosition("100", open: true, pnl: null, closed: null),
             AppPosition("90", open: false, pnl: 5m, closed: new DateTime(2026, 1, 6, 15, 0, 0, DateTimeKind.Utc)));
+        // The stored Deriv catalog; the worker has not registered it in this process yet.
+        db.Markets.AddRange(Market("R_100", "R_100", "Volatility 100 Index", "SyntheticIndex"), Market("cryBTCUSD", "BTC/USD", "BTC/USD Bitcoin", "Crypto"));
         await db.SaveChangesAsync();
 
         var state = new EfTradingStateStore(fixture.DbFactory);
@@ -77,7 +79,8 @@ public abstract class BrokerAccountSyncTests(DatabaseFixture fixture) : IAsyncLi
                 {
                     new { contract_id = 90, buy_price = 50m, sell_price = 55m, purchase_time = Monday, sell_time = Tuesday, shortcode = "MULTUP_FRXEURUSD_50.00_100_1767603600_4921257599_0_0.00_N1" },
                     new { contract_id = 300, buy_price = 20m, sell_price = 12m, purchase_time = Tuesday, sell_time = TodayMorning, shortcode = "MULTDOWN_R_100_20.00_100_1767711600_4921257599_0_0.00_N1" },
-                    new { contract_id = 400, buy_price = 10m, sell_price = 14m, purchase_time = LastMonth, sell_time = LastMonth + 600, shortcode = "MULTUP_1HZ100V_10.00_50_1766224800_4921257599_0_0.00_N1" }
+                    new { contract_id = 400, buy_price = 10m, sell_price = 14m, purchase_time = LastMonth, sell_time = LastMonth + 600, shortcode = "MULTUP_1HZ100V_10.00_50_1766224800_4921257599_0_0.00_N1" },
+                    new { contract_id = 500, buy_price = 10m, sell_price = 11m, purchase_time = LastMonth - 7200, sell_time = LastMonth - 3600, shortcode = "MULTUP_CRYBTCUSD_10.00_50_1766217600_4921257599_0_0.00_N1" }
                 }
             }
         };
@@ -99,14 +102,16 @@ public abstract class BrokerAccountSyncTests(DatabaseFixture fixture) : IAsyncLi
         Assert.Equal(("R_100", "Short", -1.25m, 10m, 1250m), (external.Instrument, external.Direction, external.UnrealizedPnl, external.Stake, external.StopLoss));
 
         var history = await queries.GetTradeHistoryPageAsync(1, 10, CancellationToken.None);
-        Assert.Equal(3, history.Total); // the app's closed trade once, plus two external ones
-        Assert.Equal(["300", "90", "400"], history.Items.Select(t => t.ContractId));
-        Assert.Equal([DashboardQueries.ExternalSource, DashboardQueries.AppSource, DashboardQueries.ExternalSource], history.Items.Select(t => t.Source));
+        Assert.Equal(4, history.Total); // the app's closed trade once, plus three external ones
+        Assert.Equal(["300", "90", "400", "500"], history.Items.Select(t => t.ContractId));
+        Assert.Equal([DashboardQueries.ExternalSource, DashboardQueries.AppSource, DashboardQueries.ExternalSource, DashboardQueries.ExternalSource],
+            history.Items.Select(t => t.Source));
         Assert.Equal("1HZ100V", history.Items[2].Instrument);
+        Assert.Equal("BTC/USD", history.Items[3].Instrument); // Deriv's cryBTCUSD, mapped through the stored catalog
         Assert.Equal(-8m, history.Items[0].RealizedPnl);
 
         var secondPage = await queries.GetTradeHistoryPageAsync(2, 2, CancellationToken.None);
-        Assert.Equal(["400"], secondPage.Items.Select(t => t.ContractId));
+        Assert.Equal(["400", "500"], secondPage.Items.Select(t => t.ContractId));
 
         var status = await queries.GetStatusAsync(CancellationToken.None);
         Assert.Equal(2, status.OpenPositions);
@@ -122,7 +127,7 @@ public abstract class BrokerAccountSyncTests(DatabaseFixture fixture) : IAsyncLi
 
         Assert.True(profit.AccountFromBroker);
         // Account: today -8 (contract 300), week -8 + 5 (90), month the same; December's +4 is outside all three.
-        Assert.Equal((-8m, -3m, -3m, 2.25m, 2, 3, 2), (profit.Account.Today, profit.Account.Week, profit.Account.Month, profit.Account.Open,
+        Assert.Equal((-8m, -3m, -3m, 2.25m, 2, 4, 3), (profit.Account.Today, profit.Account.Week, profit.Account.Month, profit.Account.Open,
             profit.Account.OpenTrades, profit.Account.ClosedTrades, profit.Account.Wins));
         Assert.Null(profit.Account.AllTime);
         // App: only its own trades.
@@ -149,6 +154,18 @@ public abstract class BrokerAccountSyncTests(DatabaseFixture fixture) : IAsyncLi
         var sold = await db.BrokerContracts.SingleAsync(c => c.ContractId == "200");
         Assert.False(sold.IsOpen);
         Assert.Equal((2m, 1228m), (sold.Profit, sold.ExitSpot));
+    }
+
+    [Fact]
+    public async Task Market_names_come_from_the_stored_catalog_for_symbols_and_broker_ids()
+    {
+        var names = await Actions().GetMarketNamesAsync(CancellationToken.None);
+
+        Assert.Equal("Volatility 100 Index", names["R_100"]);
+        Assert.Equal("BTC/USD Bitcoin", names["BTC/USD"]);
+        Assert.Equal("BTC/USD Bitcoin", names["cryBTCUSD"]);
+        Assert.Equal("BTC/USD Bitcoin", names["CRYBTCUSD"]); // shortcodes are upper case
+        Assert.True(names.ContainsKey("EUR/USD")); // built-in markets too
     }
 
     [Fact]
@@ -182,6 +199,21 @@ public abstract class BrokerAccountSyncTests(DatabaseFixture fixture) : IAsyncLi
             new RiskOptionsSource(new RiskOptions(), new RiskSettingsStore(fixture.DbFactory, clock), NullLogger<RiskOptionsSource>.Instance),
             new TradingEngineOptions(), new MarketCatalogStore(fixture.DbFactory, clock), new CloseRequestStore(fixture.DbFactory, clock));
     }
+
+    private DashboardActions Actions()
+    {
+        var clock = new FixedClock();
+        var store = new MarketCatalogStore(fixture.DbFactory, clock);
+        return new DashboardActions(Queries(), null!, null!, clock, null!, null!, null!, new HVTradingBot.Domain.Learning.LearningOptions(), null!,
+            null!, null!, null!, null!, store, new TradingEngineOptions(), null!, NullLogger<DashboardActions>.Instance);
+    }
+
+    private static MarketEntity Market(string brokerSymbol, string symbol, string name, string assetClass) => new()
+    {
+        BrokerSymbol = brokerSymbol, Symbol = symbol, Name = name, Market = "test", Submarket = "test", AssetClass = assetClass,
+        BaseCurrency = "X", QuoteCurrency = "USD", PipSize = 0.01m, PriceDecimals = 2, Multipliers = "[]", IsTradable = true, IsOpen = true,
+        UpdatedAtUtc = Now
+    };
 
     private static PositionEntity AppPosition(string contractId, bool open, decimal? pnl, DateTime? closed) => new()
     {

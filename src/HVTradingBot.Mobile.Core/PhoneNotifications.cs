@@ -1,6 +1,7 @@
 using System.Globalization;
 using HVTradingBot.Application.Abstractions;
 using HVTradingBot.Application.Notifications;
+using HVTradingBot.Domain.MarketData;
 
 namespace HVTradingBot.Mobile.Core;
 
@@ -39,10 +40,11 @@ public sealed class PhoneTradeNotifier(ITradeDecisionNotifier inner, IPhoneNotif
     public static PhoneNotification? Format(TradeDecisionNotification n)
     {
         var inv = CultureInfo.InvariantCulture;
+        var market = Instruments.DisplayNameOf(n.Instrument);
         return n.Kind switch
         {
             NotificationKind.TradeOpened => new PhoneNotification(
-                $"Opened {n.Setup?.Direction.ToString().ToLowerInvariant() ?? "trade"} {n.Instrument}",
+                $"Opened {n.Setup?.Direction.ToString().ToLowerInvariant() ?? "trade"} {market}",
                 string.Join(" · ", new[]
                 {
                     n.Strategy,
@@ -51,7 +53,7 @@ public sealed class PhoneTradeNotifier(ITradeDecisionNotifier inner, IPhoneNotif
                 }.Where(s => s is not null)),
                 n.Kind),
             NotificationKind.TradeClosed => new PhoneNotification(
-                string.Create(inv, $"{n.Instrument} closed {(n.RealizedPnl >= 0 ? "+" : "")}{n.RealizedPnl:0.00} {n.Currency}"),
+                string.Create(inv, $"{market} closed {(n.RealizedPnl >= 0 ? "+" : "")}{n.RealizedPnl:0.00} {n.Currency}"),
                 string.Join(" · ", new[]
                 {
                     n.ExitReason,

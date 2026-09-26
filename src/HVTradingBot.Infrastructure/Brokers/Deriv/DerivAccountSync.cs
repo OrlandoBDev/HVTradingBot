@@ -32,6 +32,7 @@ public sealed class DerivAccountSync(DerivSession session, IDbContextFactory<Tra
             .GetProperty("portfolio").GetProperty("contracts").EnumerateArray().ToList();
 
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        await LoadCatalogAsync(db, cancellationToken);
         var stored = await db.BrokerContracts.Where(c => c.BrokerAccountId == accountId && c.IsOpen).ToDictionaryAsync(c => c.ContractId, cancellationToken);
         var live = new HashSet<string>();
         foreach (var item in portfolio)
@@ -77,6 +78,7 @@ public sealed class DerivAccountSync(DerivSession session, IDbContextFactory<Tra
         var socket = await session.GetSocketAsync(cancellationToken);
         var accountId = session.Account!.AccountId;
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        await LoadCatalogAsync(db, cancellationToken);
         var latest = await db.BrokerContracts.Where(c => c.BrokerAccountId == accountId && !c.IsOpen).MaxAsync(c => c.SellTimeUtc, cancellationToken);
         var from = latest?.AddDays(-1) ?? clock.UtcNow - InitialHistory;
 
@@ -116,6 +118,15 @@ public sealed class DerivAccountSync(DerivSession session, IDbContextFactory<Tra
         await db.SaveChangesAsync(cancellationToken);
         logger.LogDebug("Deriv history sync: {Count} closed contracts since {From:u}", transactions.Count, from);
     }
+
+    /// <summary>
+    /// Broker id to market symbol from the stored catalog. The worker registers the catalog only after loading it, and
+    /// the sync may run first; this keeps contracts from being stored under the broker's id meanwhile.
+    /// </summary>
+    private Dictionary<string, string> _catalog = new(StringComparer.OrdinalIgnoreCase);
+
+    private async Task LoadCatalogAsync(TradingDbContext db, CancellationToken cancellationToken) =>
+        _catalog = await db.Markets.AsNoTracking().ToDictionaryAsync(m => m.BrokerSymbol, m => m.Symbol, StringComparer.OrdinalIgnoreCase, cancellationToken);
 
     private async Task<JsonElement?> ContractAsync(IDerivSocket socket, string contractId, CancellationToken cancellationToken)
     {
@@ -163,7 +174,10 @@ public sealed class DerivAccountSync(DerivSession session, IDbContextFactory<Tra
         var brokerSymbol = FirstString(c, "underlying", "underlying_symbol", "symbol") ?? shortSymbol;
         if (brokerSymbol is not null)
         {
-            row.Symbol = Truncate(DerivSymbols.ToInstrument(brokerSymbol)?.Symbol ?? brokerSymbol, 64);
+            // Our market symbol, so the dashboard shows the market's name; the broker's id only for markets we do not know.
+            var symbol = DerivSymbols.ToInstrument(brokerSymbol)?.Symbol
+                         ?? (_catalog.TryGetValue(brokerSymbol, out var known) ? known : brokerSymbol);
+            row.Symbol = Truncate(symbol, 64);
         }
 
         row.Currency = FirstString(c, "currency") ?? row.Currency;
