@@ -26,6 +26,15 @@ public sealed record PortfolioState(
     /// <summary>Realized P&amp;L of Derived (synthetic) markets today, for the Derived daily loss limit.</summary>
     public decimal DerivedDailyRealizedPnl { get; init; }
 
+    /// <summary>Realized P&amp;L of signal trades today, for the signal daily loss limit (kept apart from the bot's).</summary>
+    public decimal SignalDailyRealizedPnl { get; init; }
+
+    /// <summary>The bot's own view: without signal trades, which use their own slots.</summary>
+    public PortfolioState WithoutSignalTrades() =>
+        this with { OpenPositions = OpenPositions.Where(p => !SignalOrders.IsSignal(p.ClientOrderId)).ToList() };
+
+    public int SignalOpenPositions => OpenPositions.Count(p => SignalOrders.IsSignal(p.ClientOrderId));
+
     /// <summary>
     /// True while Forex markets are trading. While it is false (weekends, the daily break) Derived may use every
     /// position slot. Defaults to true, the stricter setting.

@@ -15,6 +15,9 @@ public sealed record TradingSystemState
     public DateOnly? PnlDay { get; init; }
     public decimal DailyRealizedPnl { get; init; }
     public decimal DerivedDailyRealizedPnl { get; init; }
+
+    /// <summary>Signal trades' realized P&amp;L today: their own budget, apart from the bot's daily and weekly figures.</summary>
+    public decimal SignalDailyRealizedPnl { get; init; }
     public DateOnly? PnlWeekStart { get; init; }
     public decimal WeeklyRealizedPnl { get; init; }
     public DateTime? LastBarTimeUtc { get; init; }
@@ -35,6 +38,7 @@ public sealed record TradingSystemState
             PnlDay = day,
             DailyRealizedPnl = PnlDay == day ? DailyRealizedPnl : 0,
             DerivedDailyRealizedPnl = PnlDay == day ? DerivedDailyRealizedPnl : 0,
+            SignalDailyRealizedPnl = PnlDay == day ? SignalDailyRealizedPnl : 0,
             PnlWeekStart = weekStart,
             WeeklyRealizedPnl = PnlWeekStart == weekStart ? WeeklyRealizedPnl : 0
         };
@@ -60,6 +64,13 @@ public sealed record TradingSystemState
             ConsecutiveLosses = losses,
             CooldownUntilUtc = cooldown
         };
+    }
+
+    /// <summary>A closed signal trade counts only against the signal budget: the bot's limits, streak and cooldown are untouched.</summary>
+    public TradingSystemState WithClosedSignalTrade(decimal realizedPnl, DateTime marketTimeUtc)
+    {
+        var rolled = RollPeriods(marketTimeUtc);
+        return rolled with { SignalDailyRealizedPnl = rolled.SignalDailyRealizedPnl + realizedPnl };
     }
 
     public TradingSystemState WithKillSwitch(bool active, string reason, DateTime nowUtc) =>

@@ -28,6 +28,8 @@ public sealed class TradingDbContext(DbContextOptions<TradingDbContext> options)
     public DbSet<AppUserEntity> AppUsers => Set<AppUserEntity>();
     public DbSet<BacktestRunEntity> BacktestRuns => Set<BacktestRunEntity>();
     public DbSet<BrokerContractEntity> BrokerContracts => Set<BrokerContractEntity>();
+    public DbSet<SignalEntity> Signals => Set<SignalEntity>();
+    public DbSet<SignalSettingsEntity> SignalSettings => Set<SignalSettingsEntity>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -220,6 +222,33 @@ public sealed class TradingDbContext(DbContextOptions<TradingDbContext> options)
             e.HasKey(x => x.Id);
             e.Property(x => x.Details).HasMaxLength(4000);
             e.HasIndex(x => x.TimestampUtc);
+        });
+
+        modelBuilder.Entity<SignalEntity>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.SetupId).HasMaxLength(160);
+            e.HasIndex(x => x.SetupId).IsUnique();
+            e.Property(x => x.Kind).HasMaxLength(32);
+            e.Property(x => x.Instrument).HasMaxLength(64);
+            e.Property(x => x.Direction).HasMaxLength(8);
+            e.Property(x => x.Strategy).HasMaxLength(64);
+            e.Property(x => x.Regime).HasMaxLength(32);
+            e.Property(x => x.Status).HasMaxLength(16);
+            e.Property(x => x.Message).HasMaxLength(2000);
+            e.Property(x => x.Checks).HasColumnType(json);
+            e.Property(x => x.AcceptedRules).HasColumnType(json);
+            e.Property(x => x.DecidedBy).HasMaxLength(200);
+            e.HasIndex(x => new { x.Status, x.ExpiresAtUtc });
+            e.HasIndex(x => x.CreatedAtUtc);
+        });
+
+        modelBuilder.Entity<SignalSettingsEntity>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.Settings).HasColumnType(json);
+            e.Property(x => x.UpdatedBy).HasMaxLength(200);
         });
 
         modelBuilder.Entity<BrokerContractEntity>(e =>

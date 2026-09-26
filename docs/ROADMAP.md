@@ -173,3 +173,24 @@ Deriv multipliers. Risk engine, learning, dashboard and emails stay unchanged. K
 - automated research pipelines
 
 Production strategies remain gated by deterministic validation and risk controls.
+
+### Guarded demo / real account switch
+
+**Why:** the app is locked to Deriv demo accounts (ADR-008): the startup validator refuses `Deriv:AccountType Real`,
+account selection only picks demo accounts, and the Settings page says so. The plumbing for real accounts already
+exists (account type, demo/real WebSocket check, red REAL badge), so unlocking is small; switching safely is the work.
+
+**When:** only after months of demo results on the Performance page (enough trades, positive expectancy, acceptable
+drawdowns), and only in a country where Deriv offers real multiplier accounts.
+
+**Design:**
+1. **Separate records per account first** (worth doing before the switch): history, performance, App P/L, learning
+   views and loss limits keyed by broker account, so demo and real results never mix.
+2. **Toggle** under Settings → Broker account: Demo / Real; switching restarts the engine on the other account;
+   back to Demo is instant.
+3. **Typed confirmation** ("REAL MONEY") and a summary (balance, risk per trade in money, loss limits) before Real
+   is activated.
+4. **Conservative real defaults** until raised by the user: 0.5% per trade, 1–2 positions, 2% daily loss.
+5. **Always visible:** red REAL badge in the header, the account bar and the engine notification.
+6. **Signals:** risk-rule overrides demo-only at first, or typed confirmation for every override on real.
+7. Learning carries over from demo (same markets and prices); shown as such.

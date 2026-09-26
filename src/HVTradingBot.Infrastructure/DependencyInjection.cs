@@ -94,6 +94,11 @@ public static class DependencyInjection
         services.AddSingleton<RiskOptionsSource>();
         services.AddSingleton<IRiskOptionsSource>(sp => sp.GetRequiredService<RiskOptionsSource>());
         services.AddSingleton<IRiskManager>(sp => new RiskManager(sp.GetRequiredService<IRiskOptionsSource>(), sp.GetRequiredService<ExecutionCostOptions>()));
+        services.AddSingleton<Signals.SignalStore>();
+        services.AddSingleton<Application.Signals.ISignalStore>(sp => sp.GetRequiredService<Signals.SignalStore>());
+        services.AddSingleton<Signals.SignalSettingsStore>();
+        services.AddSingleton<Signals.SignalSettingsSource>();
+        services.AddSingleton<Application.Signals.ISignalSettingsSource>(sp => sp.GetRequiredService<Signals.SignalSettingsSource>());
         services.AddSingleton<BacktestEngine>();
         return services;
     }
