@@ -17,6 +17,7 @@ import { Audit } from "./components/Audit";
 import { KillSwitch } from "./components/KillSwitch";
 import { Settings } from "./components/Settings";
 import { LearningView } from "./components/LearningView";
+import { NewsView } from "./components/NewsView";
 import { Login } from "./components/Login";
 import { inApp } from "./platform";
 import { AccountBar } from "./components/AccountBar";
@@ -127,6 +128,7 @@ function Dashboard({ username, onSignOut }: { username: string; onSignOut: () =>
           {route.page === "trades" && <Trades refreshKey={refreshKey} view={route.section} navigate={go} />}
           {route.page === "decisions" && <Decisions refreshKey={refreshKey} />}
           {route.page === "learning" && <LearningView refreshKey={refreshKey} />}
+          {route.page === "news" && <NewsView refreshKey={refreshKey} />}
           {route.page === "performance" && <PerformanceView refreshKey={refreshKey} />}
           {route.page === "backtest" && <Backtest />}
           {route.page === "risk" && <Risk refreshKey={refreshKey} navigate={go} />}

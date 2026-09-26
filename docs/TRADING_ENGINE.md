@@ -137,6 +137,9 @@ Penalties may apply for:
 - news risk
 - uncertainty
 
+Bounded adjustments are added on top: learned strategy performance, headline sentiment, the cross-market currency
+trend and learned news/trend conditions. See [NEWS_AND_TRENDS.md](NEWS_AND_TRENDS.md).
+
 ## Abstention
 
 The system must explicitly support abstention.

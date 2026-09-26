@@ -48,6 +48,7 @@ public static class TradingEndpoints
         api.MapGet("/profit", (DashboardQueries q, CancellationToken ct) => q.GetProfitSummaryAsync(ct));
         api.MapGet("/audit", (DashboardQueries q, int? limit, CancellationToken ct) => q.GetAuditAsync(limit ?? 100, ct));
         api.MapGet("/learning", (DashboardActions actions, CancellationToken ct) => actions.GetLearningAsync(ct));
+        api.MapGet("/news", (NewsQueries news, CancellationToken ct) => news.GetNewsAsync(ct));
 
         api.MapGet("/test-trades", (DashboardActions actions, CancellationToken ct) => actions.GetTestTradesAsync(ct));
         // The API only records the request; the worker (the only process that talks to the broker) carries it out.

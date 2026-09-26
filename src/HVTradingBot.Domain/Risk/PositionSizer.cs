@@ -7,10 +7,12 @@ public static class PositionSizer
     /// <summary>
     /// Units such that hitting the stop loses at most <see cref="RiskOptions.MaxRiskPerTradePercent"/> of equity,
     /// including expected slippage and the assumed round-trip commission, rounded down to <see cref="RiskOptions.UnitStep"/>.
+    /// A news multiplier below 1 (<see cref="TradeProposal.NewsRiskMultiplier"/>) shrinks the risk budget; it never grows it.
     /// </summary>
     public static PositionSize Calculate(TradeProposal proposal, PortfolioState portfolio, RiskOptions options, decimal expectedSlippagePips)
     {
-        var maxRisk = Math.Round(portfolio.Equity * options.RiskPercentFor(proposal.Instrument) / 100m, 2);
+        var newsMultiplier = Math.Clamp(proposal.NewsRiskMultiplier, 0m, 1m);
+        var maxRisk = Math.Round(portfolio.Equity * options.RiskPercentFor(proposal.Instrument) / 100m * newsMultiplier, 2);
         var stopDistance = proposal.Setup.RiskDistance + proposal.Instrument.FromPips(expectedSlippagePips);
         var rate = portfolio.Converter.QuoteToAccountRate(proposal.Instrument);
         // Round-trip commission on the position value (units x price in account currency), as in PaperExecutionModel.

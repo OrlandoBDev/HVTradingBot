@@ -17,6 +17,15 @@ public sealed record TradeProposal(
     /// (it is closed after a minute); every other rule applies as usual.
     /// </summary>
     public bool IsTestTrade { get; init; }
+
+    /// <summary>
+    /// Position size multiplier from news (a release is near, or headlines oppose the trade). Values above 1 are ignored:
+    /// news can only shrink a position.
+    /// </summary>
+    public decimal NewsRiskMultiplier { get; init; } = 1m;
+
+    /// <summary>Why news blocks this trade (a high-impact release is imminent or just happened); null when it does not.</summary>
+    public string? NewsBlackout { get; init; }
 }
 
 public sealed record RiskCheck(string Rule, bool Passed, string Detail);

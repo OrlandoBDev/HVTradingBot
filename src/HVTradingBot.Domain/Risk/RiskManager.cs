@@ -42,6 +42,7 @@ internal sealed class RiskRules(RiskOptions options, ExecutionCostOptions costs)
             Cooldown(portfolio),
             CurrencyExposure(proposal, portfolio),
             Tradable(proposal),
+            NewsEvents(proposal),
             Sizing(proposal, size)
         };
         if (overrideCheck is not null)
@@ -241,6 +242,19 @@ internal sealed class RiskRules(RiskOptions options, ExecutionCostOptions costs)
     private RiskCheck Tradable(TradeProposal proposal) => proposal.Instrument.IsTradable
         ? Pass(nameof(Tradable), "Tradable at the broker.")
         : Fail(nameof(Tradable), $"{proposal.Instrument.DisplayName} is analysis-only: the broker offers no contract type this app can trade.");
+
+    /// <summary>News can only tighten: it blocks trades around high-impact releases and may shrink the position.</summary>
+    private static RiskCheck NewsEvents(TradeProposal proposal)
+    {
+        if (proposal.NewsBlackout is { } reason)
+        {
+            return Fail(nameof(NewsEvents), reason);
+        }
+
+        return proposal.NewsRiskMultiplier < 1m
+            ? Pass(nameof(NewsEvents), $"Risk reduced to {Math.Max(0m, proposal.NewsRiskMultiplier):P0} of normal because of news.")
+            : Pass(nameof(NewsEvents), "No news restrictions.");
+    }
 
     private RiskCheck Sizing(TradeProposal proposal, PositionSize size) =>
         size.Units > 0 && (!proposal.Instrument.IsCurrencyPair || size.Units >= options.MinUnits)

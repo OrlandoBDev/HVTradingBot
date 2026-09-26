@@ -1,4 +1,4 @@
-export type PageId = "overview" | "markets" | "trades" | "decisions" | "learning" | "performance" | "backtest" | "risk" | "audit" | "settings";
+export type PageId = "overview" | "markets" | "trades" | "decisions" | "learning" | "news" | "performance" | "backtest" | "risk" | "audit" | "settings";
 
 export interface PageInfo {
   id: PageId;
@@ -71,7 +71,21 @@ export const PAGES: PageInfo[] = [
     details: [
       "Every setup — traded or not — is followed as a virtual trade until its stop, target or expiry.",
       "Good results raise future scores (up to +8), poor ones lower them (down to −15); persistent losers are switched off.",
+      "It also learns which news and cross-market trend conditions help or hurt each strategy (−6 … +3).",
       "Learning never changes position size or risk limits, and needs many samples before it has much effect.",
+    ],
+  },
+  {
+    id: "news",
+    label: "News",
+    icon: "✉",
+    group: "Analysis",
+    summary: "The economic calendar, market headlines and what they mean for each of your markets.",
+    details: [
+      "No new trades on a market from 30 minutes before to 30 minutes after a high-impact release for its currencies.",
+      "Other medium- or high-impact releases within two hours halve the position size; headlines clearly against a trade reduce it too.",
+      "Headline sentiment and the cross-market currency trend nudge scores a little (at most +3 each); news can only make trading more careful, never loosen a risk limit.",
+      "Derived (synthetic) markets are not moved by real-world news, so news does not affect them.",
     ],
   },
   {

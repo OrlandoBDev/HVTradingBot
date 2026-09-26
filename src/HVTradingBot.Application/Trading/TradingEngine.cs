@@ -3,12 +3,14 @@ using System.Diagnostics.Metrics;
 using Instrument = HVTradingBot.Domain.MarketData.Instrument;
 using HVTradingBot.Application.Abstractions;
 using HVTradingBot.Application.Learning;
+using HVTradingBot.Application.News;
 using HVTradingBot.Application.Notifications;
 using HVTradingBot.Domain.Analysis;
 using HVTradingBot.Domain.Common;
 using HVTradingBot.Domain.Decisions;
 using HVTradingBot.Domain.Execution;
 using HVTradingBot.Domain.MarketData;
+using HVTradingBot.Domain.News;
 using HVTradingBot.Domain.Risk;
 using HVTradingBot.Domain.Strategies;
 using Microsoft.Extensions.Logging;
@@ -50,6 +52,8 @@ public sealed class TradingEngine
     private readonly RegimeOptions _regimeOptions;
     private readonly ILogger<TradingEngine> _logger;
     private readonly ITradeDecisionNotifier? _notifier;
+    private readonly NewsService? _news;
+    private MarketIntelligenceInputs? _intelligence;
 
     public TradingEngine(
         SignalEvaluator evaluator,
@@ -66,7 +70,8 @@ public sealed class TradingEngine
         IRiskOptionsSource risk,
         RegimeOptions regimeOptions,
         ILogger<TradingEngine> logger,
-        ITradeDecisionNotifier? notifier = null)
+        ITradeDecisionNotifier? notifier = null,
+        NewsService? news = null)
     {
         _evaluator = evaluator;
         _riskManager = riskManager;
@@ -83,6 +88,7 @@ public sealed class TradingEngine
         _regimeOptions = regimeOptions;
         _logger = logger;
         _notifier = notifier;
+        _news = news;
     }
 
     public IReadOnlyCollection<Instrument> TradedInstruments => _series.Keys;
@@ -259,6 +265,11 @@ public sealed class TradingEngine
         state = await ApplyAutomaticKillSwitchAsync(state, dataStatus, correlationId, cancellationToken);
 
         var isStale = dataStatus.IsStale(_clock.UtcNow, TimeSpan.FromSeconds(_risk.Current.MaxMarketDataAgeSeconds));
+        if (closedPrimary.Count > 0)
+        {
+            await RefreshIntelligenceAsync(marketTime, cancellationToken);
+        }
+
         foreach (var instrument in closedPrimary)
         {
             await EvaluateInstrumentAsync(instrument, isStale, dataStatus, correlationId, cancellationToken);
@@ -360,6 +371,23 @@ public sealed class TradingEngine
         return await _state.UpdateAsync(s => s.WithKillSwitch(true, reason, _clock.UtcNow), cancellationToken);
     }
 
+    /// <summary>
+    /// Refreshes news (when due) and the cross-market currency trend from every market's 4H bars, once per cycle so
+    /// every market in the cycle sees the same inputs.
+    /// </summary>
+    private async Task RefreshIntelligenceAsync(DateTime marketTime, CancellationToken cancellationToken)
+    {
+        if (_news is null)
+        {
+            _intelligence = null;
+            return;
+        }
+
+        await _news.RefreshIfDueAsync(marketTime, cancellationToken);
+        var trend = MarketIntelligence.CurrencyTrend(_series.Values.Select(s => (s.Instrument, s.Indicators(TimeFrame.H4))));
+        _intelligence = _news.Inputs(trend);
+    }
+
     private async Task EvaluateInstrumentAsync(
         Instrument instrument,
         bool isStale,
@@ -377,7 +405,7 @@ public sealed class TradingEngine
         using var activity = ActivitySource.StartActivity("EvaluateInstrument");
         activity?.SetTag("instrument", instrument.Symbol);
 
-        var context = MarketContext.Build(series, _quotes[instrument], _regimeOptions, isStale);
+        var context = MarketContext.Build(series, _quotes[instrument], _regimeOptions, isStale) with { Intelligence = _intelligence };
         var signal = await _evaluator.EvaluateAsync(context, cancellationToken);
         var decisionId = Guid.NewGuid();
         var state = signal.State;
@@ -396,7 +424,11 @@ public sealed class TradingEngine
             var signalBarClose = series.Closed(TimeFrame.H1)[^1].CloseTimeUtc;
             clientOrderId = IdempotencyKey.For(instrument, best.Result.Strategy, best.Setup.Direction, signalBarClose);
             var proposal = new TradeProposal(instrument, best.Setup, context.Quote, context.AverageSpread,
-                best.Result.Strategy, best.Score.Total, clientOrderId);
+                best.Result.Strategy, best.Score.Total, clientOrderId)
+            {
+                NewsRiskMultiplier = best.News.RiskMultiplier,
+                NewsBlackout = best.News.BlackoutReason
+            };
 
             risk = await _riskManager.EvaluateAsync(proposal, await BuildPortfolioAsync(dataStatus, cancellationToken), cancellationToken);
             if (!risk.IsApproved)
@@ -540,7 +572,15 @@ public sealed class TradingEngine
                 direction == Direction.Long ? MidpointRounding.ToPositiveInfinity : MidpointRounding.ToNegativeInfinity);
             var setup = new TradeSetup(direction, entry, stop, target);
             var clientOrderId = $"TEST-{instrument.BaseCurrency}{(instrument.IsCurrencyPair ? instrument.QuoteCurrency : "")}-{_clock.UtcNow:yyyyMMddHHmmss}";
-            var proposal = new TradeProposal(instrument, setup, quote, context.AverageSpread, TestTradeStrategy, 0, clientOrderId) { IsTestTrade = true };
+            // Test trades go through the same news checks as strategy trades: blocked near high-impact releases, smaller near others.
+            await RefreshIntelligenceAsync(context.AsOfUtc, cancellationToken);
+            var news = _intelligence is { } inputs ? MarketIntelligence.Assess(instrument, direction, context.AsOfUtc, inputs) : NewsAssessment.None;
+            var proposal = new TradeProposal(instrument, setup, quote, context.AverageSpread, TestTradeStrategy, 0, clientOrderId)
+            {
+                IsTestTrade = true,
+                NewsRiskMultiplier = news.RiskMultiplier,
+                NewsBlackout = news.BlackoutReason
+            };
             var decisionId = Guid.NewGuid();
             var reasons = new List<string> { $"Test trade requested from the dashboard by {requestedBy}." };
 

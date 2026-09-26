@@ -112,6 +112,8 @@ public sealed class TradingDbContext(DbContextOptions<TradingDbContext> options)
             e.HasIndex(x => x.SetupId).IsUnique();
             e.HasIndex(x => new { x.Instrument, x.Status });
             e.HasIndex(x => x.ClosedAtUtc);
+            e.Property(x => x.NewsCondition).HasMaxLength(24);
+            e.Property(x => x.TrendAlignment).HasMaxLength(16);
         });
 
         modelBuilder.Entity<CloseRequestEntity>(e =>
