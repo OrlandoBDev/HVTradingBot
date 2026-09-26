@@ -147,25 +147,32 @@ public sealed class MobileRuntimeTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task WebView_requests_carry_their_body_in_a_header_and_live_updates_long_poll()
+    public async Task WebView_requests_carry_their_body_in_the_url_and_live_updates_long_poll()
     {
         await WaitForTradingAsync();
         var origin = new Uri(WebBridge.Origin);
 
-        var body = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("""{"active":true,"reason":"from the WebView"}"""));
-        var saved = await _runtime.Bridge.HandleApiAsync("POST", new Uri(origin, "/api/kill-switch"),
-            new Dictionary<string, string> { ["x-hv-body"] = body }, CancellationToken.None);
-        Assert.True(saved.Status == 200, saved.Body);
-
-        var events = await _runtime.Bridge.HandleApiAsync("GET", new Uri(origin, "/api/app/events?after=0"), new Dictionary<string, string>(),
+        // "é" and "+" check the UTF-8 and URL encoding round trip.
+        var body = Uri.EscapeDataString(Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("""{"active":true,"reason":"from the WebView é>?"}""")));
+        var saved = await _runtime.Bridge.HandleApiAsync("POST", new Uri(origin, $"/api/kill-switch?{WebBridge.BodyParameter}={body}"),
             CancellationToken.None);
+        Assert.True(saved.Status == 200, saved.Body);
+        Assert.Equal("from the WebView é>?", JsonDocument.Parse(saved.Body!).RootElement.GetProperty("killSwitchReason").GetString());
+
+        using (var page = JsonDocument.Parse((await _runtime.Bridge.HandleApiAsync("GET",
+                   new Uri(origin, $"/api/audit/paged?page=1&{WebBridge.BodyParameter}=&pageSize=2"), CancellationToken.None)).Body!))
+        {
+            Assert.Equal(2, page.RootElement.GetProperty("pageSize").GetInt32());
+        }
+
+        var events = await _runtime.Bridge.HandleApiAsync("GET", new Uri(origin, "/api/app/events?after=0"), CancellationToken.None);
         using var json = JsonDocument.Parse(events.Body!);
         var names = json.RootElement.GetProperty("events").EnumerateArray().Select(e => e.GetProperty("name").GetString()).ToList();
         Assert.Contains(LiveUpdates.StatusEvent, names);
         Assert.Contains(LiveUpdates.LearningEvent, names);
 
-        var bad = await _runtime.Bridge.HandleApiAsync("PUT", new Uri(origin, "/api/settings/risk"),
-            new Dictionary<string, string> { [WebBridge.BodyHeader] = "%%%" }, CancellationToken.None);
+        var bad = await _runtime.Bridge.HandleApiAsync("PUT", new Uri(origin, $"/api/settings/risk?{WebBridge.BodyParameter}=%25%25%25"),
+            CancellationToken.None);
         Assert.Equal(400, bad.Status);
     }
 

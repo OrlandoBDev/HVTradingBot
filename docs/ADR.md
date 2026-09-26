@@ -84,3 +84,15 @@ Risk limits are validated against ranges narrower than the configuration allows 
 and are applied as an immutable snapshot per decision. The token is encrypted
 with ASP.NET Core Data Protection; keys live outside the database. The API only stores settings; the worker is the
 only process that connects to the broker.
+
+## ADR-012 — Self-Contained Android App
+
+Status: Accepted
+
+The Android app runs the engine, the dashboard's logic and the database in the app process, because there is no
+hosted API for a phone to connect to. It keeps the server's boundaries instead of inventing new ones: the worker's
+hosted services run unchanged in their own supervised host, the API's endpoint logic moved to a transport-neutral
+library (`HVTradingBot.Dashboard`) that both the API and the app use, and the two sides share only the database.
+SQLite replaces PostgreSQL there (`Database:Provider`), with its own migration history; the PostgreSQL model is
+unchanged. The React dashboard is reused in a WebView whose `/api` requests are answered in-process. The Mac app
+(docs/MACOS_APP.md) keeps the Docker topology, which remains the path to a server.

@@ -93,6 +93,17 @@ the app quits** in the app's Settings to change that. The browser at `http://loc
 **Logs.** The startup screen keeps the `docker compose` output (expand **Log**); the **Logs** page shows the last 200
 lines of the `worker` or `api` container, the same as `docker compose logs --tail 200 worker` in the checkout.
 
+## Android app
+
+A self-contained Android app (`apps/HVTradingBot.Android`): the engine, the dashboard and a SQLite database run on the
+phone, with no server or Docker. The phone only connects to Deriv (and SMTP for optional emails). A foreground service
+keeps it trading in the background with the screen off, restarts it after errors and phone restarts, and shows live
+status and trade notifications. The dashboard is the same React app, updating live, Learning page included.
+Design, install and signing: [docs/ANDROID_APP.md](docs/ANDROID_APP.md).
+
+**Install:** download the **HVTradingBot-android** artifact from the latest *Android app* workflow run, open
+`HVTradingBot.apk` on the phone, then enter the Deriv demo settings under **Settings → Broker account**.
+
 ## What Is Implemented
 
 - **Market data:** real prices from Deriv's public API (5-minute candles, live ticks); offline synthetic feed.
@@ -179,6 +190,7 @@ See the `docs/` folder:
 - [Security](docs/SECURITY.md)
 - [Roadmap](docs/ROADMAP.md)
 - [macOS App](docs/MACOS_APP.md)
+- [Android App](docs/ANDROID_APP.md)
 - [Agent Build Guide](docs/AGENTS.md)
 - [ADRs](docs/ADR.md)
 

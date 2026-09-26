@@ -1,15 +1,15 @@
-import { APP_BODY_HEADER, inApp, toBase64 } from "./platform";
+import { inApp, withAppBody } from "./platform";
 
 /** Fired when the session has ended (signed out elsewhere, password changed, expired); the app shows the login page. */
 export const UNAUTHORIZED_EVENT = "hv:unauthorized";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const appBody: Record<string, string> = inApp && typeof init?.body === "string" ? { [APP_BODY_HEADER]: toBase64(init.body) } : {};
-  const response = await fetch(path, {
+  const url = inApp && typeof init?.body === "string" ? withAppBody(path, init.body) : path;
+  const response = await fetch(url, {
     ...init,
     credentials: "same-origin",
     // The custom header marks the request as coming from this app; the API refuses changes without it.
-    headers: { "Content-Type": "application/json", "X-HV-Request": "1", ...appBody, ...(init?.headers ?? {}) },
+    headers: { "Content-Type": "application/json", "X-HV-Request": "1", ...(init?.headers ?? {}) },
   });
   if (response.status === 401 && !path.startsWith("/api/auth/")) {
     window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));

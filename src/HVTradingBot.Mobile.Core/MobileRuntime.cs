@@ -102,6 +102,7 @@ public sealed class MobileRuntime : IAsyncDisposable
         builder.Configuration.AddConfiguration(configuration);
         ConfigureLogging(builder.Logging, log);
         builder.Services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(15));
+        builder.Services.AddSingleton<IHostLifetime, EmbeddedHostLifetime>();
         builder.Services.AddTradingCore(configuration).AddLiveTrading(configuration);
         builder.Services.AddTradingWorker(_ => new InProcessWorkerLock());
         if (phone is not null)

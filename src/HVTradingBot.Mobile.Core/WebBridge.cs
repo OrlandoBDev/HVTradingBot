@@ -5,13 +5,14 @@ namespace HVTradingBot.Mobile.Core;
 /// <summary>
 /// Connects the WebView to the app. The dashboard is served from https://appassets.androidplatform.net (the host
 /// Android reserves for app content), and its API requests to the same origin are answered by <see cref="LocalApi"/>
-/// instead of the network. Android's request interception does not expose request bodies, so in the app the
-/// dashboard sends the JSON body base64-encoded in the <see cref="BodyHeader"/> header.
+/// instead of the network. Android's request interception does not expose request bodies (and custom headers are not
+/// guaranteed), so in the app the dashboard sends the JSON body base64-encoded in the <see cref="BodyParameter"/> query
+/// parameter, which is always part of the intercepted URL.
 /// </summary>
 public sealed class WebBridge(LocalApi api, EventFeed events)
 {
     public const string Origin = "https://appassets.androidplatform.net";
-    public const string BodyHeader = "X-HV-Body";
+    public const string BodyParameter = "_body";
 
     /// <summary>Marks the WebView's user agent so the dashboard knows it runs inside the app.</summary>
     public const string UserAgentMarker = "HVTradingBotApp/1";
@@ -50,17 +51,19 @@ public sealed class WebBridge(LocalApi api, EventFeed events)
         _ => "application/octet-stream"
     };
 
-    public async Task<LocalApiResponse> HandleApiAsync(string method, Uri url, IReadOnlyDictionary<string, string> headers, CancellationToken cancellationToken)
+    public async Task<LocalApiResponse> HandleApiAsync(string method, Uri url, CancellationToken cancellationToken)
     {
+        var parameters = url.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries).Select(p => p.Split('=', 2)).ToList();
+        string? Parameter(string name) => parameters.FirstOrDefault(p => p[0] == name) is { Length: 2 } pair ? Uri.UnescapeDataString(pair[1]) : null;
+
         if (url.AbsolutePath == "/api/app/events" && method == "GET")
         {
-            var after = long.TryParse(Query(url, "after"), out var value) ? value : 0;
+            var after = long.TryParse(Parameter("after"), out var value) ? value : 0;
             return new LocalApiResponse(200, await events.WaitAsync(after, EventWait, cancellationToken));
         }
 
         string? body = null;
-        var encoded = headers.FirstOrDefault(h => string.Equals(h.Key, BodyHeader, StringComparison.OrdinalIgnoreCase)).Value;
-        if (!string.IsNullOrEmpty(encoded))
+        if (Parameter(BodyParameter) is { Length: > 0 } encoded)
         {
             try
             {
@@ -72,11 +75,7 @@ public sealed class WebBridge(LocalApi api, EventFeed events)
             }
         }
 
-        return await api.HandleAsync(method, url.PathAndQuery, body, cancellationToken);
+        var query = string.Join('&', parameters.Where(p => p[0] != BodyParameter).Select(p => string.Join('=', p)));
+        return await api.HandleAsync(method, url.AbsolutePath + (query.Length > 0 ? "?" + query : ""), body, cancellationToken);
     }
-
-    private static string? Query(Uri url, string name) =>
-        url.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries)
-            .Select(p => p.Split('=', 2))
-            .FirstOrDefault(p => p[0] == name) is { Length: 2 } pair ? Uri.UnescapeDataString(pair[1]) : null;
 }
