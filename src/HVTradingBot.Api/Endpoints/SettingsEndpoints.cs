@@ -34,6 +34,11 @@ public static class SettingsEndpoints
             (await actions.SaveNotificationSettingsAsync(request, http.Caller(), ct)).ToHttp());
         notifications.MapPost("/test", (DashboardActions actions, HttpContext http, CancellationToken ct) => actions.SendTestEmailAsync(http.Caller(), ct));
 
+        var signals = app.MapGroup("/api/settings/signals");
+        signals.MapGet("", (SignalDashboard dashboard, CancellationToken ct) => dashboard.GetSettingsAsync(ct));
+        signals.MapPut("", async (SignalSettingsDto request, SignalDashboard dashboard, HttpContext http, CancellationToken ct) =>
+            (await dashboard.SaveSettingsAsync(request, http.Caller(), ct)).ToHttp());
+
         var markets = app.MapGroup("/api/settings/markets");
         markets.MapGet("", (DashboardActions actions, CancellationToken ct) => actions.GetMarketSettingsAsync(ct));
         markets.MapPut("", async (MarketSelectionRequest request, DashboardActions actions, HttpContext http, CancellationToken ct) =>

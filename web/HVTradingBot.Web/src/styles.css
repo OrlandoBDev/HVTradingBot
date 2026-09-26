@@ -344,3 +344,33 @@ td.actions { text-align: right; }
 .chart-legend .target { color: var(--good); }
 tr.selected td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 @media (max-width: 900px) { .price-chart { height: 300px; } }
+
+/* ---------- Signals ---------- */
+.nav-badge {
+  margin-left: auto; min-width: 18px; padding: 0 6px; border-radius: 999px; background: var(--warn); color: #111;
+  font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+}
+.menu-button .nav-badge { margin-left: 4px; vertical-align: 2px; }
+.signal-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.signal-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; background: var(--panel-2); display: flex; flex-direction: column; gap: 6px; }
+.signal-card.selected { border-color: var(--accent); }
+.signal-card.review { border-color: color-mix(in srgb, var(--warn) 60%, var(--border)); }
+.signal-card .form-actions { margin-top: 4px; }
+.signal-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.signal-timer { margin-left: auto; font-variant-numeric: tabular-nums; }
+.signal-levels { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--muted); }
+.signal-levels b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.signal-meta { margin: 0 0 8px; }
+.signal-confirm { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; max-width: 360px; }
+.signal-modes { display: flex; flex-direction: column; gap: 6px; }
+.signal-mode { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.signal-mode .segmented { margin-left: auto; }
+.nowrap { white-space: nowrap; }
+.signal-checks { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.signal-check { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; }
+.signal-check.bad { border-color: color-mix(in srgb, var(--bad) 45%, var(--border)); background: color-mix(in srgb, var(--bad) 7%, transparent); }
+.signal-check.warn { border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); background: color-mix(in srgb, var(--warn) 7%, transparent); }
+.signal-check-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.signal-accept { margin-left: auto; }
+.signal-passing summary { cursor: pointer; color: var(--muted); font-size: 13px; margin: 6px 0; }
+.signal-levels + p, .signal-levels { margin-bottom: 10px; }

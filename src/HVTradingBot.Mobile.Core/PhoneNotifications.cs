@@ -8,10 +8,23 @@ namespace HVTradingBot.Mobile.Core;
 /// <summary>A notification for the phone's notification shade.</summary>
 public sealed record PhoneNotification(string Title, string Text, NotificationKind Kind);
 
+/// <summary>
+/// A trade signal on the phone. Tapping it opens the signal in the app; it offers Skip, and Trade when
+/// <see cref="OfferTrade"/> (the one-tap setting; never for a signal that needs a risk review).
+/// </summary>
+public sealed record SignalAlert(Guid SignalId, string Title, string Text, bool OfferTrade, DateTime ExpiresAtUtc);
+
 /// <summary>Implemented by the Android app to show notifications.</summary>
 public interface IPhoneNotificationSink
 {
     void Show(PhoneNotification notification);
+
+    void ShowSignal(SignalAlert alert) => Show(new PhoneNotification(alert.Title, alert.Text, NotificationKind.TradeOpened));
+
+    /// <summary>Removes a signal's notification once it has been decided or has expired.</summary>
+    void DismissSignal(Guid signalId)
+    {
+    }
 }
 
 /// <summary>

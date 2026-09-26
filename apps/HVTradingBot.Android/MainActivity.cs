@@ -53,9 +53,23 @@ public sealed class MainActivity : Activity
         SetContentView(root);
 
         StartEngine();
-        _webView.LoadUrl(WebBridge.Origin + "/");
+        // Opened from a signal notification: straight to that signal.
+        _webView.LoadUrl(WebBridge.Origin + "/" + SignalHash(Intent));
         AskForNotifications();
     }
+
+    protected override void OnNewIntent(Intent? intent)
+    {
+        base.OnNewIntent(intent);
+        if (SignalHash(intent) is { Length: > 0 } hash)
+        {
+            _webView?.EvaluateJavascript($"window.location.hash = '{hash[1..]}';", null);
+        }
+    }
+
+    /// <summary>"#/signals/{id}" for an intent from a signal notification, otherwise empty.</summary>
+    private static string SignalHash(Intent? intent) =>
+        Guid.TryParse(intent?.GetStringExtra(PhoneNotifications.SignalIdExtra), out var id) ? $"#/signals/{id}" : "";
 
     protected override void OnResume()
     {

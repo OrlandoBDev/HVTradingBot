@@ -25,6 +25,7 @@ export function Overview({ status, refreshKey, navigate }: { status: SystemStatu
       </div>
 
       {profit && <AppPnl app={profit.app} currency={profit.currency} fromBroker={profit.accountFromBroker} />}
+      {profit?.signals && <SignalPnl signals={profit.signals} currency={profit.currency} />}
 
       <div className="status-strip">
         <span>
@@ -57,7 +58,7 @@ function AppPnl({ app, currency, fromBroker }: { app: PnlPeriods; currency: stri
   return (
     <Card title="App P/L">
       <p className="hint">
-        Only trades placed by this app{fromBroker ? "; the figures above cover every trade on the broker account" : ""}. Days and weeks in your local time.
+        Only trades the bot placed (signal trades are shown separately){fromBroker ? "; the figures above cover every trade on the broker account" : ""}. Days and weeks in your local time.
       </p>
       <div className="grid-stats">
         <Stat label="Today" value={money(app.today, currency)} tone={signClass(app.today)} sub="realized" />
@@ -66,6 +67,23 @@ function AppPnl({ app, currency, fromBroker }: { app: PnlPeriods; currency: stri
         <Stat label="All time" value={money(app.allTime, currency)} tone={signClass(app.allTime)}
           sub={`${app.closedTrades} trade(s)${winRate == null ? "" : `, ${winRate.toFixed(0)}% won`}`} />
         <Stat label="Open" value={money(app.open, currency)} tone={signClass(app.open)} sub={`${app.openTrades} open position(s)`} />
+      </div>
+    </Card>
+  );
+}
+
+/** Trades you took from signals: kept apart from the bot's own results. */
+function SignalPnl({ signals, currency }: { signals: PnlPeriods; currency: string }) {
+  const winRate = signals.closedTrades === 0 ? null : (signals.wins / signals.closedTrades) * 100;
+  return (
+    <Card title="Signal trades P/L">
+      <p className="hint">Trades you chose from signals. They have their own slots and loss budget and are not part of App P/L.</p>
+      <div className="grid-stats">
+        <Stat label="Today" value={money(signals.today, currency)} tone={signClass(signals.today)} sub="realized" />
+        <Stat label="This week" value={money(signals.week, currency)} tone={signClass(signals.week)} sub="realized since Monday" />
+        <Stat label="All time" value={money(signals.allTime, currency)} tone={signClass(signals.allTime)}
+          sub={`${signals.closedTrades} trade(s)${winRate == null ? "" : `, ${winRate.toFixed(0)}% won`}`} />
+        <Stat label="Open" value={money(signals.open, currency)} tone={signClass(signals.open)} sub={`${signals.openTrades} open position(s)`} />
       </div>
     </Card>
   );

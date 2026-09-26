@@ -93,6 +93,22 @@ No new trade on a market from 30 minutes before to 30 minutes after a high-impac
 medium- or high-impact releases within two hours, and headlines clearly against the trade, shrink the position. News
 can only tighten risk. See [NEWS_AND_TRENDS.md](NEWS_AND_TRENDS.md).
 
+### Signal Trades
+
+Signals are setups the engine sends to the user instead of trading them (markets set to "Signals", and optional near
+misses scoring just below the automatic threshold). A signal is traded only when the user accepts it, and it never
+touches the bot's own limits:
+
+- Its own slots (default 2), risk per trade (default 0.5%) and daily loss budget (default 2%); trades are tagged by the
+  `SIG-` client order id. The bot's slot and loss rules ignore signal trades; currency exposure counts every position.
+- Accepting re-prices the entry at the live quote and refuses the signal once the price has covered a set share
+  (default 1/3) of the way to its stop or target, or after it expires (default 10 minutes).
+- The same rules run again at placement. A failed rule can be accepted by the user, except hard rules, which always
+  block: trading mode, kill switch, stale data, market not tradable, sizing, already traded. Loss limits can be accepted
+  only when "Allow trading past a loss limit" is on, with a typed `ACCEPT`.
+- Accepted rules are recorded on the risk check ("Accepted by you: ..."), the decision journal and the audit log
+  (`SignalTradedWithOverrides`); results of overridden trades are reported separately on the Signals page.
+
 ### Kill Switch
 
 Triggers may include:

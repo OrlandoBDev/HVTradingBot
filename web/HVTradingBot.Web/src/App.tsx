@@ -21,6 +21,7 @@ import { NewsView } from "./components/NewsView";
 import { Login } from "./components/Login";
 import { inApp } from "./platform";
 import { AccountBar } from "./components/AccountBar";
+import { Signals } from "./components/Signals";
 
 /** Shows the sign-in page until there is a session, then the dashboard. */
 export function App() {
@@ -56,7 +57,7 @@ function Dashboard({ username, onSignOut }: { username: string; onSignOut: () =>
 
   // Tables refetch when the market advances (a new bar) or the kill switch changes, not on every status push.
   // In the Android app a learning pulse (setup added or resolved) refreshes too, so the Learning page updates live.
-  const refreshKey = `${status?.marketData.lastBarTimeUtc}|${status?.killSwitchActive}|${status?.openPositions}|${learning?.version}`;
+  const refreshKey = `${status?.marketData.lastBarTimeUtc}|${status?.killSwitchActive}|${status?.openPositions}|${learning?.version}|${status?.waitingSignals}`;
   const refreshStatus = () => api.get<SystemStatus>("/api/status").then(setStatus).catch(() => undefined);
   const page = pageInfo(route.page);
 
@@ -68,7 +69,9 @@ function Dashboard({ username, onSignOut }: { username: string; onSignOut: () =>
   return (
     <div className="shell">
       <header className="topbar">
-        <button className="menu-button" aria-label="Menu" onClick={() => setMenuOpen((o) => !o)}>☰</button>
+        <button className="menu-button" aria-label="Menu" onClick={() => setMenuOpen((o) => !o)}>
+          ☰{!!status?.waitingSignals && <span className="nav-badge" title="Signals waiting for your decision">{status.waitingSignals}</span>}
+        </button>
         <div className="brand">
           <span className="logo">HV</span>
           <span className="brand-name">HVTradingBot</span>
@@ -107,6 +110,7 @@ function Dashboard({ username, onSignOut }: { username: string; onSignOut: () =>
                 <button key={p.id} className={`nav-item ${p.id === route.page ? "active" : ""}`} onClick={() => go(p.id)}>
                   <span className="nav-icon">{p.icon}</span>
                   {p.label}
+                  {p.id === "signals" && !!status?.waitingSignals && <span className="nav-badge" title="Waiting for your decision">{status.waitingSignals}</span>}
                 </button>
               ))}
             </div>
@@ -126,6 +130,7 @@ function Dashboard({ username, onSignOut }: { username: string; onSignOut: () =>
           {status && route.page === "overview" && <Overview status={status} refreshKey={refreshKey} navigate={go} />}
           {route.page === "markets" && <Markets refreshKey={refreshKey} navigate={go} />}
           {route.page === "trades" && <Trades refreshKey={refreshKey} view={route.section} navigate={go} />}
+          {route.page === "signals" && <Signals refreshKey={refreshKey} section={route.section} navigate={go} />}
           {route.page === "decisions" && <Decisions refreshKey={refreshKey} />}
           {route.page === "learning" && <LearningView refreshKey={refreshKey} />}
           {route.page === "news" && <NewsView refreshKey={refreshKey} />}

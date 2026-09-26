@@ -219,8 +219,10 @@ public sealed class SignalStore(IDbContextFactory<TradingDbContext> dbFactory, I
         return fresh;
     }
 
-    public static IReadOnlyList<SignalCheck> ReadChecks(SignalEntity signal) =>
-        JsonSerializer.Deserialize<List<SignalCheck>>(signal.Checks, Json) ?? [];
+    public static IReadOnlyList<SignalCheck> ReadChecks(SignalEntity signal) => ReadChecks(signal.Checks);
+
+    public static IReadOnlyList<SignalCheck> ReadChecks(string checksJson) =>
+        JsonSerializer.Deserialize<List<SignalCheck>>(checksJson, Json) ?? [];
 
     public static IReadOnlyList<string> ReadAcceptedRules(SignalEntity signal) =>
         JsonSerializer.Deserialize<List<string>>(signal.AcceptedRules, Json) ?? [];

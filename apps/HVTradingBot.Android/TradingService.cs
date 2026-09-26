@@ -19,6 +19,10 @@ public sealed class TradingService : Service
 {
     private const string ActionStop = "com.hvtradingbot.android.STOP";
 
+    /// <summary>The Skip and Trade buttons of a signal notification.</summary>
+    public const string ActionSkipSignal = "com.hvtradingbot.android.SKIP_SIGNAL";
+    public const string ActionTradeSignal = "com.hvtradingbot.android.TRADE_SIGNAL";
+
     private PowerManager.WakeLock? _wakeLock;
     private MobileRuntime? _subscribed;
     private string? _shown;
@@ -52,6 +56,11 @@ public sealed class TradingService : Service
             return StartCommandResult.NotSticky;
         }
 
+        if (intent?.Action is ActionSkipSignal or ActionTradeSignal && Guid.TryParse(intent.GetStringExtra(PhoneNotifications.SignalIdExtra), out var signalId))
+        {
+            _ = DecideSignalAsync(signalId, intent.Action == ActionTradeSignal);
+        }
+
         AcquireWakeLock();
         var runtime = AppRuntime.Get(this);
         if (!ReferenceEquals(runtime, _subscribed))
@@ -81,6 +90,56 @@ public sealed class TradingService : Service
         {
             global::Android.Util.Log.Error("HVTradingBot", $"Engine failed to start: {ex}");
             Show(EngineNotification("HVTradingBot could not start", ex.Message));
+        }
+    }
+
+    /// <summary>
+    /// A signal notification's button: records the decision through the same route the dashboard uses (Trade accepts
+    /// no extra risks; a signal with failed rules has no Trade button and is reviewed in the app).
+    /// </summary>
+    private async Task DecideSignalAsync(Guid signalId, bool trade)
+    {
+        var phone = new PhoneNotifications(ApplicationContext!);
+        phone.DismissSignal(signalId);
+        try
+        {
+            await AppRuntime.EnsureStartedAsync(this);
+            var response = await AppRuntime.Get(this).Api.HandleAsync("POST", $"/api/signals/{signalId}/{(trade ? "accept" : "skip")}",
+                trade ? "{\"acceptedRules\":[]}" : null, CancellationToken.None);
+            if (response.Status >= 400)
+            {
+                phone.Show(new PhoneNotification(trade ? "Signal not traded" : "Signal not skipped", ProblemText(response.Body),
+                    HVTradingBot.Application.Notifications.NotificationKind.OrderRejected));
+            }
+        }
+        catch (Exception ex)
+        {
+            global::Android.Util.Log.Error("HVTradingBot", $"Signal decision failed: {ex}");
+        }
+    }
+
+    /// <summary>The first validation message (or the title) of an API problem response.</summary>
+    private static string ProblemText(string? body)
+    {
+        try
+        {
+            using var json = System.Text.Json.JsonDocument.Parse(body ?? "{}");
+            if (json.RootElement.TryGetProperty("errors", out var errors))
+            {
+                foreach (var field in errors.EnumerateObject())
+                {
+                    foreach (var message in field.Value.EnumerateArray())
+                    {
+                        return message.GetString() ?? "";
+                    }
+                }
+            }
+
+            return json.RootElement.TryGetProperty("title", out var title) ? title.GetString() ?? "" : "";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return body ?? "";
         }
     }
 
