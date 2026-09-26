@@ -694,7 +694,9 @@ public sealed class TradingEngine
             _clock.UtcNow,
             converter)
         {
-            DerivedDailyRealizedPnl = state.PnlDay == DateOnly.FromDateTime(marketTime) ? state.DerivedDailyRealizedPnl : 0
+            DerivedDailyRealizedPnl = state.PnlDay == DateOnly.FromDateTime(marketTime) ? state.DerivedDailyRealizedPnl : 0,
+            // While Forex is closed, Derived may use every position slot.
+            ForexMarketOpen = IsForexOpen(marketTime)
         };
     }
 

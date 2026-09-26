@@ -123,6 +123,8 @@ Design, install and signing: [docs/ANDROID_APP.md](docs/ANDROID_APP.md).
 - **Risk engine:** all rules in `docs/RISK_MANAGEMENT.md`, checked at proposal and again before execution, kill switch.
   Defaults are a small-account profile (1% per trade, 3% daily, 8% weekly, 2 positions, broker fee ≤ 30% of risk);
   limits are editable under **Settings → Risk limits** within safe ranges and apply without a restart.
+  Setups scoring 90+ may open up to 2 extra positions on new markets (Forex or Derived) when the limits are full,
+  within the daily loss budget; while Forex is closed, Derived may use every slot.
 - **Execution:** Deriv demo account (multiplier contracts with broker-side stop loss / take profit, idempotent
   submission, unknown-state reconciliation) or local paper broker.
 - **Journal:** every decision incl. NO_TRADE, orders, positions (R, MAE, MFE), audit log.

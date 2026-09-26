@@ -68,8 +68,8 @@ const GROUPS: { title: string; intro: string; fields: Field[] }[] = [
       },
       {
         key: "maxOpenPositions", label: "Max open positions", step: 1, min: 1, max: 10, unit: "",
-        what: "Total positions open at the same time, across all markets.",
-        example: ({ v, f, b, c }) => `Up to ${v} at once; worst case all stop out together: about ${pct(b, v * f.maxRiskPerTradePercent, c)}.`,
+        what: "Normal positions open at the same time, across all markets. High-score extras (below) can add a few more.",
+        example: ({ v, f, b, c }) => `Up to ${v} at once (${v + f.maxExtraDerivedPositions} with high-score extras); worst case ${v} stop out together: about ${pct(b, v * f.maxRiskPerTradePercent, c)}.`,
       },
       {
         key: "minRewardToRisk", label: "Min reward : risk", step: 0.1, min: 1, max: 5, unit: ": 1",
@@ -88,9 +88,9 @@ const GROUPS: { title: string; intro: string; fields: Field[] }[] = [
     intro: "Extra limits for Derived (synthetic) markets so they cannot crowd out Forex. Derived prices are random by design, so they get less money.",
     fields: [
       {
-        key: "maxDerivedOpenPositions", label: "Max Derived positions at once", step: 1, min: 0, max: 10, unit: "",
-        what: "Derived positions count toward the total, but never more than this many — the remaining slots stay free for Forex. 0 = no Derived trading.",
-        example: ({ v, f }) => `With ${f.maxOpenPositions} total and ${v} Derived: at least ${Math.max(0, f.maxOpenPositions - v)} slot(s) are always available for Forex.`,
+        key: "maxDerivedOpenPositions", label: "Max Derived positions while Forex is open", step: 1, min: 0, max: 10, unit: "",
+        what: "While Forex is trading, Derived positions take at most this many of the normal slots, so the rest stay free for Forex. While Forex is closed (weekends, the daily break) Derived may use every slot. 0 = no Derived trading while Forex is open.",
+        example: ({ v, f }) => `Forex open: at least ${Math.max(0, f.maxOpenPositions - v)} slot(s) always free for Forex. Forex closed: up to ${f.maxOpenPositions} Derived, plus high-score extras.`,
       },
       {
         key: "derivedRiskPerTradePercent", label: "Risk per Derived trade", step: 0.1, min: 0.1, max: 3, unit: "%",
@@ -102,17 +102,23 @@ const GROUPS: { title: string; intro: string; fields: Field[] }[] = [
         what: "After Derived trades lose this much in a day, only Derived pauses until tomorrow — Forex keeps trading.",
         example: ({ v, f, b, c }) => `Derived stops for the day after losing ${pct(b, v, c)} (about ${Math.max(1, Math.floor(v / f.derivedRiskPerTradePercent))} losing Derived trade(s)).`,
       },
+    ],
+  },
+  {
+    title: "High-score extras",
+    intro: "Very strong setups may open even when the position limits are full, on any market type. Every other rule still applies.",
+    fields: [
       {
         key: "highScoreOverrideMinScore", label: "High-score override from score", step: 1, min: 75, max: 100, unit: "",
-        what: "A Derived candidate scoring at least this much is traded even when the Derived limit is reached or that market already has a position open. Forex is not affected: these extras never use a Forex slot, and they only open if every open Derived trade plus the new one could stop out without going over the Derived daily loss limit.",
-        example: ({ v, f, b, c }) => `Score ${v}+ opens an extra Derived trade while open Derived risk plus the new ${pct(b, f.derivedRiskPerTradePercent, c)} stays within ${pct(b, f.maxDerivedDailyLossPercent, c)} minus today's Derived losses.`,
+        what: "A candidate scoring at least this much may open as an extra position when the normal limits are full, on a market with no open position (a Derived market may add to one it already trades). It only opens if every open trade plus the new one could stop out without going over today's remaining loss limit (Derived: the Derived limit too).",
+        example: ({ v, f, b, c }) => `Score ${v}+ opens an extra trade while all open risk plus the new trade stays within ${pct(b, f.maxDailyLossPercent, c)} minus today's losses.`,
       },
       {
         key: "maxExtraDerivedPositions", label: "Max high-score extra positions", step: 1, min: 0, max: 5, unit: "",
-        what: "How many Derived positions the high-score override may add on top of the Derived limit. 0 turns the override off.",
+        what: "How many extra positions high-score trades may add on top of the normal limit, shared by Forex and Derived. 0 turns the override off.",
         example: ({ v, f }) => v === 0
-          ? "Override off: the Derived limit and one-position-per-market rule always apply."
-          : `Up to ${f.maxDerivedOpenPositions + v} Derived positions at once (${f.maxDerivedOpenPositions} normal + ${v} extra), still leaving ${Math.max(0, f.maxOpenPositions - f.maxDerivedOpenPositions)} slot(s) for Forex.`,
+          ? "Override off: the position limits and one-position-per-market rule always apply."
+          : `At most ${f.maxOpenPositions + v} positions at once (${f.maxOpenPositions} normal + ${v} extra), across all markets.`,
       },
     ],
   },

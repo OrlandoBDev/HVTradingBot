@@ -26,6 +26,12 @@ public sealed record PortfolioState(
     /// <summary>Realized P&amp;L of Derived (synthetic) markets today, for the Derived daily loss limit.</summary>
     public decimal DerivedDailyRealizedPnl { get; init; }
 
+    /// <summary>
+    /// True while Forex markets are trading. While it is false (weekends, the daily break) Derived may use every
+    /// position slot. Defaults to true, the stricter setting.
+    /// </summary>
+    public bool ForexMarketOpen { get; init; } = true;
+
     public int DerivedOpenPositions => OpenPositions.Count(p => RiskOptions.IsDerived(p.Instrument));
 
     /// <summary>

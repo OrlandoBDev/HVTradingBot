@@ -41,6 +41,20 @@ Track:
 - correlated positions
 - same-direction concentration
 
+### Position Slots and High-Score Extras
+
+- **Normal slots** (`MaxOpenPositions`, default 3) are shared by all markets. While Forex trades, Derived markets
+  take at most `MaxDerivedOpenPositions` (1) of them so they cannot crowd Forex out; while Forex is closed
+  (weekends, the daily break) Derived may use every slot. Derived trades already open when Forex reopens run to
+  their stop or target; Forex takes slots as they free up.
+- **High-score extras** (`MaxExtraDerivedPositions`, default 2, shared by every market type): a candidate scoring at
+  least `HighScoreOverrideMinScore` (90) may open when the slots are full, on a market with no open position (a
+  Derived market may also add to one it already trades; Forex never does). At most normal + extras (5) are open at
+  once. An extra only opens if every open trade and the new one could hit their stops without going over today's
+  remaining daily loss limit (Derived: the Derived daily limit too). Every other rule still applies.
+- **Derived risk budget:** every Derived trade after the first must fit in today's remaining Derived loss budget
+  if all open Derived trades and the new one hit their stops.
+
 ### Daily / Weekly Loss
 
 Block new trades once thresholds are breached.
