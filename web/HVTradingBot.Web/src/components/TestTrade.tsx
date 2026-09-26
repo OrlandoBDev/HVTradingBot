@@ -80,8 +80,9 @@ export function TestTrade() {
   return (
     <Card title="Test trade">
       <p className="hint">
-        See the whole pipeline work on demand: one real order on your demo account, checked by every risk rule, sent to the broker, held for
-        60 seconds, closed, and recorded in the journal, trade history and your email. It is sized like a normal trade, but because it is
+        See the whole pipeline work on demand: one real order on your demo account, checked by the risk rules (a test trade may use a Derived
+        market even when the Derived position limit is reached), sent to the broker, held for 60 seconds, closed, and recorded in the journal,
+        trade history and your email. It is sized like a normal trade, but because it is
         closed after a minute the cost is usually just the spread and commission.
       </p>
       <div className="form-row">

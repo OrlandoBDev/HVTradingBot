@@ -540,7 +540,7 @@ public sealed class TradingEngine
                 direction == Direction.Long ? MidpointRounding.ToPositiveInfinity : MidpointRounding.ToNegativeInfinity);
             var setup = new TradeSetup(direction, entry, stop, target);
             var clientOrderId = $"TEST-{instrument.BaseCurrency}{(instrument.IsCurrencyPair ? instrument.QuoteCurrency : "")}-{_clock.UtcNow:yyyyMMddHHmmss}";
-            var proposal = new TradeProposal(instrument, setup, quote, context.AverageSpread, TestTradeStrategy, 0, clientOrderId);
+            var proposal = new TradeProposal(instrument, setup, quote, context.AverageSpread, TestTradeStrategy, 0, clientOrderId) { IsTestTrade = true };
             var decisionId = Guid.NewGuid();
             var reasons = new List<string> { $"Test trade requested from the dashboard by {requestedBy}." };
 
