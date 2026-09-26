@@ -10,12 +10,12 @@ namespace HVTradingBot.Infrastructure.Persistence.Stores;
 /// Single-row system state shared by the worker and the API. Updates take a row lock (SELECT ... FOR UPDATE)
 /// inside a transaction, so concurrent changes (e.g. a kill-switch toggle during a trading cycle) are serialized
 /// and never overwrite each other. SQLite (the Android app) has no row locks; there the engine and dashboard share
-/// one process and one store instance, so updates are serialized in memory instead.
+/// one process (with a store instance each), so updates are serialized by a process-wide lock instead.
 /// </summary>
 public sealed class EfTradingStateStore(IDbContextFactory<TradingDbContext> dbFactory) : ITradingStateStore
 {
     private const int StateId = 1;
-    private readonly SemaphoreSlim _sqliteUpdates = new(1, 1);
+    private static readonly SemaphoreSlim SqliteUpdates = new(1, 1);
 
     public async Task<TradingSystemState> GetAsync(CancellationToken cancellationToken)
     {
@@ -29,14 +29,14 @@ public sealed class EfTradingStateStore(IDbContextFactory<TradingDbContext> dbFa
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         if (db.Database.IsSqlite())
         {
-            await _sqliteUpdates.WaitAsync(cancellationToken);
+            await SqliteUpdates.WaitAsync(cancellationToken);
             try
             {
                 return await UpdateSqliteAsync(db, update, cancellationToken);
             }
             finally
             {
-                _sqliteUpdates.Release();
+                SqliteUpdates.Release();
             }
         }
 

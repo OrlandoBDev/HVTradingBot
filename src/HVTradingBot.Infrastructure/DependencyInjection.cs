@@ -47,7 +47,8 @@ public static class DependencyInjection
                 "Set ConnectionStrings__TradingDb (./run.sh does this from .env; IDE runs in Development read .env directly - run ./run.sh once to create it), or use dotnet user-secrets.");
         }
 
-        services.AddDbContextFactory<TradingDbContext>(o => DatabaseSetup.Configure(o, connectionString));
+        var provider = DatabaseSetup.ProviderFrom(configuration);
+        services.AddDbContextFactory<TradingDbContext>(o => DatabaseSetup.Configure(o, provider, connectionString));
 
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton<ITradingStateStore, EfTradingStateStore>();
