@@ -87,6 +87,32 @@
     "DisableAfterSamples": 30,
     "DisableBelowR": -0.15,
     "LookbackDays": 90,
-    "ExpireAfterHours": 72
+    "ExpireAfterHours": 72,
+    "ContextMaxBoost": 3,
+    "ContextMaxPenalty": 6
+  },
+  "News": {
+    "Enabled": true,
+    "Provider": "Public",
+    "RefreshMinutes": 15,
+    "BlackoutMinutesBefore": 30,
+    "BlackoutMinutesAfter": 30,
+    "CautionMinutes": 120,
+    "CautionRiskMultiplier": 0.5,
+    "OpposedSentimentRiskMultiplier": 0.75,
+    "SentimentThreshold": 0.25,
+    "SentimentLookbackHours": 24,
+    "SentimentHalfLifeHours": 6,
+    "MinHeadlines": 3,
+    "SentimentPoints": 6,
+    "MaxSentimentBoost": 3,
+    "TrendPoints": 6,
+    "MaxTrendBoost": 3,
+    "BlockWhenCalendarUnavailable": false,
+    "CalendarUrl": "https://nfs.faireconomy.media/ff_calendar_thisweek.json",
+    "HeadlineFeeds": [
+      "https://www.fxstreet.com/rss/news",
+      "https://www.investing.com/rss/news_1.rss"
+    ]
   }
 }

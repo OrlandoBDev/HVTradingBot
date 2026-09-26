@@ -94,6 +94,7 @@ ensure_deriv_credentials() {
 export_app_settings() {
   export Broker__Provider="${BROKER_PROVIDER:-Deriv}"
   export MarketData__Provider="${MARKET_DATA_PROVIDER:-Deriv}"
+  export News__Provider="${NEWS_PROVIDER:-Public}"
   export Deriv__AppId="${DERIV_APP_ID:-}"
   export Deriv__ApiToken="${DERIV_API_TOKEN:-}"
   if [ -n "${DERIV_ACCOUNT_ID:-}" ]; then export Deriv__AccountId="$DERIV_ACCOUNT_ID"; fi
@@ -260,7 +261,7 @@ run_dev() {
   export ConnectionStrings__TradingDb="Host=127.0.0.1;Port=${POSTGRES_PORT};Database=${DEV_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
   export DOTNET_ENVIRONMENT=Production ASPNETCORE_ENVIRONMENT=Production
   BROKER_PROVIDER=Paper MARKET_DATA_PROVIDER=Simulated DERIV_APP_ID="" DERIV_API_TOKEN="" DERIV_ACCOUNT_ID=""
-  export Broker__Provider=Paper MarketData__Provider=Simulated Notifications__Email__Enabled=false
+  export Broker__Provider=Paper MarketData__Provider=Simulated News__Provider=Simulated Notifications__Email__Enabled=false
 
   start_api Debug "$DEV_API_PORT" "$RUN_DIR/dev-api.log" "$DEV_MARKER"
   start_worker Debug "$RUN_DIR/dev-worker.log" "$DEV_MARKER"

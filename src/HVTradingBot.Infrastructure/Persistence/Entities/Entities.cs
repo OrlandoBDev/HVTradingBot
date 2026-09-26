@@ -249,6 +249,12 @@ public sealed class SetupOutcomeEntity
     public decimal? RMultiple { get; set; }
     public decimal? ExitPrice { get; set; }
     public DateTime? ClosedAtUtc { get; set; }
+
+    /// <summary>News condition when the setup was found (<c>NewsCondition</c>); null before news was recorded.</summary>
+    public string? NewsCondition { get; set; }
+
+    /// <summary>Relation to the cross-market currency trend (<c>TrendAlignment</c>).</summary>
+    public string? TrendAlignment { get; set; }
 }
 
 /// <summary>Risk limits changed on the Settings page (JSON of <c>RiskLimits</c>), applied over the configured defaults.</summary>

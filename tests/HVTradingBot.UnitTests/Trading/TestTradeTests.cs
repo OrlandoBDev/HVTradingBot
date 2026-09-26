@@ -1,6 +1,7 @@
 using HVTradingBot.Application.Abstractions;
 using HVTradingBot.Application.Backtesting;
 using HVTradingBot.Application.Learning;
+using HVTradingBot.Application.News;
 using HVTradingBot.Application.Trading;
 using HVTradingBot.Domain.Analysis;
 using HVTradingBot.Domain.Common;
@@ -8,6 +9,7 @@ using HVTradingBot.Domain.Decisions;
 using HVTradingBot.Domain.Execution;
 using HVTradingBot.Domain.Learning;
 using HVTradingBot.Domain.MarketData;
+using HVTradingBot.Domain.News;
 using HVTradingBot.Domain.Risk;
 using HVTradingBot.Domain.Scoring;
 using HVTradingBot.Domain.Strategies;
@@ -21,7 +23,7 @@ public class TestTradeTests
     private static readonly DateTime End = new(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
 
     private static async Task<(TradingEngine Engine, InMemoryJournal Journal, InMemorySimulatedBroker Broker, InMemoryStateStore State, MarketDataStatus Status)> Ready(
-        bool processFirstBar = true, decimal minRewardToRisk = 2m)
+        bool processFirstBar = true, decimal minRewardToRisk = 2m, INewsSource? newsSource = null)
     {
         var costs = new ExecutionCostOptions();
         var broker = new InMemorySimulatedBroker("USD", 10_000m, costs);
@@ -33,7 +35,8 @@ public class TestTradeTests
         var engine = new TradingEngine(new SignalEvaluator(StrategyCatalog.CreateDefault(), new ScoringOptions(), learning), risk, broker,
             new ExecutionService(broker, risk, NullLogger<ExecutionService>.Instance), state, journal, journal, clock, learning,
             TradingUniverse.From([Instruments.EurUsd], "USD"), new TradingEngineOptions(), new FixedRiskOptions(new RiskOptions { MinRewardToRisk = minRewardToRisk }), new RegimeOptions(),
-            NullLogger<TradingEngine>.Instance);
+            NullLogger<TradingEngine>.Instance,
+            news: newsSource is null ? null : new NewsService(newsSource, new NewsOptions { Provider = NewsProvider.Simulated }, NullLogger<NewsService>.Instance));
 
         var bars = MarketSeriesGenerator.Generate(Instruments.EurUsd, 4, End, 20);
         await engine.InitializeAsync(new Dictionary<Instrument, IReadOnlyList<Candle>> { [Instruments.EurUsd] = bars.Take(bars.Count - 1).ToList() }, CancellationToken.None);
@@ -62,6 +65,46 @@ public class TestTradeTests
         Assert.Equal(DecisionState.Executed, decision.State);
         Assert.True(decision.Risk!.IsApproved);
         Assert.True(decision.Setup!.RewardToRisk >= 2m);
+    }
+
+    [Fact]
+    public async Task Test_trade_is_blocked_around_a_high_impact_release()
+    {
+        var (engine, journal, broker, _, status) = await Ready(newsSource: new FixedNews("USD", EventImpact.High));
+
+        var outcome = await engine.PlaceTestTradeAsync(Instruments.EurUsd, status, "tester", "c1", CancellationToken.None);
+
+        Assert.False(outcome.Filled);
+        Assert.Empty(await broker.GetPositionsAsync(CancellationToken.None));
+        var decision = journal.Decisions.Single(d => d.Strategy == TradingEngine.TestTradeStrategy);
+        Assert.Contains(decision.Risk!.Checks, c => c is { Rule: "NewsEvents", Passed: false });
+    }
+
+    [Fact]
+    public async Task Test_trade_is_smaller_near_a_medium_impact_release()
+    {
+        var (plainEngine, _, _, _, plainStatus) = await Ready();
+        var (engine, _, _, _, status) = await Ready(newsSource: new FixedNews("USD", EventImpact.Medium));
+
+        var normal = await plainEngine.PlaceTestTradeAsync(Instruments.EurUsd, plainStatus, "tester", "c1", CancellationToken.None);
+        var reduced = await engine.PlaceTestTradeAsync(Instruments.EurUsd, status, "tester", "c1", CancellationToken.None);
+
+        Assert.True(normal.Filled, normal.Message);
+        Assert.True(reduced.Filled, reduced.Message);
+        var normalRisk = decimal.Parse(normal.Message.Split("risk ")[1].Split(' ')[0], System.Globalization.CultureInfo.InvariantCulture);
+        var reducedRisk = decimal.Parse(reduced.Message.Split("risk ")[1].Split(' ')[0], System.Globalization.CultureInfo.InvariantCulture);
+        Assert.True(reducedRisk <= normalRisk / 2m + 0.01m, $"{reducedRisk} vs {normalRisk}");
+    }
+
+    /// <summary>One release on <paramref name="currency"/> 10 minutes after whatever time is asked about.</summary>
+    private sealed class FixedNews(string currency, EventImpact impact) : INewsSource
+    {
+        public string Name => "fixed";
+
+        public bool FollowsMarketTime => true;
+
+        public Task<NewsSnapshot> FetchAsync(DateTime nowUtc, CancellationToken cancellationToken) =>
+            Task.FromResult(new NewsSnapshot([new EconomicEvent("e1", currency, "Release", nowUtc.AddMinutes(10), impact)], [], nowUtc, true, Name));
     }
 
     [Fact]

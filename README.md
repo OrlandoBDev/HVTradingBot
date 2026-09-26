@@ -114,7 +114,12 @@ Design, install and signing: [docs/ANDROID_APP.md](docs/ANDROID_APP.md).
 - **Evaluation:** every market at every 5-minute close; setups from closed 1H/4H/Daily bars; 15-minute timing.
 - **Scoring:** 0–100 per `docs/TRADING_ENGINE.md`, abstention rules, configurable thresholds.
 - **Adaptive learning:** every setup is tracked as a virtual trade; bounded score adjustments and disabling of
-  persistently losing strategy/regime/asset-class combinations (never changes size or risk limits).
+  persistently losing strategy/regime/asset-class combinations (never changes size or risk limits). It also learns
+  which news and cross-market trend conditions help or hurt each strategy.
+- **News, calendar and trends:** free, keyless economic calendar and headline feeds (simulated offline); no new trades
+  around high-impact releases, smaller positions near other releases or against the news, and small bounded score
+  adjustments from headline sentiment and the cross-market currency trend. News can only tighten risk
+  (`docs/NEWS_AND_TRENDS.md`).
 - **Risk engine:** all rules in `docs/RISK_MANAGEMENT.md`, checked at proposal and again before execution, kill switch.
   Defaults are a small-account profile (1% per trade, 3% daily, 8% weekly, 2 positions, broker fee ≤ 30% of risk);
   limits are editable under **Settings → Risk limits** within safe ranges and apply without a restart.
@@ -187,6 +192,7 @@ See the `docs/` folder:
 - [Features](docs/FEATURES.md)
 - [Trading Engine](docs/TRADING_ENGINE.md)
 - [Risk Management](docs/RISK_MANAGEMENT.md)
+- [News and Trends](docs/NEWS_AND_TRENDS.md)
 - [Broker Integration](docs/BROKER_INTEGRATION.md)
 - [Backtesting](docs/BACKTESTING.md)
 - [Security](docs/SECURITY.md)

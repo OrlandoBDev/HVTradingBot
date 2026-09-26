@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using HVTradingBot.Domain.Analysis;
 using HVTradingBot.Domain.MarketData;
+using HVTradingBot.Domain.News;
 
 namespace HVTradingBot.Domain.Learning;
 
@@ -11,7 +12,43 @@ public sealed record SetupKey(string Strategy, MarketRegime Regime, AssetClass A
 }
 
 /// <summary>A resolved setup outcome in R (profit / initial risk), from a real or virtual trade.</summary>
-public sealed record SetupOutcome(SetupKey Key, decimal RMultiple, DateTime ClosedAtUtc);
+public sealed record SetupOutcome(SetupKey Key, decimal RMultiple, DateTime ClosedAtUtc)
+{
+    /// <summary>The news around the setup when it was found (null when no news data applied, e.g. Derived markets).</summary>
+    public NewsCondition? News { get; init; }
+
+    /// <summary>How the setup related to the cross-market currency trend (null when not a currency pair).</summary>
+    public TrendAlignment? Trend { get; init; }
+}
+
+/// <summary>A market condition the engine also learns about per strategy: <c>News</c> or <c>Trend</c>, and its value.</summary>
+public sealed record ContextKey(string Strategy, string Factor, string Value)
+{
+    public const string NewsFactor = "News";
+    public const string TrendFactor = "Trend";
+
+    public static ContextKey For(string strategy, NewsCondition condition) => new(strategy, NewsFactor, condition.ToString());
+
+    public static ContextKey For(string strategy, TrendAlignment alignment) => new(strategy, TrendFactor, alignment.ToString());
+
+    public override string ToString() => $"{Strategy}/{Factor}:{Value}";
+}
+
+/// <summary>
+/// How a strategy did under one news or trend condition compared with the same strategy under all conditions of that
+/// factor. <see cref="ScoreAdjustment"/> is the bounded score change for new setups found under this condition.
+/// </summary>
+public sealed record ContextPerformance(
+    ContextKey Key,
+    int Samples,
+    int Wins,
+    decimal AverageR,
+    decimal BaselineR,
+    decimal ShrunkExcessR,
+    decimal ScoreAdjustment)
+{
+    public decimal WinRate => Samples == 0 ? 0 : Math.Round((decimal)Wins / Samples * 100m, 1);
+}
 
 public sealed record StrategyPerformance(
     SetupKey Key,
@@ -51,6 +88,12 @@ public sealed class LearningOptions
 
     /// <summary>Virtual trades that hit neither stop nor target within this time are closed at the market.</summary>
     [Range(1, 720)] public int ExpireAfterHours { get; set; } = 72;
+
+    /// <summary>Largest boost from learned news and trend conditions (added to the per-strategy adjustment above).</summary>
+    [Range(0, 20)] public decimal ContextMaxBoost { get; set; } = 3m;
+
+    /// <summary>Largest penalty from learned news and trend conditions.</summary>
+    [Range(0, 30)] public decimal ContextMaxPenalty { get; set; } = 6m;
 }
 
 /// <summary>
@@ -81,10 +124,80 @@ public static class StrategyPerformanceModel
         return new StrategyPerformance(key, n, outcomes.Count(o => o.RMultiple > 0), Math.Round(average, 3), Math.Round(shrunk, 3),
             Math.Round(adjustment, 1), disabled);
     }
+
+    /// <summary>
+    /// Learns which news and trend conditions help or hurt each strategy. Each outcome is measured against the
+    /// strategy's average across every condition of the same factor, and the excess is shrunk towards zero
+    /// (sum of excess R / (n + prior)). A strategy that is poor everywhere is therefore not penalised twice (that is the
+    /// per-strategy model's job); only the difference the news or trend makes moves the score, within
+    /// [-ContextMaxPenalty, +ContextMaxBoost].
+    /// </summary>
+    public static IReadOnlyDictionary<ContextKey, ContextPerformance> ComputeContext(
+        IEnumerable<SetupOutcome> outcomes, DateTime nowUtc, LearningOptions options)
+    {
+        var since = nowUtc.AddDays(-options.LookbackDays);
+        var tagged = outcomes
+            .Where(o => o.ClosedAtUtc >= since)
+            .SelectMany(o => Tags(o).Select(key => (Key: key, o.RMultiple)))
+            .ToList();
+
+        var baselines = tagged
+            .GroupBy(t => (t.Key.Strategy, t.Key.Factor))
+            .ToDictionary(g => g.Key, g => g.Average(t => t.RMultiple));
+
+        return tagged
+            .GroupBy(t => t.Key)
+            .ToDictionary(g => g.Key, g =>
+            {
+                var n = g.Count();
+                var baseline = baselines[(g.Key.Strategy, g.Key.Factor)];
+                var excess = g.Sum(t => t.RMultiple - baseline) / (n + options.PriorStrength);
+                var adjustment = Math.Clamp(excess * options.PointsPerR, -options.ContextMaxPenalty, options.ContextMaxBoost);
+                return new ContextPerformance(g.Key, n, g.Count(t => t.RMultiple > 0), Math.Round(g.Average(t => t.RMultiple), 3),
+                    Math.Round(baseline, 3), Math.Round(excess, 3), Math.Round(adjustment, 1));
+            });
+    }
+
+    /// <summary>Sum of the learned adjustments for the setup's conditions, clamped to the context bounds.</summary>
+    public static decimal ContextAdjustment(IReadOnlyDictionary<ContextKey, ContextPerformance> model, string strategy,
+        NewsCondition? news, TrendAlignment? trend, LearningOptions options)
+    {
+        decimal total = 0;
+        if (news is { } n && model.TryGetValue(ContextKey.For(strategy, n), out var byNews))
+        {
+            total += byNews.ScoreAdjustment;
+        }
+
+        if (trend is { } t && model.TryGetValue(ContextKey.For(strategy, t), out var byTrend))
+        {
+            total += byTrend.ScoreAdjustment;
+        }
+
+        return Math.Clamp(total, -options.ContextMaxPenalty, options.ContextMaxBoost);
+    }
+
+    private static IEnumerable<ContextKey> Tags(SetupOutcome outcome)
+    {
+        if (outcome.News is { } news)
+        {
+            yield return ContextKey.For(outcome.Key.Strategy, news);
+        }
+
+        if (outcome.Trend is { } trend)
+        {
+            yield return ContextKey.For(outcome.Key.Strategy, trend);
+        }
+    }
 }
 
 /// <summary>Current learned performance, looked up while scoring.</summary>
 public interface IStrategyPerformanceProvider
 {
     StrategyPerformance? Get(SetupKey key);
+
+    /// <summary>
+    /// Learned score change for a setup of <paramref name="strategy"/> under these news and trend conditions, within
+    /// [-ContextMaxPenalty, +ContextMaxBoost]; 0 until anything has been learned.
+    /// </summary>
+    decimal GetContextAdjustment(string strategy, NewsCondition? news, TrendAlignment? trend) => 0;
 }
