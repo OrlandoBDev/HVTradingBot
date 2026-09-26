@@ -9,11 +9,13 @@ namespace HVTradingBot.Infrastructure.Persistence.Stores;
 /// <summary>
 /// Single-row system state shared by the worker and the API. Updates take a row lock (SELECT ... FOR UPDATE)
 /// inside a transaction, so concurrent changes (e.g. a kill-switch toggle during a trading cycle) are serialized
-/// and never overwrite each other.
+/// and never overwrite each other. SQLite (the Android app) has no row locks; there the engine and dashboard share
+/// one process and one store instance, so updates are serialized in memory instead.
 /// </summary>
 public sealed class EfTradingStateStore(IDbContextFactory<TradingDbContext> dbFactory) : ITradingStateStore
 {
     private const int StateId = 1;
+    private readonly SemaphoreSlim _sqliteUpdates = new(1, 1);
 
     public async Task<TradingSystemState> GetAsync(CancellationToken cancellationToken)
     {
@@ -25,6 +27,19 @@ public sealed class EfTradingStateStore(IDbContextFactory<TradingDbContext> dbFa
     public async Task<TradingSystemState> UpdateAsync(Func<TradingSystemState, TradingSystemState> update, CancellationToken cancellationToken)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        if (db.Database.IsSqlite())
+        {
+            await _sqliteUpdates.WaitAsync(cancellationToken);
+            try
+            {
+                return await UpdateSqliteAsync(db, update, cancellationToken);
+            }
+            finally
+            {
+                _sqliteUpdates.Release();
+            }
+        }
+
         var strategy = db.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async ct =>
         {
@@ -44,6 +59,24 @@ public sealed class EfTradingStateStore(IDbContextFactory<TradingDbContext> dbFa
             await transaction.CommitAsync(ct);
             return updated;
         }, cancellationToken);
+    }
+
+    private static async Task<TradingSystemState> UpdateSqliteAsync(TradingDbContext db, Func<TradingSystemState, TradingSystemState> update,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var entity = await db.SystemState.SingleOrDefaultAsync(s => s.Id == StateId, cancellationToken);
+        if (entity is null)
+        {
+            entity = new SystemStateEntity { Id = StateId, Mode = nameof(TradingMode.Paper) };
+            db.SystemState.Add(entity);
+        }
+
+        var updated = update(ToModel(entity));
+        Apply(updated, entity);
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return updated;
     }
 
     private static TradingSystemState ToModel(SystemStateEntity e) => new()

@@ -4,14 +4,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HVTradingBot.IntegrationTests;
 
-[Collection(PostgresCollection.Name)]
-public class TestTradeStoreTests(PostgresFixture fixture) : IAsyncLifetime
+public abstract class TestTradeStoreTests(DatabaseFixture fixture) : IAsyncLifetime
 {
     public async Task InitializeAsync()
     {
         await fixture.ResetAsync();
         await using var db = await fixture.DbFactory.CreateDbContextAsync();
-        await db.Database.ExecuteSqlRawAsync("TRUNCATE test_trades;");
+        await db.Database.ExecuteSqlRawAsync("DELETE FROM test_trades;");
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
@@ -36,3 +35,9 @@ public class TestTradeStoreTests(PostgresFixture fixture) : IAsyncLifetime
         public DateTime UtcNow => DateTime.UtcNow;
     }
 }
+
+[Collection(PostgresCollection.Name)]
+public sealed class TestTradeStoreTestsOnPostgres(PostgresFixture fixture) : TestTradeStoreTests(fixture);
+
+[Collection(SqliteCollection.Name)]
+public sealed class TestTradeStoreTestsOnSqlite(SqliteFixture fixture) : TestTradeStoreTests(fixture);

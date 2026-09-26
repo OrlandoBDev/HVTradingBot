@@ -138,6 +138,17 @@ public static class DependencyInjection
     {
         var factory = services.GetRequiredService<IDbContextFactory<TradingDbContext>>();
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        await MigrateAsync(db, cancellationToken);
+    }
+
+    /// <summary>Applies migrations; on SQLite also switches to WAL so dashboard reads never wait for engine writes.</summary>
+    public static async Task MigrateAsync(TradingDbContext db, CancellationToken cancellationToken)
+    {
+        if (db.Database.IsSqlite())
+        {
+            await db.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;", cancellationToken);
+        }
+
         // EF Core takes a database lock during migration, so the API and worker can both call this safely.
         await db.Database.MigrateAsync(cancellationToken);
     }

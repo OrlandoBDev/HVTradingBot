@@ -1,5 +1,4 @@
 using System.Text.Json;
-using HVTradingBot.Api.Infrastructure;
 using HVTradingBot.Application.Abstractions;
 using HVTradingBot.Application.Performance;
 using HVTradingBot.Application.Trading;
@@ -15,7 +14,7 @@ using HVTradingBot.Infrastructure.Settings;
 using HVTradingBot.Infrastructure.Trades;
 using Microsoft.EntityFrameworkCore;
 
-namespace HVTradingBot.Api.Services;
+namespace HVTradingBot.Dashboard;
 
 /// <summary>Read-only projections for the dashboard. Never places or modifies orders.</summary>
 public sealed class DashboardQueries(
@@ -27,6 +26,9 @@ public sealed class DashboardQueries(
     MarketCatalogStore catalog,
     CloseRequestStore closeRequests)
 {
+    /// <summary>The worker counts as running while its heartbeat is at most this old.</summary>
+    public static readonly TimeSpan WorkerHeartbeatTimeout = TimeSpan.FromSeconds(60);
+
     private sealed record AccountSnapshot(string Currency, decimal Balance, decimal StartingBalance);
 
     /// <summary>Balance of the broker the worker last connected to (Deriv account or local paper account).</summary>
@@ -70,7 +72,7 @@ public sealed class DashboardQueries(
             state.KillSwitchReason,
             state.KillSwitchChangedUtc,
             state.WorkerHeartbeatUtc,
-            state.WorkerHeartbeatUtc is { } hb && now - hb <= WorkerHealthCheck.HeartbeatTimeout,
+            state.WorkerHeartbeatUtc is { } hb && now - hb <= WorkerHeartbeatTimeout,
             new MarketDataStatusDto(state.LastBarTimeUtc, state.LastDataReceivedUtc,
                 new MarketDataStatus(state.LastBarTimeUtc, state.LastDataReceivedUtc).IsStale(now, TimeSpan.FromSeconds(riskSource.Current.MaxMarketDataAgeSeconds))),
             new AccountDto(account.Currency, balance, account.StartingBalance, balance + unrealized, unrealized),

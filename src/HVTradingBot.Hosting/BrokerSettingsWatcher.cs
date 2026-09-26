@@ -7,7 +7,7 @@ using HVTradingBot.Infrastructure.Markets;
 using HVTradingBot.Infrastructure.Persistence;
 using HVTradingBot.Infrastructure.Settings;
 
-namespace HVTradingBot.Worker;
+namespace HVTradingBot.Hosting;
 
 /// <summary>
 /// Every few seconds: records the worker heartbeat and market-data freshness (bars arrive only every 5 minutes),
@@ -28,7 +28,7 @@ public sealed class BrokerSettingsWatcher(
     IEmailSettingsProvider emailSettings,
     ITradeDecisionNotifier notifier,
     TradingEngineOptions engineOptions,
-    WorkerInstanceLock instanceLock,
+    IWorkerInstanceLock instanceLock,
     IHostApplicationLifetime lifetime,
     ILogger<BrokerSettingsWatcher> logger) : BackgroundService
 {

@@ -12,8 +12,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HVTradingBot.IntegrationTests;
 
-[Collection(PostgresCollection.Name)]
-public class DerivBrokerTests(PostgresFixture fixture) : IAsyncLifetime
+public abstract class DerivBrokerTests(DatabaseFixture fixture) : IAsyncLifetime
 {
     private static readonly DateTime T0 = new(2026, 1, 5, 10, 0, 0, DateTimeKind.Utc);
     private static readonly CurrencyConverter Converter = new("USD", new Dictionary<string, decimal> { ["EUR/USD"] = 1.1m });
@@ -275,3 +274,9 @@ public class DerivBrokerTests(PostgresFixture fixture) : IAsyncLifetime
         public DateTime UtcNow => new(2026, 1, 5, 10, 5, 3, DateTimeKind.Utc);
     }
 }
+
+[Collection(PostgresCollection.Name)]
+public sealed class DerivBrokerTestsOnPostgres(PostgresFixture fixture) : DerivBrokerTests(fixture);
+
+[Collection(SqliteCollection.Name)]
+public sealed class DerivBrokerTestsOnSqlite(SqliteFixture fixture) : DerivBrokerTests(fixture);

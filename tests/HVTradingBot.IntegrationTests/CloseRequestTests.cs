@@ -7,8 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HVTradingBot.IntegrationTests;
 
-[Collection(PostgresCollection.Name)]
-public class CloseRequestTests(PostgresFixture fixture) : IAsyncLifetime
+public abstract class CloseRequestTests(DatabaseFixture fixture) : IAsyncLifetime
 {
     private static readonly DateTime T0 = new(2026, 1, 5, 10, 0, 0, DateTimeKind.Utc);
     private static readonly CurrencyConverter Converter = new("USD", new Dictionary<string, decimal> { ["EUR/USD"] = 1.1m });
@@ -17,7 +16,7 @@ public class CloseRequestTests(PostgresFixture fixture) : IAsyncLifetime
     {
         await fixture.ResetAsync();
         await using var db = await fixture.DbFactory.CreateDbContextAsync();
-        await db.Database.ExecuteSqlRawAsync("TRUNCATE close_requests;");
+        await db.Database.ExecuteSqlRawAsync("DELETE FROM close_requests;");
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
@@ -52,3 +51,9 @@ public class CloseRequestTests(PostgresFixture fixture) : IAsyncLifetime
         public DateTime UtcNow => T0.AddMinutes(6);
     }
 }
+
+[Collection(PostgresCollection.Name)]
+public sealed class CloseRequestTestsOnPostgres(PostgresFixture fixture) : CloseRequestTests(fixture);
+
+[Collection(SqliteCollection.Name)]
+public sealed class CloseRequestTestsOnSqlite(SqliteFixture fixture) : CloseRequestTests(fixture);

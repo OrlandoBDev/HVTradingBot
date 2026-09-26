@@ -1,6 +1,7 @@
 using System.Reflection;
 using HVTradingBot.App.Core.Startup;
 using HVTradingBot.Application.Trading;
+using HVTradingBot.Dashboard;
 using HVTradingBot.Domain.Risk;
 using HVTradingBot.Infrastructure.Persistence;
 using NetArchTest.Rules;
@@ -14,6 +15,7 @@ public class LayerTests
     private static readonly Assembly Infrastructure = typeof(TradingDbContext).Assembly;
     private static readonly Assembly Api = typeof(Program).Assembly;
     private static readonly Assembly AppCore = typeof(StartupPipeline).Assembly;
+    private static readonly Assembly Dashboard = typeof(DashboardActions).Assembly;
 
     private static void AssertSuccess(TestResult result) =>
         Assert.True(result.IsSuccessful, "Violations: " + string.Join(", ", result.FailingTypeNames ?? []));
@@ -39,10 +41,16 @@ public class LayerTests
             .GetResult());
 
     [Fact]
-    public void Api_cannot_place_orders()
+    public void Api_cannot_place_orders() => AssertCannotPlaceOrders(Api);
+
+    [Fact]
+    public void Dashboard_cannot_place_orders() => AssertCannotPlaceOrders(Dashboard);
+
+    private static void AssertCannotPlaceOrders(Assembly assembly)
     {
-        // The dashboard may only read state and toggle the kill switch; it must never reach a broker or the execution service.
-        AssertSuccess(Types.InAssembly(Api).ShouldNot()
+        // The dashboard may only read state and record requests; it must never reach a broker or the execution service.
+        // (The Android app hosts the dashboard and the engine in one process, so this boundary is what keeps them apart.)
+        AssertSuccess(Types.InAssembly(assembly).ShouldNot()
             .HaveDependencyOnAny(
                 "HVTradingBot.Application.Abstractions.IBroker",
                 "HVTradingBot.Application.Abstractions.IExecutionBroker",

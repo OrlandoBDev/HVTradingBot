@@ -11,7 +11,6 @@ using HVTradingBot.Infrastructure.Persistence;
 using HVTradingBot.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Npgsql;
 
 namespace HVTradingBot.Infrastructure.Brokers.Deriv;
 
@@ -522,7 +521,7 @@ public sealed class DerivBroker(
                 await db.SaveChangesAsync(cancellationToken);
                 return null;
             }
-            catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+            catch (DbUpdateException ex) when (DatabaseSetup.IsUniqueViolation(ex))
             {
                 db.ChangeTracker.Clear();
                 existing = await db.Orders.AsNoTracking().SingleAsync(o => o.ClientOrderId == clientOrderId, cancellationToken);
