@@ -1152,6 +1152,11 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("instrument");
 
+                    b.Property<string>("NewsCondition")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("news_condition");
+
                     b.Property<DateTime>("OpenedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("opened_at_utc");
@@ -1194,6 +1199,11 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
                         .HasPrecision(28, 10)
                         .HasColumnType("numeric(28,10)")
                         .HasColumnName("take_profit");
+
+                    b.Property<string>("TrendAlignment")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("trend_alignment");
 
                     b.HasKey("Id")
                         .HasName("pk_setup_outcomes");

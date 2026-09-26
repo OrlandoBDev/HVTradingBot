@@ -2,11 +2,13 @@ using HVTradingBot.Application.Abstractions;
 using HVTradingBot.Application.Backtesting;
 using HVTradingBot.Application.Learning;
 using HVTradingBot.Application.MarketData;
+using HVTradingBot.Application.News;
 using HVTradingBot.Application.Trading;
 using HVTradingBot.Domain.Analysis;
 using HVTradingBot.Domain.Decisions;
 using HVTradingBot.Domain.Execution;
 using HVTradingBot.Domain.Learning;
+using HVTradingBot.Domain.News;
 using HVTradingBot.Domain.Risk;
 using HVTradingBot.Domain.Scoring;
 using HVTradingBot.Domain.Strategies;
@@ -16,6 +18,7 @@ using HVTradingBot.Infrastructure.Configuration;
 using HVTradingBot.Infrastructure.MarketData;
 using HVTradingBot.Infrastructure.Notifications;
 using HVTradingBot.Infrastructure.Markets;
+using HVTradingBot.Infrastructure.News;
 using HVTradingBot.Infrastructure.Persistence;
 using HVTradingBot.Infrastructure.Persistence.Stores;
 using HVTradingBot.Infrastructure.Settings;
@@ -23,6 +26,7 @@ using HVTradingBot.Infrastructure.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace HVTradingBot.Infrastructure;
@@ -81,6 +85,8 @@ public static class DependencyInjection
         services.AddSingleton<LearningService>();
         services.AddSingleton<IStrategyPerformanceProvider>(sp => sp.GetRequiredService<LearningService>());
 
+        services.AddMarketNews(configuration);
+
         services.AddSingleton<IReadOnlyList<ITradingStrategy>>(_ => StrategyCatalog.CreateDefault());
         services.AddSingleton<SignalEvaluator>();
         services.AddEmailSettings(configuration);
@@ -137,6 +143,45 @@ public static class DependencyInjection
         services.AddTradeDecisionNotifications(configuration);
         services.AddSingleton<TradingEngine>();
         return services;
+    }
+
+    /// <summary>
+    /// News and the economic calendar (News section): the free public sources by default, the generated offline news
+    /// with the simulated market, or none. News can only make trading more careful; see <see cref="NewsOptions"/>.
+    /// The simulated market runs on its own accelerated clock, so real news would land at the wrong times: with it,
+    /// public news is replaced by the simulated news, which follows market time.
+    /// </summary>
+    private static void AddMarketNews(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddValidatedOptions<NewsOptions>(configuration, NewsOptions.SectionName);
+        var news = configuration.GetSection(NewsOptions.SectionName).Get<NewsOptions>() ?? new NewsOptions();
+        var marketData = configuration.GetSection(MarketDataOptions.SectionName).Get<MarketDataOptions>() ?? new MarketDataOptions();
+        var provider = !news.Enabled ? NewsProvider.None
+            : news.Provider == NewsProvider.Public && marketData.Provider == MarketDataProvider.Simulated ? NewsProvider.Simulated
+            : news.Provider;
+        services.PostConfigure<NewsOptions>(o => o.Provider = provider);
+        switch (provider)
+        {
+            case NewsProvider.Public:
+                services.AddSingleton<INewsSource>(sp =>
+                {
+                    var http = new HttpClient(new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(15) })
+                    {
+                        Timeout = TimeSpan.FromSeconds(15)
+                    };
+                    http.DefaultRequestHeaders.UserAgent.ParseAdd("HVTradingBot/1.0 (+news)");
+                    return new PublicNewsSource(http, sp.GetRequiredService<NewsOptions>(), sp.GetRequiredService<ILogger<PublicNewsSource>>());
+                });
+                break;
+            case NewsProvider.Simulated:
+                services.AddSingleton<INewsSource>(_ => new SimulatedNewsSource());
+                break;
+            default:
+                services.AddSingleton<INewsSource, NoNewsSource>();
+                break;
+        }
+
+        services.AddSingleton<NewsService>();
     }
 
     public static async Task MigrateDatabaseAsync(this IServiceProvider services, CancellationToken cancellationToken)

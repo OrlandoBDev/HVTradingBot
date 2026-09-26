@@ -73,6 +73,12 @@ If data is stale:
 - raise health alert
 - optionally trigger kill switch
 
+### News Events
+
+No new trade on a market from 30 minutes before to 30 minutes after a high-impact release for its currencies; other
+medium- or high-impact releases within two hours, and headlines clearly against the trade, shrink the position. News
+can only tighten risk. See [NEWS_AND_TRENDS.md](NEWS_AND_TRENDS.md).
+
 ### Kill Switch
 
 Triggers may include:

@@ -98,6 +98,7 @@ public sealed partial class DashboardActions(
         var now = clock.UtcNow;
         var outcomes = await virtualTrades.GetOutcomesAsync(now.AddDays(-learningOptions.LookbackDays), ct);
         var model = StrategyPerformanceModel.Compute(outcomes, now, learningOptions);
+        var context = StrategyPerformanceModel.ComputeContext(outcomes, now, learningOptions);
         return new
         {
             learningOptions.Enabled,
@@ -121,6 +122,25 @@ public sealed partial class DashboardActions(
                     p.ShrunkR,
                     p.ScoreAdjustment,
                     p.Disabled
+                }),
+            learningOptions.ContextMaxBoost,
+            learningOptions.ContextMaxPenalty,
+            // What news and cross-market trend conditions have been worth to each strategy.
+            Conditions = context.Values
+                .OrderBy(c => c.Key.Factor, StringComparer.Ordinal)
+                .ThenBy(c => c.Key.Strategy, StringComparer.Ordinal)
+                .ThenBy(c => c.Key.Value, StringComparer.Ordinal)
+                .Select(c => new
+                {
+                    c.Key.Strategy,
+                    c.Key.Factor,
+                    Condition = c.Key.Value,
+                    c.Samples,
+                    c.WinRate,
+                    c.AverageR,
+                    c.BaselineR,
+                    c.ShrunkExcessR,
+                    c.ScoreAdjustment
                 })
         };
     }
