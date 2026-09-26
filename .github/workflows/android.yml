@@ -1,7 +1,8 @@
 name: Android app
 
 # Builds the installable APK (apps/HVTradingBot.Android) whenever the app, the shared code or the dashboard changes.
-# Download it from the run's "HVTradingBot-android" artifact.
+# Download it from the run's "HVTradingBot-android" artifact. Published only when the ANDROID_KEYSTORE_* secrets hold the
+# app's signing key; otherwise the run just checks that the app compiles.
 on:
   push:
     paths:
@@ -69,8 +70,9 @@ jobs:
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/hvtradingbot.keystore"
             echo "ANDROID_KEYSTORE=$RUNNER_TEMP/hvtradingbot.keystore" >> "$GITHUB_ENV"
+            echo "APK_SIGNED=true" >> "$GITHUB_ENV"
           else
-            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret: the APK is signed with a throwaway debug key, so it cannot update an installed copy."
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret: the app is only compiled, no APK is published. A build signed with a throwaway key cannot update the installed app, and installing it would mean uninstalling, which deletes the app's data. See docs/ANDROID_APP.md."
           fi
 
       - name: Build
@@ -79,7 +81,9 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: apps/HVTradingBot.Android/build-apk.sh -p:AndroidSdkDirectory="$ANDROID_HOME"
 
+      # Only APKs signed with the app's own key are published (see the Signing key step).
       - uses: actions/upload-artifact@v4
+        if: env.APK_SIGNED == 'true'
         with:
           name: HVTradingBot-android
           path: apps/HVTradingBot.Android/bin/apk/HVTradingBot.apk
