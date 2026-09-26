@@ -27,6 +27,7 @@ public sealed class TradingDbContext(DbContextOptions<TradingDbContext> options)
     public DbSet<AuditLogEntity> AuditLogs => Set<AuditLogEntity>();
     public DbSet<AppUserEntity> AppUsers => Set<AppUserEntity>();
     public DbSet<BacktestRunEntity> BacktestRuns => Set<BacktestRunEntity>();
+    public DbSet<BrokerContractEntity> BrokerContracts => Set<BrokerContractEntity>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -217,6 +218,21 @@ public sealed class TradingDbContext(DbContextOptions<TradingDbContext> options)
             e.HasKey(x => x.Id);
             e.Property(x => x.Details).HasMaxLength(4000);
             e.HasIndex(x => x.TimestampUtc);
+        });
+
+        modelBuilder.Entity<BrokerContractEntity>(e =>
+        {
+            e.HasKey(x => x.ContractId);
+            e.Property(x => x.ContractId).HasMaxLength(32);
+            e.Property(x => x.Broker).HasMaxLength(32);
+            e.Property(x => x.BrokerAccountId).HasMaxLength(32);
+            e.Property(x => x.Symbol).HasMaxLength(64);
+            e.Property(x => x.ContractType).HasMaxLength(32);
+            e.Property(x => x.Direction).HasMaxLength(8);
+            e.Property(x => x.Currency).HasMaxLength(8);
+            e.Property(x => x.Description).HasMaxLength(1000);
+            e.HasIndex(x => new { x.BrokerAccountId, x.IsOpen });
+            e.HasIndex(x => new { x.BrokerAccountId, x.SellTimeUtc });
         });
 
         modelBuilder.Entity<BacktestRunEntity>(e =>

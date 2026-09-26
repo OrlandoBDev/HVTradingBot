@@ -109,6 +109,7 @@ public static class DependencyInjection
             sp.GetRequiredService<DerivOptions>()));
         services.AddSingleton<DerivSession>();
         services.AddSingleton<DerivMarketDiscovery>();
+        services.AddSingleton<DerivAccountSync>();
 
         if (marketData.Provider == MarketDataProvider.Deriv)
         {

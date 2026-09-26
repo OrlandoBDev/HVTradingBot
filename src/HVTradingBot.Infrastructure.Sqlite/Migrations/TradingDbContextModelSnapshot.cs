@@ -235,6 +235,130 @@ namespace HVTradingBot.Infrastructure.Sqlite.Migrations
                     b.ToTable("broker_connection_status", (string)null);
                 });
 
+            modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.BrokerContractEntity", b =>
+                {
+                    b.Property<string>("ContractId")
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("contract_id");
+
+                    b.Property<string>("Broker")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("broker");
+
+                    b.Property<string>("BrokerAccountId")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("broker_account_id");
+
+                    b.Property<double>("BuyPrice")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("REAL")
+                        .HasColumnName("buy_price");
+
+                    b.Property<double?>("Commission")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("REAL")
+                        .HasColumnName("commission");
+
+                    b.Property<string>("ContractType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("contract_type");
+
+                    b.Property<string>("Currency")
+                        .HasMaxLength(8)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("currency");
+
+                    b.Property<double?>("CurrentSpot")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("REAL")
+                        .HasColumnName("current_spot");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Direction")
+                        .HasMaxLength(8)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("direction");
+
+                    b.Property<double?>("EntrySpot")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("REAL")
+                        .HasColumnName("entry_spot");
+
+                    b.Property<double?>("ExitSpot")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("REAL")
+                        .HasColumnName("exit_spot");
+
+                    b.Property<bool>("IsOpen")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("is_open");
+
+                    b.Property<double?>("Multiplier")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("REAL")
+                        .HasColumnName("multiplier");
+
+                    b.Property<double?>("Profit")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("REAL")
+                        .HasColumnName("profit");
+
+                    b.Property<DateTime>("PurchaseTimeUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("purchase_time_utc");
+
+                    b.Property<double?>("SellPrice")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("REAL")
+                        .HasColumnName("sell_price");
+
+                    b.Property<DateTime?>("SellTimeUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("sell_time_utc");
+
+                    b.Property<double?>("StopLoss")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("REAL")
+                        .HasColumnName("stop_loss");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("symbol");
+
+                    b.Property<double?>("TakeProfit")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("REAL")
+                        .HasColumnName("take_profit");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("ContractId")
+                        .HasName("pk_broker_contracts");
+
+                    b.HasIndex("BrokerAccountId", "IsOpen")
+                        .HasDatabaseName("ix_broker_contracts_broker_account_id_is_open");
+
+                    b.HasIndex("BrokerAccountId", "SellTimeUtc")
+                        .HasDatabaseName("ix_broker_contracts_broker_account_id_sell_time_utc");
+
+                    b.ToTable("broker_contracts", (string)null);
+                });
+
             modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.BrokerSettingsEntity", b =>
                 {
                     b.Property<int>("Id")

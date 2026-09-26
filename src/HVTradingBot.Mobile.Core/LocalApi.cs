@@ -49,6 +49,7 @@ public sealed partial class LocalApi
         Get("/api/trades", r => Ok(queries.GetTradeHistoryAsync(r.Int("limit") ?? 200, r.Ct)));
         Get("/api/risk", r => Ok(queries.GetRiskStatusAsync(r.Ct)));
         Get("/api/performance", r => Ok(queries.GetPerformanceAsync(r.Ct)));
+        Get("/api/profit", r => Ok(queries.GetProfitSummaryAsync(r.Ct)));
         Get("/api/audit", r => Ok(queries.GetAuditAsync(r.Int("limit") ?? 100, r.Ct)));
         Get("/api/learning", r => Ok(actions.GetLearningAsync(r.Ct)));
         Get("/api/test-trades", r => Ok(actions.GetTestTradesAsync(r.Ct)));

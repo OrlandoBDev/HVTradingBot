@@ -3,68 +3,66 @@ using System;
 using HVTradingBot.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace HVTradingBot.Infrastructure.Persistence.Migrations
+namespace HVTradingBot.Infrastructure.Sqlite.Migrations
 {
     [DbContext(typeof(TradingDbContext))]
-    partial class TradingDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260926160538_AddBrokerContracts")]
+    partial class AddBrokerContracts
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
-                .HasAnnotation("Relational:MaxIdentifierLength", 63);
-
-            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
 
             modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.AppUserEntity", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("created_at_utc");
 
                     b.Property<int>("FailedLogins")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("failed_logins");
 
                     b.Property<DateTime?>("LastLoginAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("last_login_at_utc");
 
                     b.Property<DateTime?>("LockedUntilUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("locked_until_utc");
 
                     b.Property<DateTime?>("PasswordChangedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("password_changed_at_utc");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("password_hash");
 
                     b.Property<string>("SecurityStamp")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("security_stamp");
 
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("username");
 
                     b.HasKey("Id")
@@ -81,33 +79,31 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<string>("Action")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("action");
 
                     b.Property<string>("Actor")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("actor");
 
                     b.Property<string>("CorrelationId")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("correlation_id");
 
                     b.Property<string>("Details")
                         .IsRequired()
                         .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("details");
 
                     b.Property<DateTime>("TimestampUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("timestamp_utc");
 
                     b.HasKey("Id")
@@ -123,35 +119,35 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("created_at_utc");
 
-                    b.Property<decimal>("NetPnl")
+                    b.Property<double>("NetPnl")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("net_pnl");
 
                     b.Property<string>("Parameters")
                         .IsRequired()
-                        .HasColumnType("jsonb")
+                        .HasColumnType("TEXT")
                         .HasColumnName("parameters");
 
                     b.Property<string>("Source")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("source");
 
                     b.Property<string>("Summary")
                         .IsRequired()
-                        .HasColumnType("jsonb")
+                        .HasColumnType("TEXT")
                         .HasColumnName("summary");
 
                     b.Property<int>("TotalTrades")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("total_trades");
 
                     b.HasKey("Id")
@@ -166,35 +162,35 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.BrokerAccountEntity", b =>
                 {
                     b.Property<string>("AccountKey")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("account_key");
 
                     b.Property<string>("Broker")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("broker");
 
                     b.Property<string>("Currency")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("currency");
 
                     b.Property<bool>("IsDemo")
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("is_demo");
 
-                    b.Property<decimal>("LastBalance")
+                    b.Property<double>("LastBalance")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("last_balance");
 
-                    b.Property<decimal>("StartingBalance")
+                    b.Property<double>("StartingBalance")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("starting_balance");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("updated_at_utc");
 
                     b.HasKey("AccountKey")
@@ -206,34 +202,34 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.BrokerConnectionStatusEntity", b =>
                 {
                     b.Property<int>("Id")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("id");
 
                     b.Property<string>("AccountsJson")
-                        .HasColumnType("jsonb")
+                        .HasColumnType("TEXT")
                         .HasColumnName("accounts_json");
 
                     b.Property<DateTime>("CheckedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("checked_at_utc");
 
                     b.Property<string>("ConnectedAccountId")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("connected_account_id");
 
                     b.Property<string>("Message")
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("message");
 
                     b.Property<int>("SettingsVersion")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("settings_version");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("status");
 
                     b.HasKey("Id")
@@ -246,112 +242,112 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
                 {
                     b.Property<string>("ContractId")
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("contract_id");
 
                     b.Property<string>("Broker")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("broker");
 
                     b.Property<string>("BrokerAccountId")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("broker_account_id");
 
-                    b.Property<decimal>("BuyPrice")
+                    b.Property<double>("BuyPrice")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("buy_price");
 
-                    b.Property<decimal?>("Commission")
+                    b.Property<double?>("Commission")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("commission");
 
                     b.Property<string>("ContractType")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("contract_type");
 
                     b.Property<string>("Currency")
                         .HasMaxLength(8)
-                        .HasColumnType("character varying(8)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("currency");
 
-                    b.Property<decimal?>("CurrentSpot")
+                    b.Property<double?>("CurrentSpot")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("current_spot");
 
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("description");
 
                     b.Property<string>("Direction")
                         .HasMaxLength(8)
-                        .HasColumnType("character varying(8)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("direction");
 
-                    b.Property<decimal?>("EntrySpot")
+                    b.Property<double?>("EntrySpot")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("entry_spot");
 
-                    b.Property<decimal?>("ExitSpot")
+                    b.Property<double?>("ExitSpot")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("exit_spot");
 
                     b.Property<bool>("IsOpen")
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("is_open");
 
-                    b.Property<decimal?>("Multiplier")
+                    b.Property<double?>("Multiplier")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("multiplier");
 
-                    b.Property<decimal?>("Profit")
+                    b.Property<double?>("Profit")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("profit");
 
                     b.Property<DateTime>("PurchaseTimeUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("purchase_time_utc");
 
-                    b.Property<decimal?>("SellPrice")
+                    b.Property<double?>("SellPrice")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("sell_price");
 
                     b.Property<DateTime?>("SellTimeUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("sell_time_utc");
 
-                    b.Property<decimal?>("StopLoss")
+                    b.Property<double?>("StopLoss")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("stop_loss");
 
                     b.Property<string>("Symbol")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("symbol");
 
-                    b.Property<decimal?>("TakeProfit")
+                    b.Property<double?>("TakeProfit")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("take_profit");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("updated_at_utc");
 
                     b.HasKey("ContractId")
@@ -369,40 +365,40 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.BrokerSettingsEntity", b =>
                 {
                     b.Property<int>("Id")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("id");
 
                     b.Property<string>("DerivAccountId")
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("deriv_account_id");
 
                     b.Property<string>("DerivApiTokenHint")
                         .HasMaxLength(8)
-                        .HasColumnType("character varying(8)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("deriv_api_token_hint");
 
                     b.Property<string>("DerivApiTokenProtected")
                         .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("deriv_api_token_protected");
 
                     b.Property<string>("DerivAppId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("deriv_app_id");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("updated_at_utc");
 
                     b.Property<string>("UpdatedBy")
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("updated_by");
 
                     b.Property<int>("Version")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("version");
 
                     b.HasKey("Id")
@@ -415,45 +411,45 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
                 {
                     b.Property<string>("Instrument")
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("instrument");
 
                     b.Property<string>("TimeFrame")
                         .HasMaxLength(8)
-                        .HasColumnType("character varying(8)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("time_frame");
 
                     b.Property<DateTime>("OpenTimeUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("open_time_utc");
 
-                    b.Property<decimal>("Close")
+                    b.Property<double>("Close")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("close");
 
-                    b.Property<decimal>("High")
+                    b.Property<double>("High")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("high");
 
-                    b.Property<decimal>("Low")
+                    b.Property<double>("Low")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("low");
 
-                    b.Property<decimal>("Open")
+                    b.Property<double>("Open")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("open");
 
-                    b.Property<decimal>("Spread")
+                    b.Property<double>("Spread")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("spread");
 
                     b.Property<long>("Volume")
-                        .HasColumnType("bigint")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("volume");
 
                     b.HasKey("Instrument", "TimeFrame", "OpenTimeUtc")
@@ -466,52 +462,52 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<DateTime?>("CompletedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("completed_at_utc");
 
-                    b.Property<decimal?>("ExitPrice")
+                    b.Property<double?>("ExitPrice")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("exit_price");
 
                     b.Property<string>("Instrument")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("instrument");
 
                     b.Property<string>("Message")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("message");
 
                     b.Property<Guid>("PositionId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("position_id");
 
-                    b.Property<decimal?>("RealizedPnl")
+                    b.Property<double?>("RealizedPnl")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("realized_pnl");
 
                     b.Property<DateTime>("RequestedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("requested_at_utc");
 
                     b.Property<string>("RequestedBy")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("requested_by");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("status");
 
                     b.HasKey("Id")
@@ -526,68 +522,68 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.MarketEntity", b =>
                 {
                     b.Property<string>("BrokerSymbol")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("broker_symbol");
 
                     b.Property<string>("AssetClass")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("asset_class");
 
                     b.Property<string>("BaseCurrency")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("base_currency");
 
                     b.Property<bool>("IsOpen")
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("is_open");
 
                     b.Property<bool>("IsTradable")
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("is_tradable");
 
                     b.Property<string>("Market")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("market");
 
                     b.Property<string>("Multipliers")
                         .IsRequired()
-                        .HasColumnType("jsonb")
+                        .HasColumnType("TEXT")
                         .HasColumnName("multipliers");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("name");
 
-                    b.Property<decimal>("PipSize")
+                    b.Property<double>("PipSize")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("pip_size");
 
                     b.Property<int>("PriceDecimals")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("price_decimals");
 
                     b.Property<string>("QuoteCurrency")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("quote_currency");
 
                     b.Property<string>("Submarket")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("submarket");
 
                     b.Property<string>("Symbol")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("symbol");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("updated_at_utc");
 
                     b.HasKey("BrokerSymbol")
@@ -603,34 +599,34 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.MarketSelectionEntity", b =>
                 {
                     b.Property<int>("Id")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("id");
 
                     b.Property<int>("AppliedVersion")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("applied_version");
 
                     b.Property<bool>("DerivedOnlyWhenForexClosed")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(true)
                         .HasColumnName("derived_only_when_forex_closed");
 
                     b.Property<string>("Instruments")
                         .IsRequired()
-                        .HasColumnType("jsonb")
+                        .HasColumnType("TEXT")
                         .HasColumnName("instruments");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("updated_at_utc");
 
                     b.Property<string>("UpdatedBy")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("updated_by");
 
                     b.Property<int>("Version")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("version");
 
                     b.HasKey("Id")
@@ -642,46 +638,46 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.MarketSnapshotEntity", b =>
                 {
                     b.Property<string>("Instrument")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("instrument");
 
-                    b.Property<decimal>("Ask")
+                    b.Property<double>("Ask")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("ask");
 
-                    b.Property<decimal>("Bid")
+                    b.Property<double>("Bid")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("bid");
 
                     b.Property<string>("Indicators")
-                        .HasColumnType("jsonb")
+                        .HasColumnType("TEXT")
                         .HasColumnName("indicators");
 
                     b.Property<string>("LastDecision")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("last_decision");
 
                     b.Property<DateTime?>("LastDecisionTimeUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("last_decision_time_utc");
 
                     b.Property<DateTime>("MarketTimeUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("market_time_utc");
 
                     b.Property<string>("Regime")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("regime");
 
-                    b.Property<decimal>("SpreadPips")
+                    b.Property<double>("SpreadPips")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("spread_pips");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("updated_at_utc");
 
                     b.HasKey("Instrument")
@@ -693,93 +689,93 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.NotificationSettingsEntity", b =>
                 {
                     b.Property<int>("Id")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("id");
 
                     b.Property<bool>("Enabled")
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("enabled");
 
                     b.Property<string>("FromAddress")
                         .HasMaxLength(320)
-                        .HasColumnType("character varying(320)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("from_address");
 
                     b.Property<string>("FromName")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("from_name");
 
                     b.Property<bool?>("LastAttemptSucceeded")
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("last_attempt_succeeded");
 
                     b.Property<DateTime?>("LastAttemptUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("last_attempt_utc");
 
                     b.Property<string>("LastError")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("last_error");
 
                     b.Property<bool>("OnKillSwitch")
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("on_kill_switch");
 
                     b.Property<bool>("OnOrderRejected")
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("on_order_rejected");
 
                     b.Property<bool>("OnTradeClosed")
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("on_trade_closed");
 
                     b.Property<bool>("OnTradeOpened")
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("on_trade_opened");
 
                     b.Property<string>("PasswordHint")
                         .HasMaxLength(8)
-                        .HasColumnType("character varying(8)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("password_hint");
 
                     b.Property<string>("PasswordProtected")
                         .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("password_protected");
 
                     b.Property<string>("SmtpHost")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("smtp_host");
 
                     b.Property<int>("SmtpPort")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("smtp_port");
 
                     b.Property<string>("ToAddresses")
                         .IsRequired()
-                        .HasColumnType("jsonb")
+                        .HasColumnType("TEXT")
                         .HasColumnName("to_addresses");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("updated_at_utc");
 
                     b.Property<string>("UpdatedBy")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("updated_by");
 
                     b.Property<string>("Username")
                         .HasMaxLength(320)
-                        .HasColumnType("character varying(320)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("username");
 
                     b.Property<int>("Version")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("version");
 
                     b.HasKey("Id")
@@ -792,87 +788,87 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<string>("Broker")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("broker");
 
                     b.Property<string>("BrokerAccountId")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("broker_account_id");
 
                     b.Property<string>("BrokerContractId")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("broker_contract_id");
 
                     b.Property<string>("ClientOrderId")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("client_order_id");
 
                     b.Property<string>("CorrelationId")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("correlation_id");
 
                     b.Property<Guid?>("DecisionId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("decision_id");
 
                     b.Property<string>("Direction")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("direction");
 
-                    b.Property<decimal?>("FillPrice")
+                    b.Property<double?>("FillPrice")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("fill_price");
 
                     b.Property<string>("Instrument")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("instrument");
 
                     b.Property<DateTime>("MarketTimeUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("market_time_utc");
 
                     b.Property<DateTime>("RecordedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("recorded_at_utc");
 
                     b.Property<string>("RejectReason")
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("reject_reason");
 
-                    b.Property<decimal>("RequestedPrice")
+                    b.Property<double>("RequestedPrice")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("requested_price");
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("status");
 
-                    b.Property<decimal>("StopLoss")
+                    b.Property<double>("StopLoss")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("stop_loss");
 
-                    b.Property<decimal>("TakeProfit")
+                    b.Property<double>("TakeProfit")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("take_profit");
 
-                    b.Property<decimal>("Units")
+                    b.Property<double>("Units")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("units");
 
                     b.HasKey("Id")
@@ -891,29 +887,28 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.PaperAccountEntity", b =>
                 {
                     b.Property<int>("Id")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("id");
 
-                    b.Property<decimal>("Balance")
+                    b.Property<double>("Balance")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("balance");
 
                     b.Property<string>("Currency")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("currency");
 
-                    b.Property<decimal>("StartingBalance")
+                    b.Property<double>("StartingBalance")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("starting_balance");
 
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("version");
 
                     b.HasKey("Id")
                         .HasName("pk_paper_accounts");
@@ -925,138 +920,138 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<string>("Broker")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("broker");
 
                     b.Property<string>("BrokerAccountId")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("broker_account_id");
 
                     b.Property<string>("BrokerContractId")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("broker_contract_id");
 
                     b.Property<int?>("BrokerMultiplier")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("broker_multiplier");
 
-                    b.Property<decimal?>("BrokerStake")
+                    b.Property<double?>("BrokerStake")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("broker_stake");
 
                     b.Property<string>("ClientOrderId")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("client_order_id");
 
                     b.Property<DateTime?>("ClosedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("closed_at_utc");
 
-                    b.Property<decimal?>("Commission")
+                    b.Property<double?>("Commission")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("commission");
 
                     b.Property<string>("Direction")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("direction");
 
-                    b.Property<decimal>("EntryPrice")
+                    b.Property<double>("EntryPrice")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("entry_price");
 
-                    b.Property<decimal?>("ExitPrice")
+                    b.Property<double?>("ExitPrice")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("exit_price");
 
                     b.Property<string>("ExitReason")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("exit_reason");
 
-                    b.Property<decimal>("InitialRiskAmount")
+                    b.Property<double>("InitialRiskAmount")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("initial_risk_amount");
 
                     b.Property<string>("Instrument")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("instrument");
 
                     b.Property<bool>("IsOpen")
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("is_open");
 
-                    b.Property<decimal?>("MaePips")
+                    b.Property<double?>("MaePips")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("mae_pips");
 
-                    b.Property<decimal>("MaxAdverseExcursion")
+                    b.Property<double>("MaxAdverseExcursion")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("max_adverse_excursion");
 
-                    b.Property<decimal>("MaxFavorableExcursion")
+                    b.Property<double>("MaxFavorableExcursion")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("max_favorable_excursion");
 
-                    b.Property<decimal?>("MfePips")
+                    b.Property<double?>("MfePips")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("mfe_pips");
 
                     b.Property<DateTime>("OpenedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("opened_at_utc");
 
                     b.Property<Guid>("OrderId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("order_id");
 
-                    b.Property<decimal?>("RMultiple")
+                    b.Property<double?>("RMultiple")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("r_multiple");
 
-                    b.Property<decimal?>("RealizedPnl")
+                    b.Property<double?>("RealizedPnl")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("realized_pnl");
 
                     b.Property<int>("Score")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("score");
 
-                    b.Property<decimal>("StopLoss")
+                    b.Property<double>("StopLoss")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("stop_loss");
 
                     b.Property<string>("Strategy")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("strategy");
 
-                    b.Property<decimal>("TakeProfit")
+                    b.Property<double>("TakeProfit")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("take_profit");
 
-                    b.Property<decimal>("Units")
+                    b.Property<double>("Units")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("units");
 
                     b.HasKey("Id")
@@ -1081,24 +1076,24 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.RiskSettingsEntity", b =>
                 {
                     b.Property<int>("Id")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("id");
 
                     b.Property<string>("Limits")
                         .IsRequired()
-                        .HasColumnType("jsonb")
+                        .HasColumnType("TEXT")
                         .HasColumnName("limits");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("updated_at_utc");
 
                     b.Property<string>("UpdatedBy")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("updated_by");
 
                     b.Property<int>("Version")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("version");
 
                     b.HasKey("Id")
@@ -1111,88 +1106,88 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<string>("AssetClass")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("asset_class");
 
                     b.Property<DateTime?>("ClosedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("closed_at_utc");
 
                     b.Property<Guid?>("DecisionId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("decision_id");
 
                     b.Property<string>("DecisionState")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("decision_state");
 
                     b.Property<string>("Direction")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("direction");
 
-                    b.Property<decimal>("Entry")
+                    b.Property<double>("Entry")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("entry");
 
-                    b.Property<decimal?>("ExitPrice")
+                    b.Property<double?>("ExitPrice")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("exit_price");
 
                     b.Property<string>("Instrument")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("instrument");
 
                     b.Property<DateTime>("OpenedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("opened_at_utc");
 
-                    b.Property<decimal?>("RMultiple")
+                    b.Property<double?>("RMultiple")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("r_multiple");
 
                     b.Property<string>("Regime")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("regime");
 
                     b.Property<int>("Score")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("score");
 
                     b.Property<string>("SetupId")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("setup_id");
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("status");
 
-                    b.Property<decimal>("StopLoss")
+                    b.Property<double>("StopLoss")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("stop_loss");
 
                     b.Property<string>("Strategy")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("strategy");
 
-                    b.Property<decimal>("TakeProfit")
+                    b.Property<double>("TakeProfit")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("take_profit");
 
                     b.HasKey("Id")
@@ -1214,90 +1209,89 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.SystemStateEntity", b =>
                 {
                     b.Property<int>("Id")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("id");
 
                     b.Property<string>("BrokerAccountId")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("broker_account_id");
 
                     b.Property<bool>("BrokerIsDemo")
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("broker_is_demo");
 
                     b.Property<string>("BrokerName")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("broker_name");
 
                     b.Property<int>("ConsecutiveLosses")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("consecutive_losses");
 
                     b.Property<DateTime?>("CooldownUntilUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("cooldown_until_utc");
 
-                    b.Property<decimal>("DailyRealizedPnl")
+                    b.Property<double>("DailyRealizedPnl")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("daily_realized_pnl");
 
-                    b.Property<decimal>("DerivedDailyRealizedPnl")
+                    b.Property<double>("DerivedDailyRealizedPnl")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("derived_daily_realized_pnl");
 
                     b.Property<bool>("KillSwitchActive")
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("kill_switch_active");
 
                     b.Property<DateTime?>("KillSwitchChangedUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("kill_switch_changed_utc");
 
                     b.Property<string>("KillSwitchReason")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("kill_switch_reason");
 
                     b.Property<DateTime?>("LastBarTimeUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("last_bar_time_utc");
 
                     b.Property<DateTime?>("LastDataReceivedUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("last_data_received_utc");
 
                     b.Property<string>("MarketDataSource")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("market_data_source");
 
                     b.Property<string>("Mode")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("mode");
 
                     b.Property<DateOnly?>("PnlDay")
-                        .HasColumnType("date")
+                        .HasColumnType("TEXT")
                         .HasColumnName("pnl_day");
 
                     b.Property<DateOnly?>("PnlWeekStart")
-                        .HasColumnType("date")
+                        .HasColumnType("TEXT")
                         .HasColumnName("pnl_week_start");
 
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("version");
 
-                    b.Property<decimal>("WeeklyRealizedPnl")
+                    b.Property<double>("WeeklyRealizedPnl")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("weekly_realized_pnl");
 
                     b.Property<DateTime?>("WorkerHeartbeatUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("worker_heartbeat_utc");
 
                     b.HasKey("Id")
@@ -1310,73 +1304,73 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<string>("ClientOrderId")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("client_order_id");
 
                     b.Property<DateTime?>("CloseRequestedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("close_requested_at_utc");
 
                     b.Property<DateTime?>("ClosedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("closed_at_utc");
 
-                    b.Property<decimal?>("ExitPrice")
+                    b.Property<double?>("ExitPrice")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("exit_price");
 
-                    b.Property<decimal?>("FillPrice")
+                    b.Property<double?>("FillPrice")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("fill_price");
 
                     b.Property<int>("HoldSeconds")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("hold_seconds");
 
                     b.Property<string>("Instrument")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("instrument");
 
                     b.Property<string>("Message")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("message");
 
                     b.Property<DateTime?>("OpenedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("opened_at_utc");
 
                     b.Property<Guid?>("PositionId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("position_id");
 
-                    b.Property<decimal?>("RealizedPnl")
+                    b.Property<double?>("RealizedPnl")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("realized_pnl");
 
                     b.Property<DateTime>("RequestedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("requested_at_utc");
 
                     b.Property<string>("RequestedBy")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("requested_by");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("status");
 
                     b.HasKey("Id")
@@ -1392,82 +1386,82 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<string>("ClientOrderId")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("client_order_id");
 
                     b.Property<string>("CorrelationId")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("correlation_id");
 
                     b.Property<string>("Details")
                         .IsRequired()
-                        .HasColumnType("jsonb")
+                        .HasColumnType("TEXT")
                         .HasColumnName("details");
 
                     b.Property<string>("Direction")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("direction");
 
-                    b.Property<decimal?>("Entry")
+                    b.Property<double?>("Entry")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("entry");
 
                     b.Property<string>("Instrument")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("instrument");
 
                     b.Property<DateTime>("MarketTimeUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("market_time_utc");
 
                     b.Property<string>("Reasons")
                         .IsRequired()
                         .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("reasons");
 
                     b.Property<DateTime>("RecordedAtUtc")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("recorded_at_utc");
 
                     b.Property<string>("Regime")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("regime");
 
-                    b.Property<decimal?>("RewardToRisk")
+                    b.Property<double?>("RewardToRisk")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("reward_to_risk");
 
                     b.Property<int?>("Score")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("score");
 
                     b.Property<string>("State")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("state");
 
-                    b.Property<decimal?>("StopLoss")
+                    b.Property<double?>("StopLoss")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("stop_loss");
 
                     b.Property<string>("Strategy")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("strategy");
 
-                    b.Property<decimal?>("TakeProfit")
+                    b.Property<double?>("TakeProfit")
                         .HasPrecision(28, 10)
-                        .HasColumnType("numeric(28,10)")
+                        .HasColumnType("REAL")
                         .HasColumnName("take_profit");
 
                     b.HasKey("Id")

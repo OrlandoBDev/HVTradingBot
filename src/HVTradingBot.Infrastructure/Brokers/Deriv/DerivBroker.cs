@@ -595,13 +595,13 @@ public sealed class DerivBroker(
         p.TakeProfit, p.InitialRiskAmount, DateTime.SpecifyKind(p.OpenedAtUtc, DateTimeKind.Utc), p.Strategy, p.Score,
         p.MaxFavorableExcursion, p.MaxAdverseExcursion);
 
-    private static decimal? LimitLevel(JsonElement proposal, string name) =>
+    internal static decimal? LimitLevel(JsonElement proposal, string name) =>
         proposal.TryGetProperty("limit_order", out var limits) && limits.TryGetProperty(name, out var level)
         && level.TryGetProperty("value", out var value)
             ? Dec(value)
             : null;
 
-    private static bool IsSold(JsonElement contract) =>
+    internal static bool IsSold(JsonElement contract) =>
         (contract.TryGetProperty("is_sold", out var sold) && sold.ValueKind switch
         {
             JsonValueKind.Number => sold.GetInt32() == 1,
@@ -612,7 +612,7 @@ public sealed class DerivBroker(
         || (contract.TryGetProperty("status", out var status) && status.ValueKind == JsonValueKind.String && status.GetString() is "sold" or "won" or "lost");
 
     /// <summary>Commission Deriv charged on a contract, when it reports one.</summary>
-    private static decimal? ContractCommission(JsonElement contract) =>
+    internal static decimal? ContractCommission(JsonElement contract) =>
         contract.TryGetProperty("commission", out var c) && c.ValueKind is JsonValueKind.Number or JsonValueKind.String ? Dec(c) : null;
 
     /// <summary>Deriv sends some numbers as JSON strings (e.g. "profit": "0.87"); accept both.</summary>
@@ -623,17 +623,17 @@ public sealed class DerivBroker(
         _ => throw new FormatException($"Expected a number from Deriv but got {value.ValueKind} '{value}'.")
     };
 
-    private static string ReadId(JsonElement element, string name)
+    internal static string ReadId(JsonElement element, string name)
     {
         var value = element.GetProperty(name);
         return value.ValueKind == JsonValueKind.String ? value.GetString()! : value.GetRawText();
     }
 
-    private static string? FirstString(JsonElement element, params string[] names) =>
+    internal static string? FirstString(JsonElement element, params string[] names) =>
         names.Select(n => element.TryGetProperty(n, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null)
             .FirstOrDefault(v => v is not null);
 
-    private static decimal? FirstDecimal(JsonElement element, params string[] names)
+    internal static decimal? FirstDecimal(JsonElement element, params string[] names)
     {
         foreach (var name in names)
         {
@@ -647,7 +647,7 @@ public sealed class DerivBroker(
         return null;
     }
 
-    private static long? FirstLong(JsonElement element, params string[] names)
+    internal static long? FirstLong(JsonElement element, params string[] names)
     {
         foreach (var name in names)
         {

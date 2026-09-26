@@ -64,15 +64,19 @@ public sealed record DecisionDto(
 
 public sealed record DecisionDetailDto(DecisionDto Decision, JsonElement Details);
 
+/// <summary>
+/// A position or closed trade. <see cref="Source"/> is "App" for trades this app placed and "External" for contracts
+/// opened elsewhere on the broker account (then Id is empty, prices may be unknown and Stake/ContractType describe it).
+/// </summary>
 public sealed record PositionDto(
     Guid Id,
     string ClientOrderId,
     string Instrument,
     string Direction,
     decimal Units,
-    decimal EntryPrice,
-    decimal StopLoss,
-    decimal TakeProfit,
+    decimal? EntryPrice,
+    decimal? StopLoss,
+    decimal? TakeProfit,
     decimal InitialRiskAmount,
     DateTime OpenedAtUtc,
     string Strategy,
@@ -88,7 +92,21 @@ public sealed record PositionDto(
     decimal? MfePips,
     string? CloseStatus = null,
     string? CloseMessage = null,
-    decimal? Commission = null);
+    decimal? Commission = null,
+    string Source = "App",
+    string? ContractId = null,
+    decimal? Stake = null,
+    string? ContractType = null);
+
+/// <summary>Realized profit per period (UTC), open profit and trade counts.</summary>
+public sealed record PnlPeriodsDto(decimal Today, decimal Week, decimal Month, decimal? AllTime, decimal Open, int OpenTrades, int ClosedTrades,
+    int Wins);
+
+/// <summary>
+/// Profit for the whole broker account (every contract, also ones opened outside the app) and for the app's own
+/// trades. Without a broker account (paper trading) both are the app's trades.
+/// </summary>
+public sealed record ProfitSummaryDto(string Currency, PnlPeriodsDto Account, PnlPeriodsDto App, bool AccountFromBroker, DateTime? SyncedAtUtc);
 
 public sealed record RiskLimitStatusDto(string Name, string Current, string Limit, bool Breached);
 

@@ -49,7 +49,7 @@ public sealed class MobileRuntimeTests : IAsyncLifetime
         [
             "/api/auth/me", "/api/status", "/api/markets", "/api/markets/names", "/api/decisions?limit=5", "/api/decisions/paged?page=1&pageSize=10",
             "/api/decisions/paged?state=NoTrade&instrument=EUR%2FUSD", "/api/trades/paged?page=1&pageSize=10", "/api/audit/paged?page=1&pageSize=10",
-            "/api/positions/open", "/api/trades", "/api/risk", "/api/performance", "/api/audit", "/api/learning", "/api/test-trades",
+            "/api/positions/open", "/api/trades", "/api/risk", "/api/performance", "/api/profit", "/api/audit", "/api/learning", "/api/test-trades",
             "/api/backtests?limit=20", "/api/settings/deriv", "/api/settings/risk", "/api/settings/notifications", "/api/settings/markets",
             "/api/app/engine", "/api/app/logs?count=50"
         ];

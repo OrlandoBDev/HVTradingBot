@@ -60,7 +60,7 @@ public sealed class DashboardQueries(
         var state = await stateStore.GetAsync(cancellationToken);
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var account = await AccountAsync(db, state, cancellationToken);
-        var positions = await OpenPositionsAsync(db, BrokerOf(state), cancellationToken);
+        var positions = await WithBrokerContractsAsync(db, state, await OpenPositionsAsync(db, BrokerOf(state), cancellationToken), cancellationToken);
         var unrealized = positions.Sum(p => p.UnrealizedPnl ?? 0);
         var balance = account.Balance;
         var now = clock.UtcNow;
@@ -178,12 +178,19 @@ public sealed class DashboardQueries(
     public async Task<PagedResult<PositionDto>> GetTradeHistoryPageAsync(int? page, int? pageSize, CancellationToken cancellationToken)
     {
         var (p, size) = Paging(page, pageSize);
-        var broker = BrokerOf(await stateStore.GetAsync(cancellationToken));
+        var state = await stateStore.GetAsync(cancellationToken);
+        var broker = BrokerOf(state);
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var query = db.Positions.AsNoTracking().Where(x => !x.IsOpen && x.Broker == broker);
-        var total = await query.CountAsync(cancellationToken);
-        var rows = await query.OrderByDescending(x => x.ClosedAtUtc).ThenBy(x => x.Id).Skip((p - 1) * size).Take(size).ToListAsync(cancellationToken);
-        return new PagedResult<PositionDto>(rows.Select(x => ToDto(x, null, null)).ToList(), total, p, size);
+        var external = ExternalContracts(db, state).Where(c => !c.IsOpen);
+        var total = await query.CountAsync(cancellationToken) + await external.CountAsync(cancellationToken);
+
+        // Both lists are newest first: the page is within the first p * size of their merge.
+        var app = await query.OrderByDescending(x => x.ClosedAtUtc).ThenBy(x => x.Id).Take(p * size).ToListAsync(cancellationToken);
+        var others = await external.OrderByDescending(c => c.SellTimeUtc).Take(p * size).ToListAsync(cancellationToken);
+        var rows = app.Select(x => ToDto(x, null, null)).Concat(others.Select(ToDto))
+            .OrderByDescending(x => x.ClosedAtUtc).Skip((p - 1) * size).Take(size).ToList();
+        return new PagedResult<PositionDto>(rows, total, p, size);
     }
 
     public async Task<PagedResult<AuditEntryDto>> GetAuditPageAsync(int? page, int? pageSize, CancellationToken cancellationToken)
@@ -208,10 +215,10 @@ public sealed class DashboardQueries(
     {
         var state = await stateStore.GetAsync(cancellationToken);
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var positions = await OpenPositionsAsync(db, BrokerOf(state), cancellationToken);
+        var positions = await WithBrokerContractsAsync(db, state, await OpenPositionsAsync(db, BrokerOf(state), cancellationToken), cancellationToken);
 
         // Show "closing…" (or why a close failed) next to positions the user asked to close.
-        var requests = await closeRequests.LatestForAsync(positions.Select(p => p.Id).ToList(), cancellationToken);
+        var requests = await closeRequests.LatestForAsync(positions.Where(p => p.Source == AppSource).Select(p => p.Id).ToList(), cancellationToken);
         return positions.Select(p => requests.TryGetValue(p.Id, out var r) && r.Status != CloseRequestStatus.Closed
             ? p with { CloseStatus = r.Status, CloseMessage = r.Message }
             : p).ToList();
@@ -243,9 +250,9 @@ public sealed class DashboardQueries(
         var exposure = new Dictionary<string, int>();
         foreach (var p in positions)
         {
-            if (Instruments.TryGet(p.Instrument, out var instrument))
+            if (Instruments.TryGet(p.Instrument, out var instrument) && Enum.TryParse<Direction>(p.Direction, out var direction))
             {
-                PortfolioState.Add(exposure, instrument, Enum.Parse<Direction>(p.Direction));
+                PortfolioState.Add(exposure, instrument, direction);
             }
         }
 
@@ -309,6 +316,99 @@ public sealed class DashboardQueries(
             .ToListAsync(cancellationToken);
     }
 
+    public const string AppSource = "App";
+    public const string ExternalSource = "External";
+
+    /// <summary>Contracts on the connected broker account that this app did not open (synced by the worker).</summary>
+    private static IQueryable<BrokerContractEntity> ExternalContracts(TradingDbContext db, TradingSystemState state)
+    {
+        var account = state.BrokerAccountId;
+        return db.BrokerContracts.AsNoTracking()
+            .Where(c => account != null && c.BrokerAccountId == account && !db.Positions.Any(p => p.BrokerContractId == c.ContractId));
+    }
+
+    /// <summary>
+    /// Adds the broker account's other open contracts to the app's positions, and uses the broker's own profit for the
+    /// app's positions once synced (it includes commission; the quote-based estimate does not).
+    /// </summary>
+    private static async Task<List<PositionDto>> WithBrokerContractsAsync(TradingDbContext db, TradingSystemState state, List<PositionDto> app,
+        CancellationToken cancellationToken)
+    {
+        if (state.BrokerAccountId is not { } account)
+        {
+            return app;
+        }
+
+        var contracts = await db.BrokerContracts.AsNoTracking().Where(c => c.BrokerAccountId == account && c.IsOpen).ToDictionaryAsync(c => c.ContractId, cancellationToken);
+        if (contracts.Count == 0)
+        {
+            return app;
+        }
+
+        var result = app.Select(p => p.ContractId is { } id && contracts.TryGetValue(id, out var c) && c.Profit is { } profit
+            ? p with { UnrealizedPnl = profit, CurrentPrice = c.CurrentSpot ?? p.CurrentPrice }
+            : p).ToList();
+        var external = await ExternalContracts(db, state).Where(c => c.IsOpen).OrderBy(c => c.PurchaseTimeUtc).ToListAsync(cancellationToken);
+        result.AddRange(external.Select(ToDto));
+        return result;
+    }
+
+    /// <summary>Realized profit today, this week (from Monday) and this month, all UTC, plus open profit.</summary>
+    public async Task<ProfitSummaryDto> GetProfitSummaryAsync(CancellationToken cancellationToken)
+    {
+        var state = await stateStore.GetAsync(cancellationToken);
+        var broker = BrokerOf(state);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var account = await AccountAsync(db, state, cancellationToken);
+        var open = await WithBrokerContractsAsync(db, state, await OpenPositionsAsync(db, broker, cancellationToken), cancellationToken);
+
+        var now = clock.UtcNow;
+        var today = now.Date;
+        var week = today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
+        var month = new DateTime(today.Year, today.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var since = month < week ? month : week;
+
+        var appClosed = db.Positions.AsNoTracking().Where(p => !p.IsOpen && p.Broker == broker);
+        var appRecent = await appClosed.Where(p => p.ClosedAtUtc >= since)
+            .Select(p => new ClosedAmount(p.ClosedAtUtc!.Value, p.RealizedPnl ?? 0)).ToListAsync(cancellationToken);
+        var appAll = await appClosed.SumAsync(p => p.RealizedPnl ?? 0, cancellationToken);
+        var appCount = await appClosed.CountAsync(cancellationToken);
+        var appWins = await appClosed.CountAsync(p => p.RealizedPnl > 0, cancellationToken);
+        var appOpen = open.Where(p => p.Source == AppSource).ToList();
+        var app = Periods(appRecent, today, week, month, appAll, appOpen, appCount, appWins);
+
+        var synced = state.BrokerAccountId is { } accountId
+            ? await db.BrokerContracts.AsNoTracking().Where(c => c.BrokerAccountId == accountId).MaxAsync(c => (DateTime?)c.UpdatedAtUtc, cancellationToken)
+            : null;
+        if (synced is null)
+        {
+            // Paper trading, or no broker sync yet: the account's trades are the app's.
+            return new ProfitSummaryDto(account.Currency, app, app, false, null);
+        }
+
+        var accountClosed = db.BrokerContracts.AsNoTracking().Where(c => c.BrokerAccountId == state.BrokerAccountId && !c.IsOpen && c.SellTimeUtc != null);
+        var recent = await accountClosed.Where(c => c.SellTimeUtc >= since)
+            .Select(c => new ClosedAmount(c.SellTimeUtc!.Value, c.Profit ?? 0)).ToListAsync(cancellationToken);
+        var count = await accountClosed.CountAsync(cancellationToken);
+        var wins = await accountClosed.CountAsync(c => c.Profit > 0, cancellationToken);
+        // All time is unknown for the account: the sync reaches back about a month, and older trades may not be the app's.
+        var accountPeriods = Periods(recent, today, week, month, null, open, count, wins);
+        return new ProfitSummaryDto(account.Currency, accountPeriods, app, true, synced);
+    }
+
+    private sealed record ClosedAmount(DateTime ClosedAtUtc, decimal Profit);
+
+    private static PnlPeriodsDto Periods(IReadOnlyList<ClosedAmount> closed, DateTime today, DateTime week, DateTime month, decimal? allTime,
+        IReadOnlyList<PositionDto> open, int closedTrades, int wins) => new(
+        closed.Where(c => c.ClosedAtUtc >= today).Sum(c => c.Profit),
+        closed.Where(c => c.ClosedAtUtc >= week).Sum(c => c.Profit),
+        closed.Where(c => c.ClosedAtUtc >= month).Sum(c => c.Profit),
+        allTime,
+        open.Sum(p => p.UnrealizedPnl ?? 0),
+        open.Count,
+        closedTrades,
+        wins);
+
     /// <summary>Open positions recorded for <paramref name="broker"/>. Unrealized P&amp;L is an estimate from the latest quotes (excludes commission).</summary>
     private async Task<List<PositionDto>> OpenPositionsAsync(TradingDbContext db, string broker, CancellationToken cancellationToken)
     {
@@ -355,7 +455,14 @@ public sealed class DashboardQueries(
     private static PositionDto ToDto(PositionEntity p, decimal? currentPrice, decimal? unrealized) => new(
         p.Id, p.ClientOrderId, p.Instrument, p.Direction, p.Units, p.EntryPrice, p.StopLoss, p.TakeProfit, p.InitialRiskAmount,
         p.OpenedAtUtc, p.Strategy, p.Score, currentPrice, unrealized, p.ClosedAtUtc, p.ExitPrice, p.ExitReason, p.RealizedPnl,
-        p.RMultiple, p.MaePips, p.MfePips, Commission: p.Commission);
+        p.RMultiple, p.MaePips, p.MfePips, Commission: p.Commission, ContractId: p.BrokerContractId);
+
+    /// <summary>A contract opened outside this app, as the broker reports it.</summary>
+    private static PositionDto ToDto(BrokerContractEntity c) => new(
+        Guid.Empty, $"deriv-{c.ContractId}", c.Symbol, c.Direction ?? c.ContractType, 0, c.EntrySpot, c.StopLoss, c.TakeProfit, 0,
+        c.PurchaseTimeUtc, ExternalSource, 0, c.IsOpen ? c.CurrentSpot : null, c.IsOpen ? c.Profit : null, c.SellTimeUtc, c.ExitSpot,
+        c.IsOpen ? null : "Closed", c.IsOpen ? null : c.Profit, null, null, null, Commission: c.Commission, Source: ExternalSource,
+        ContractId: c.ContractId, Stake: c.BuyPrice, ContractType: c.ContractType);
 
     private static DecisionDto ToDto(TradeDecisionEntity d) => new(
         d.Id, d.MarketTimeUtc, d.Instrument, d.State, d.Regime, d.Strategy, d.Direction, d.Score, d.Entry, d.StopLoss,
