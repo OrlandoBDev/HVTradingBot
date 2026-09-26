@@ -99,7 +99,7 @@ public sealed record RiskLimits(
 
         if (MaxExtraDerivedPositions is { } extra)
         {
-            Check(extra >= 0 && extra <= 5, nameof(MaxExtraDerivedPositions), "Extra Derived positions must be between 0 (off) and 5.");
+            Check(extra >= 0 && extra <= 5, nameof(MaxExtraDerivedPositions), "High-score extra positions must be between 0 (off) and 5.");
         }
 
         if (HighScoreOverrideMinScore is { } minScore)

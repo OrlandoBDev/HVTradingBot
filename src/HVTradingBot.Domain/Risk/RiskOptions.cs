@@ -26,7 +26,10 @@ public sealed class RiskOptions
     /// <summary>Positions are rounded down to a multiple of this size (1,000 = micro lot; 1 for brokers that size by stake).</summary>
     [Range(1, 100_000)] public decimal UnitStep { get; set; } = 1_000m;
     [Range(1_000, 100_000_000)] public decimal MaxUnits { get; set; } = 1_000_000m;
-    /// <summary>Derived (synthetic) markets: at most this many open at once, so they cannot take the slots Forex needs.</summary>
+    /// <summary>
+    /// Derived (synthetic) markets: at most this many in the normal slots while Forex is open, so they cannot take the
+    /// slots Forex needs. While Forex is closed Derived may use every slot (see <see cref="DerivedSlots"/>).
+    /// </summary>
     [Range(0, 20)] public int MaxDerivedOpenPositions { get; set; } = 1;
 
     /// <summary>Derived (synthetic) markets: risk per trade (% of equity), typically lower than for Forex.</summary>
@@ -36,13 +39,24 @@ public sealed class RiskOptions
     [Range(0.1, 20)] public decimal MaxDerivedDailyLossPercent { get; set; } = 1m;
 
     /// <summary>
-    /// Derived (synthetic) markets: a candidate scoring at least <see cref="HighScoreOverrideMinScore"/> may open even
-    /// when the Derived position limit is reached or the same market already has a position, up to this many extra
-    /// Derived positions. Extras never use Forex slots and must fit in the Derived daily loss budget. 0 turns it off.
+    /// High-score extras, shared by every market type (the name predates Forex extras and is kept so saved settings
+    /// still apply). A candidate scoring at least <see cref="HighScoreOverrideMinScore"/> may open when the position
+    /// limits are full, on a market with no open position (Derived may also add to a market it already trades), up to
+    /// this many extra positions in total. An extra must fit in today's remaining loss budget (Derived: also the
+    /// Derived budget) if every open trade and the new one hit their stops. 0 turns it off.
     /// </summary>
     [Range(0, 10)] public int MaxExtraDerivedPositions { get; set; } = 2;
 
-    /// <summary>Minimum score for the Derived high-score override.</summary>
+    /// <summary>Most positions open at once: the normal limit plus the high-score extras.</summary>
+    public int MaxTotalPositions => MaxOpenPositions + MaxExtraDerivedPositions;
+
+    /// <summary>
+    /// Derived positions allowed in the normal slots: <see cref="MaxDerivedOpenPositions"/> while Forex trades, so Derived
+    /// cannot crowd it out; every slot while Forex is closed (weekends, the daily break).
+    /// </summary>
+    public int DerivedSlots(bool forexOpen) => forexOpen ? Math.Min(MaxDerivedOpenPositions, MaxOpenPositions) : MaxOpenPositions;
+
+    /// <summary>Minimum score for the high-score override.</summary>
     [Range(75, 100)] public int HighScoreOverrideMinScore { get; set; } = 90;
 
     public static bool IsDerived(MarketData.Instrument instrument) => instrument.AssetClass == MarketData.AssetClass.SyntheticIndex;
