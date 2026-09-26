@@ -21,18 +21,18 @@ public class TestTradeTests
     private static readonly DateTime End = new(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
 
     private static async Task<(TradingEngine Engine, InMemoryJournal Journal, InMemorySimulatedBroker Broker, InMemoryStateStore State, MarketDataStatus Status)> Ready(
-        bool processFirstBar = true)
+        bool processFirstBar = true, decimal minRewardToRisk = 2m)
     {
         var costs = new ExecutionCostOptions();
         var broker = new InMemorySimulatedBroker("USD", 10_000m, costs);
         var journal = new InMemoryJournal { KeepDecisions = true };
         var state = new InMemoryStateStore();
         var clock = new ReplayClock();
-        var risk = new RiskManager(new RiskOptions { MinUnits = 1, UnitStep = 1 }, costs);
+        var risk = new RiskManager(new RiskOptions { MinUnits = 1, UnitStep = 1, MinRewardToRisk = minRewardToRisk }, costs);
         var learning = new LearningService(new InMemoryVirtualTradeStore(), new LearningOptions(), costs, NullLogger<LearningService>.Instance);
         var engine = new TradingEngine(new SignalEvaluator(StrategyCatalog.CreateDefault(), new ScoringOptions(), learning), risk, broker,
             new ExecutionService(broker, risk, NullLogger<ExecutionService>.Instance), state, journal, journal, clock, learning,
-            TradingUniverse.From([Instruments.EurUsd], "USD"), new TradingEngineOptions(), new FixedRiskOptions(new RiskOptions()), new RegimeOptions(),
+            TradingUniverse.From([Instruments.EurUsd], "USD"), new TradingEngineOptions(), new FixedRiskOptions(new RiskOptions { MinRewardToRisk = minRewardToRisk }), new RegimeOptions(),
             NullLogger<TradingEngine>.Instance);
 
         var bars = MarketSeriesGenerator.Generate(Instruments.EurUsd, 4, End, 20);
@@ -87,5 +87,34 @@ public class TestTradeTests
         Assert.False(outcome.Filled);
         Assert.Contains("KillSwitch", outcome.Message);
         Assert.Empty(await broker.GetPositionsAsync(CancellationToken.None));
+    }
+
+    /// <summary>
+    /// Stop and target are rounded to the market's price precision; the target must still give at least the minimum
+    /// R:R, or the risk engine refuses the test trade ("R:R 2.00 below minimum 2.00").
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(LivePrices))]
+    public async Task Rounded_stop_and_target_never_fall_below_the_minimum_reward_to_risk(decimal ask, decimal minRewardToRisk)
+    {
+        var (engine, journal, _, _, status) = await Ready(processFirstBar: false, minRewardToRisk: minRewardToRisk);
+        var live = new Quote(Instruments.EurUsd, End, ask - 0.00008m, ask);
+
+        var outcome = await engine.PlaceTestTradeAsync(Instruments.EurUsd, status, "tester", "c1", CancellationToken.None, [live]);
+
+        Assert.True(outcome.Filled, outcome.Message);
+        Assert.True(journal.Decisions.Single().Setup!.RewardToRisk >= minRewardToRisk);
+    }
+
+    public static TheoryData<decimal, decimal> LivePrices()
+    {
+        var data = new TheoryData<decimal, decimal>();
+        for (var i = 0; i < 12; i++)
+        {
+            data.Add(1.10000m + i * 0.00007m, 2m);
+        }
+
+        data.Add(1.10013m, 2.5m); // a stricter limit set on the Settings page
+        return data;
     }
 }

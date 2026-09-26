@@ -6,8 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HVTradingBot.IntegrationTests;
 
-[Collection(PostgresCollection.Name)]
-public class DerivSettingsTests(PostgresFixture fixture) : IAsyncLifetime
+public abstract class DerivSettingsTests(DatabaseFixture fixture) : IAsyncLifetime
 {
     private const string Token = "pat_1234567890abcdWXYZ";
 
@@ -109,3 +108,9 @@ public class DerivSettingsTests(PostgresFixture fixture) : IAsyncLifetime
         public void Advance(TimeSpan by) => UtcNow += by;
     }
 }
+
+[Collection(PostgresCollection.Name)]
+public sealed class DerivSettingsTestsOnPostgres(PostgresFixture fixture) : DerivSettingsTests(fixture);
+
+[Collection(SqliteCollection.Name)]
+public sealed class DerivSettingsTestsOnSqlite(SqliteFixture fixture) : DerivSettingsTests(fixture);

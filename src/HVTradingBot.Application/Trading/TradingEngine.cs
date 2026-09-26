@@ -532,9 +532,15 @@ public sealed class TradingEngine
             var direction = context.Regime == MarketRegime.TrendingBearish ? Direction.Short : Direction.Long;
             var entry = direction == Direction.Long ? quote.Ask : quote.Bid;
             var sign = direction.Sign();
-            var setup = new TradeSetup(direction, entry, instrument.RoundPrice(entry - sign * atr * 1.5m), instrument.RoundPrice(entry + sign * atr * 3m));
+            // Stop 1.5 ATR away; target at the minimum R:R (at least 2) measured from the rounded stop and rounded away
+            // from the entry, so rounding to the market's precision can never leave it just below the risk limit.
+            var stop = instrument.RoundPrice(entry - sign * atr * 1.5m);
+            var rewardToRisk = Math.Max(2m, _risk.Current.MinRewardToRisk);
+            var target = Math.Round(entry + sign * Math.Abs(entry - stop) * rewardToRisk, instrument.PriceDecimals,
+                direction == Direction.Long ? MidpointRounding.ToPositiveInfinity : MidpointRounding.ToNegativeInfinity);
+            var setup = new TradeSetup(direction, entry, stop, target);
             var clientOrderId = $"TEST-{instrument.BaseCurrency}{(instrument.IsCurrencyPair ? instrument.QuoteCurrency : "")}-{_clock.UtcNow:yyyyMMddHHmmss}";
-            var proposal = new TradeProposal(instrument, setup, quote, context.AverageSpread, TestTradeStrategy, 0, clientOrderId);
+            var proposal = new TradeProposal(instrument, setup, quote, context.AverageSpread, TestTradeStrategy, 0, clientOrderId) { IsTestTrade = true };
             var decisionId = Guid.NewGuid();
             var reasons = new List<string> { $"Test trade requested from the dashboard by {requestedBy}." };
 

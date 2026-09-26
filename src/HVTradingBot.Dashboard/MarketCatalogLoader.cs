@@ -1,6 +1,6 @@
 using HVTradingBot.Infrastructure.Markets;
 
-namespace HVTradingBot.Api.Services;
+namespace HVTradingBot.Dashboard;
 
 /// <summary>Keeps the API's instrument registry in sync with the market catalog the worker discovers.</summary>
 public sealed class MarketCatalogLoader(MarketCatalogStore catalog, ILogger<MarketCatalogLoader> logger) : BackgroundService

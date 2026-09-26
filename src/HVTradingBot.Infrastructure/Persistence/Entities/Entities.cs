@@ -335,3 +335,37 @@ public sealed class AppUserEntity
     public DateTime? LastLoginAtUtc { get; set; }
     public DateTime? PasswordChangedAtUtc { get; set; }
 }
+
+/// <summary>
+/// A contract on the broker account as the broker reports it, whether this app opened it or not (another app, the
+/// broker's website). Written by the worker's broker sync; the dashboard shows these as the account's trades.
+/// </summary>
+public sealed class BrokerContractEntity
+{
+    public required string ContractId { get; set; }
+    public required string Broker { get; set; }
+    public required string BrokerAccountId { get; set; }
+    /// <summary>Instrument symbol (e.g. "EUR/USD") when known, otherwise the broker's own symbol.</summary>
+    public required string Symbol { get; set; }
+    public required string ContractType { get; set; }
+    /// <summary>"Long"/"Short" for multiplier contracts, null for other contract types.</summary>
+    public string? Direction { get; set; }
+    public string? Currency { get; set; }
+    /// <summary>Stake paid for the contract.</summary>
+    public decimal BuyPrice { get; set; }
+    public decimal? Multiplier { get; set; }
+    public decimal? EntrySpot { get; set; }
+    public decimal? CurrentSpot { get; set; }
+    public decimal? StopLoss { get; set; }
+    public decimal? TakeProfit { get; set; }
+    /// <summary>Current profit while open, final profit once sold (after commission).</summary>
+    public decimal? Profit { get; set; }
+    public decimal? Commission { get; set; }
+    public DateTime PurchaseTimeUtc { get; set; }
+    public bool IsOpen { get; set; }
+    public decimal? SellPrice { get; set; }
+    public DateTime? SellTimeUtc { get; set; }
+    public decimal? ExitSpot { get; set; }
+    public string? Description { get; set; }
+    public DateTime UpdatedAtUtc { get; set; }
+}

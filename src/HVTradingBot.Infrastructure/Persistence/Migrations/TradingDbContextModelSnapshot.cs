@@ -242,6 +242,130 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
                     b.ToTable("broker_connection_status", (string)null);
                 });
 
+            modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.BrokerContractEntity", b =>
+                {
+                    b.Property<string>("ContractId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("contract_id");
+
+                    b.Property<string>("Broker")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("broker");
+
+                    b.Property<string>("BrokerAccountId")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("broker_account_id");
+
+                    b.Property<decimal>("BuyPrice")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("numeric(28,10)")
+                        .HasColumnName("buy_price");
+
+                    b.Property<decimal?>("Commission")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("numeric(28,10)")
+                        .HasColumnName("commission");
+
+                    b.Property<string>("ContractType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("contract_type");
+
+                    b.Property<string>("Currency")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("currency");
+
+                    b.Property<decimal?>("CurrentSpot")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("numeric(28,10)")
+                        .HasColumnName("current_spot");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Direction")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("direction");
+
+                    b.Property<decimal?>("EntrySpot")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("numeric(28,10)")
+                        .HasColumnName("entry_spot");
+
+                    b.Property<decimal?>("ExitSpot")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("numeric(28,10)")
+                        .HasColumnName("exit_spot");
+
+                    b.Property<bool>("IsOpen")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_open");
+
+                    b.Property<decimal?>("Multiplier")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("numeric(28,10)")
+                        .HasColumnName("multiplier");
+
+                    b.Property<decimal?>("Profit")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("numeric(28,10)")
+                        .HasColumnName("profit");
+
+                    b.Property<DateTime>("PurchaseTimeUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("purchase_time_utc");
+
+                    b.Property<decimal?>("SellPrice")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("numeric(28,10)")
+                        .HasColumnName("sell_price");
+
+                    b.Property<DateTime?>("SellTimeUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sell_time_utc");
+
+                    b.Property<decimal?>("StopLoss")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("numeric(28,10)")
+                        .HasColumnName("stop_loss");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("symbol");
+
+                    b.Property<decimal?>("TakeProfit")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("numeric(28,10)")
+                        .HasColumnName("take_profit");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("ContractId")
+                        .HasName("pk_broker_contracts");
+
+                    b.HasIndex("BrokerAccountId", "IsOpen")
+                        .HasDatabaseName("ix_broker_contracts_broker_account_id_is_open");
+
+                    b.HasIndex("BrokerAccountId", "SellTimeUtc")
+                        .HasDatabaseName("ix_broker_contracts_broker_account_id_sell_time_utc");
+
+                    b.ToTable("broker_contracts", (string)null);
+                });
+
             modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.BrokerSettingsEntity", b =>
                 {
                     b.Property<int>("Id")

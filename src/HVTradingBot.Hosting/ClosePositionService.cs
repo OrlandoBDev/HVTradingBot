@@ -6,7 +6,7 @@ using HVTradingBot.Infrastructure.Persistence.Entities;
 using HVTradingBot.Infrastructure.Trades;
 using Serilog.Context;
 
-namespace HVTradingBot.Worker;
+namespace HVTradingBot.Hosting;
 
 /// <summary>
 /// Carries out "close this position" requests from the dashboard: closes through the engine (which reconciles at once,

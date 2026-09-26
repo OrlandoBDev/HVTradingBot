@@ -6,7 +6,7 @@ using HVTradingBot.Infrastructure.Persistence.Entities;
 using HVTradingBot.Infrastructure.TestTrades;
 using Serilog.Context;
 
-namespace HVTradingBot.Worker;
+namespace HVTradingBot.Hosting;
 
 /// <summary>
 /// Carries out test trades requested from the dashboard: place through the engine, hold for a minute, close at the

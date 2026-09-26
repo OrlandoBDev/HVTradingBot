@@ -10,8 +10,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HVTradingBot.IntegrationTests;
 
-[Collection(PostgresCollection.Name)]
-public class DerivFeedHistoryTests(PostgresFixture fixture) : IAsyncLifetime
+public abstract class DerivFeedHistoryTests(DatabaseFixture fixture) : IAsyncLifetime
 {
     private static readonly DateTime Now = new(2026, 9, 24, 12, 3, 0, DateTimeKind.Utc);
 
@@ -19,7 +18,7 @@ public class DerivFeedHistoryTests(PostgresFixture fixture) : IAsyncLifetime
     {
         await fixture.ResetAsync();
         await using var db = await fixture.DbFactory.CreateDbContextAsync();
-        await db.Database.ExecuteSqlRawAsync("TRUNCATE candles;");
+        await db.Database.ExecuteSqlRawAsync("DELETE FROM candles;");
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
@@ -90,3 +89,9 @@ public class DerivFeedHistoryTests(PostgresFixture fixture) : IAsyncLifetime
         public DateTime UtcNow => Now;
     }
 }
+
+[Collection(PostgresCollection.Name)]
+public sealed class DerivFeedHistoryTestsOnPostgres(PostgresFixture fixture) : DerivFeedHistoryTests(fixture);
+
+[Collection(SqliteCollection.Name)]
+public sealed class DerivFeedHistoryTestsOnSqlite(SqliteFixture fixture) : DerivFeedHistoryTests(fixture);

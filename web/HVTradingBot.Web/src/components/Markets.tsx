@@ -1,8 +1,12 @@
-import type { Market, MarketSettings } from "../types";
+import { lazy, Suspense, useMemo, useState } from "react";
+import type { Market, MarketSettings, Position } from "../types";
 import type { PageId } from "../pages";
 import { num, price, time } from "../format";
 import { useData } from "../useData";
 import { Badge, Card, Empty, ErrorNote, RegimeBadge, stateTone } from "./Ui";
+
+// The chart library is only needed on the Markets page, so it loads separately from the rest of the dashboard.
+const PriceChart = lazy(() => import("./PriceChart").then((m) => ({ default: m.PriceChart })));
 
 type Navigate = (page: PageId, section?: string) => void;
 
@@ -14,7 +18,10 @@ export function Markets({ refreshKey, navigate, compact = false }: { refreshKey:
   // Closed markets (no prices for 10+ minutes) are hidden until they trade again.
   const data = all?.filter((m) => m.isOpen);
   const closed = all?.filter((m) => !m.isOpen) ?? [];
-  return (
+  const [chosen, setChosen] = useState<string | null>(null);
+  const chartable = data?.filter((m) => !m.isLoading) ?? [];
+  const charted = chartable.find((m) => m.instrument === chosen) ?? chartable[0];
+  const table = (
     <Card
       title={compact ? "Markets" : undefined}
       actions={
@@ -56,7 +63,11 @@ export function Markets({ refreshKey, navigate, compact = false }: { refreshKey:
             </thead>
             <tbody>
               {data.map((m) => (
-                <tr key={m.instrument}>
+                <tr
+                  key={m.instrument}
+                  className={compact || m.isLoading ? undefined : `clickable ${m.instrument === charted?.instrument ? "selected" : ""}`}
+                  onClick={compact || m.isLoading ? undefined : () => setChosen(m.instrument)}
+                >
                   <td>
                     <span className="strong">{m.displayName}</span>
                     {m.displayName !== m.instrument && <span className="muted small"> {m.instrument}</span>}
@@ -90,5 +101,49 @@ export function Markets({ refreshKey, navigate, compact = false }: { refreshKey:
         </p>
       )}
     </Card>
+  );
+  if (compact) return table;
+  return (
+    <div className="stack">
+      {charted && (
+        <Card
+          title={
+            <select aria-label="Chart market" value={charted.instrument} onChange={(e) => setChosen(e.target.value)}>
+              {chartable.map((m) => (
+                <option key={m.instrument} value={m.instrument}>{m.displayName}</option>
+              ))}
+            </select>
+          }
+          actions={<span className="muted small">5-minute bars · UTC</span>}
+        >
+          <MarketChart market={charted} refreshKey={refreshKey} />
+        </Card>
+      )}
+      {table}
+    </div>
+  );
+}
+
+function MarketChart({ market, refreshKey }: { market: Market; refreshKey: unknown }) {
+  const { data: positions } = useData<Position[]>("/api/positions/open", refreshKey);
+  // Memoised so the chart redraws its overlays only when the positions change, not on every status push.
+  const open = useMemo(() => positions?.filter((p) => p.instrument === market.instrument) ?? [], [positions, market.instrument]);
+  return (
+    <>
+      <Suspense fallback={<div className="price-chart" />}>
+        <PriceChart instrument={market.instrument} priceDecimals={market.priceDecimals} positions={open} />
+      </Suspense>
+      <p className="chart-legend muted small">
+        {open.length === 0 ? (
+          "No open position in this market."
+        ) : (
+          <>
+            <span className="entry">Entry</span>
+            <span className="stop">Stop</span>
+            <span className="target">Target</span>
+          </>
+        )}
+      </p>
+    </>
   );
 }

@@ -2,7 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\HVTradingBot.Infrastructure\HVTradingBot.Infrastructure.csproj" />
-    <ProjectReference Include="..\HVTradingBot.Contracts\HVTradingBot.Contracts.csproj" />
+    <ProjectReference Include="..\HVTradingBot.Dashboard\HVTradingBot.Dashboard.csproj" />
   </ItemGroup>
 
   <ItemGroup>

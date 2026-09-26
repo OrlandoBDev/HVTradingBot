@@ -1,3 +1,4 @@
+using HVTradingBot.Dashboard;
 using HVTradingBot.Application.Abstractions;
 using HVTradingBot.Domain.Risk;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -7,7 +8,7 @@ namespace HVTradingBot.Api.Infrastructure;
 /// <summary>Reports whether the trading worker is alive (heartbeat) and receiving market data.</summary>
 public sealed class WorkerHealthCheck(ITradingStateStore state, IClock clock, RiskOptions risk) : IHealthCheck
 {
-    public static readonly TimeSpan HeartbeatTimeout = TimeSpan.FromSeconds(60);
+    public static readonly TimeSpan HeartbeatTimeout = DashboardQueries.WorkerHeartbeatTimeout;
 
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {

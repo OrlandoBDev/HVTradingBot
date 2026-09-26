@@ -85,9 +85,9 @@ export interface Position {
   instrument: string;
   direction: string;
   units: number;
-  entryPrice: number;
-  stopLoss: number;
-  takeProfit: number;
+  entryPrice: number | null;
+  stopLoss: number | null;
+  takeProfit: number | null;
   initialRiskAmount: number;
   openedAtUtc: string;
   strategy: string;
@@ -105,6 +105,32 @@ export interface Position {
   closeMessage: string | null;
   /** What the broker charged for the trade; already included in the P&L. */
   commission: number | null;
+  /** "App" for trades this app placed, "External" for contracts opened elsewhere on the broker account. */
+  source: "App" | "External";
+  contractId: string | null;
+  /** Stake paid (external contracts). */
+  stake: number | null;
+  contractType: string | null;
+}
+
+export interface PnlPeriods {
+  today: number;
+  week: number;
+  month: number;
+  allTime: number | null;
+  open: number;
+  openTrades: number;
+  closedTrades: number;
+  wins: number;
+}
+
+/** Profit of the whole broker account and of the app's own trades. */
+export interface ProfitSummary {
+  currency: string;
+  account: PnlPeriods;
+  app: PnlPeriods;
+  accountFromBroker: boolean;
+  syncedAtUtc: string | null;
 }
 
 export interface RiskStatus {
@@ -221,4 +247,33 @@ export interface AuthStatus {
   authenticated: boolean;
   username: string | null;
   setupRequired: boolean;
+}
+
+/** A stored bar from GET /api/candles (oldest first). */
+export interface CandleBar {
+  openTimeUtc: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  spread: number;
+  volume: number;
+}
+
+export interface CandleSeries {
+  instrument: string;
+  timeFrame: string;
+  candles: CandleBar[];
+}
+
+/** A newly closed candle pushed over the dashboard hub's "bar" message. */
+export interface LiveBar {
+  instrument: string;
+  timeFrame: string;
+  openTimeUtc: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
 }

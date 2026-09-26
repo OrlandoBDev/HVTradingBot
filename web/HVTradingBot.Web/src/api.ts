@@ -1,8 +1,11 @@
+import { inApp, withAppBody } from "./platform";
+
 /** Fired when the session has ended (signed out elsewhere, password changed, expired); the app shows the login page. */
 export const UNAUTHORIZED_EVENT = "hv:unauthorized";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
+  const url = inApp && typeof init?.body === "string" ? withAppBody(path, init.body) : path;
+  const response = await fetch(url, {
     ...init,
     credentials: "same-origin",
     // The custom header marks the request as coming from this app; the API refuses changes without it.
