@@ -14,6 +14,7 @@
   --radius: 10px;
   --mono: ui-monospace, "SF Mono", Menlo, monospace;
   --topbar-h: 52px;
+  --account-bar-h: 52px;
 }
 
 @media (prefers-color-scheme: light) {
@@ -74,7 +75,7 @@ code { font-family: var(--mono); font-size: 12.5px; background: var(--panel-2); 
 .body { display: grid; grid-template-columns: 220px minmax(0, 1fr); }
 
 .sidebar {
-  position: sticky; top: var(--topbar-h); height: calc(100vh - var(--topbar-h)); overflow-y: auto;
+  position: sticky; top: var(--topbar-h); height: calc(100vh - var(--topbar-h) - var(--account-bar-h)); overflow-y: auto;
   background: var(--sidebar); border-right: 1px solid var(--border); padding: 14px 10px; display: flex; flex-direction: column; gap: 14px;
 }
 .nav-group-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 0 10px 4px; }
@@ -312,3 +313,22 @@ td.actions { text-align: right; }
 @media (max-width: 700px) { .user-menu .user-name { display: none; } }
 .topbar .user-menu { margin-left: auto; }
 .topbar .topbar-status + .user-menu { margin-left: 14px; }
+
+/* Account summary pinned to the bottom of every page (AccountBar). */
+.account-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; min-height: var(--account-bar-h);
+  display: flex; justify-content: center; align-items: center; gap: 36px;
+  padding: 6px 16px calc(6px + env(safe-area-inset-bottom));
+  background: var(--sidebar); border: none; border-top: 1px solid var(--border);
+  color: var(--text); font: inherit; cursor: pointer; text-align: left;
+}
+.account-bar:hover { background: var(--panel-2); }
+.account-item { display: flex; flex-direction: column; min-width: 0; }
+.account-label { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.account-value { font-weight: 650; font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.content { padding-bottom: calc(var(--account-bar-h) + 32px); }
+@media (max-width: 900px) {
+  .account-bar { justify-content: space-between; gap: 12px; }
+  .content { padding-bottom: calc(var(--account-bar-h) + 24px); }
+  .scrim { bottom: var(--account-bar-h); }
+}

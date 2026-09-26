@@ -19,6 +19,7 @@ import { Settings } from "./components/Settings";
 import { LearningView } from "./components/LearningView";
 import { Login } from "./components/Login";
 import { inApp } from "./platform";
+import { AccountBar } from "./components/AccountBar";
 
 /** Shows the sign-in page until there is a session, then the dashboard. */
 export function App() {
@@ -133,6 +134,7 @@ function Dashboard({ username, onSignOut }: { username: string; onSignOut: () =>
           {route.page === "settings" && <Settings section={route.section} navigate={go} />}
         </main>
       </div>
+      {status && <AccountBar status={status} onOpen={() => go("trades")} />}
     </div>
   );
 }
