@@ -69,14 +69,15 @@ public sealed class EngineSupervisor(Func<IHost> createHost, ILogger<EngineSuper
                 host?.Dispose();
             }
 
+            // The worker asks for a restart with exit code 3 (e.g. new market selection): come back at once. Consumed
+            // before anything else so the process-wide exit code never outlives the host that set it.
+            var requested = Environment.ExitCode == BrokerSettingsWatcher.RestartExitCode;
+            Environment.ExitCode = 0;
             if (stoppingToken.IsCancellationRequested)
             {
                 break;
             }
 
-            // The worker asks for a restart with exit code 3 (e.g. new market selection): come back at once.
-            var requested = Environment.ExitCode == BrokerSettingsWatcher.RestartExitCode;
-            Environment.ExitCode = 0;
             if (requested || DateTime.UtcNow - started >= HealthyRun)
             {
                 delay = MinRestartDelay;

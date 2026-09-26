@@ -176,6 +176,42 @@ public sealed class MobileRuntimeTests : IAsyncLifetime
         Assert.Equal(400, bad.Status);
     }
 
+    [Fact]
+    public async Task Test_trade_is_placed_held_for_a_minute_and_closed()
+    {
+        await WaitForTradingAsync();
+        string? instrument = null;
+        await WaitUntilAsync(async () =>
+        {
+            using var markets = await GetJsonAsync("/api/markets");
+            instrument = markets.RootElement.EnumerateArray()
+                .Where(m => m.GetProperty("isOpen").GetBoolean() && m.GetProperty("isTradable").GetBoolean() && !m.GetProperty("isLoading").GetBoolean())
+                .Select(m => m.GetProperty("instrument").GetString())
+                .FirstOrDefault();
+            return instrument is not null;
+        }, "an open, tradable market");
+
+        var requested = await _runtime.Api.HandleAsync("POST", "/api/test-trades", $$"""{"instrument":"{{instrument}}"}""", CancellationToken.None);
+        Assert.True(requested.Status == 200, requested.Body);
+
+        string? status = null;
+        string? message = null;
+        await WaitUntilAsync(async () =>
+        {
+            using var trades = await GetJsonAsync("/api/test-trades");
+            var latest = trades.RootElement[0];
+            status = latest.GetProperty("status").GetString();
+            message = latest.GetProperty("message").GetString();
+            return status is "Closed" or "Failed";
+        }, "the test trade to close", TimeSpan.FromSeconds(150));
+        Assert.True(status == "Closed", $"{status}: {message}");
+
+        // The engine keeps trading the simulated markets meanwhile; the test trade is one entry in the history.
+        using var history = await GetJsonAsync("/api/trades/paged?page=1&pageSize=100");
+        Assert.Contains(history.RootElement.GetProperty("items").EnumerateArray(),
+            t => t.GetProperty("strategy").GetString() == HVTradingBot.Application.Trading.TradingEngine.TestTradeStrategy);
+    }
+
     private async Task WaitForTradingAsync() =>
         await WaitUntilAsync(async () =>
         {
@@ -191,9 +227,9 @@ public sealed class MobileRuntimeTests : IAsyncLifetime
         return JsonDocument.Parse(response.Body!);
     }
 
-    private async Task WaitUntilAsync(Func<Task<bool>> condition, string what)
+    private async Task WaitUntilAsync(Func<Task<bool>> condition, string what, TimeSpan? timeout = null)
     {
-        var deadline = DateTime.UtcNow.AddSeconds(90);
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(90));
         while (DateTime.UtcNow < deadline)
         {
             if (await condition())
