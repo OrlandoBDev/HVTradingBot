@@ -42,6 +42,8 @@ public sealed class MainActivity : Activity
         settings.AllowContentAccess = false;
         settings.UserAgentString = $"{settings.UserAgentString} {WebBridge.UserAgentMarker}";
         _webView.SetWebViewClient(new DashboardWebViewClient(this));
+        // Confirmations and the kill switch's reason prompt need a chrome client; without one they never show.
+        _webView.SetWebChromeClient(new DashboardChromeClient(this));
         _webView.SetBackgroundColor(global::Android.Graphics.Color.ParseColor("#0F172A"));
 
         // Android 15 draws apps edge to edge: keep the dashboard clear of the status and navigation bars.
