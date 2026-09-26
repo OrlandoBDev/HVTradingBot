@@ -15,6 +15,7 @@ public sealed class MobileRuntimeTests : IAsyncLifetime
 {
     private readonly string _folder = Path.Combine(Path.GetTempPath(), "hvtradingbot-mobile-" + Guid.NewGuid().ToString("N"));
     private readonly ConcurrentQueue<(string Event, string Json)> _published = new();
+    private readonly RecordingPhone _phone = new();
     private MobileRuntime _runtime = null!;
 
     public async Task InitializeAsync()
@@ -28,7 +29,7 @@ public sealed class MobileRuntimeTests : IAsyncLifetime
                 ["MarketData:Simulated:BarIntervalMilliseconds"] = "20",
                 ["MarketData:Simulated:WarmupDays"] = "10"
             }
-        });
+        }, _phone);
         _runtime.Live.Published += (name, json) => _published.Enqueue((name, json));
         await _runtime.StartAsync(CancellationToken.None);
     }
@@ -51,7 +52,8 @@ public sealed class MobileRuntimeTests : IAsyncLifetime
             "/api/decisions/paged?state=NoTrade&instrument=EUR%2FUSD", "/api/trades/paged?page=1&pageSize=10", "/api/audit/paged?page=1&pageSize=10",
             "/api/positions/open", "/api/trades", "/api/risk", "/api/performance", "/api/profit", "/api/audit", "/api/learning", "/api/test-trades",
             "/api/backtests?limit=20", "/api/settings/deriv", "/api/settings/risk", "/api/settings/notifications", "/api/settings/markets",
-            "/api/app/engine", "/api/app/logs?count=50", "/api/candles?instrument=EUR%2FUSD&timeframe=M5&limit=50", "/api/candles?instrument=EUR/USD&timeframe=H1"
+            "/api/app/engine", "/api/app/logs?count=50", "/api/candles?instrument=EUR%2FUSD&timeframe=M5&limit=50", "/api/candles?instrument=EUR/USD&timeframe=H1",
+            "/api/signals", "/api/signals?active=true&page=1&pageSize=10", "/api/signals/stats", "/api/settings/signals"
         ];
         foreach (var path in reads)
         {
@@ -214,6 +216,65 @@ public sealed class MobileRuntimeTests : IAsyncLifetime
         using var history = await GetJsonAsync("/api/trades/paged?page=1&pageSize=100");
         Assert.Contains(history.RootElement.GetProperty("items").EnumerateArray(),
             t => t.GetProperty("strategy").GetString() == HVTradingBot.Application.Trading.TradingEngine.TestTradeStrategy);
+    }
+
+    [Fact]
+    public async Task Signals_reach_the_phone_and_are_decided_from_the_notification_route()
+    {
+        await WaitForTradingAsync();
+        // Every setup from 40 up becomes a near-miss signal, so the simulated markets send some quickly.
+        using (var settings = await GetJsonAsync("/api/settings/signals"))
+        {
+            var body = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(settings.RootElement.GetRawText())!;
+            body["nearMissEnabled"] = JsonSerializer.SerializeToElement(true);
+            body["nearMissMinScore"] = JsonSerializer.SerializeToElement(40);
+            var saved = await _runtime.Api.HandleAsync("PUT", "/api/settings/signals", JsonSerializer.Serialize(body), CancellationToken.None);
+            Assert.True(saved.Status == 200, saved.Body);
+        }
+
+        await WaitUntilAsync(() => Task.FromResult(_phone.Signals.Count >= 2), "two signal notifications", TimeSpan.FromSeconds(120));
+        var skip = _phone.Signals.First().SignalId;
+        var trade = _phone.Signals.Skip(1).First().SignalId;
+        Assert.StartsWith("Signal: ", _phone.Signals.First().Title);
+        Assert.Contains(_published, p => p.Event == LiveUpdates.SignalsEvent);
+
+        var skipped = await _runtime.Api.HandleAsync("POST", $"/api/signals/{skip}/skip", null, CancellationToken.None);
+        var accepted = await _runtime.Api.HandleAsync("POST", $"/api/signals/{trade}/accept", """{"acceptedRules":[]}""", CancellationToken.None);
+        Assert.True(skipped.Status == 200, skipped.Body);
+        // In the fast simulation a signal may already have expired; either way the request is answered.
+        Assert.True(accepted.Status is 200 or 400, accepted.Body);
+
+        await WaitUntilAsync(() => Task.FromResult(_phone.Dismissed.Contains(skip)), "the skipped signal's notification to go");
+        if (accepted.Status == 200)
+        {
+            string? status = null;
+            await WaitUntilAsync(async () =>
+            {
+                using var signal = await GetJsonAsync($"/api/signals/{trade}");
+                status = signal.RootElement.GetProperty("status").GetString();
+                return status is not ("Accepted" or "Placing");
+            }, "the worker to place the accepted signal");
+            Assert.Contains(status, new[] { "Placed", "NeedsReview", "Failed" });
+        }
+
+        Assert.Equal(404, (await _runtime.Api.HandleAsync("POST", $"/api/signals/{Guid.NewGuid()}/skip", null, CancellationToken.None)).Status);
+        Assert.Equal(400, (await _runtime.Api.HandleAsync("POST", $"/api/signals/{skip}/accept", """{"acceptedRules":["KillSwitch"]}""",
+            CancellationToken.None)).Status);
+    }
+
+    private sealed class RecordingPhone : IPhoneNotificationSink
+    {
+        public ConcurrentQueue<PhoneNotification> Shown { get; } = new();
+
+        public ConcurrentQueue<SignalAlert> Signals { get; } = new();
+
+        public ConcurrentBag<Guid> Dismissed { get; } = [];
+
+        public void Show(PhoneNotification notification) => Shown.Enqueue(notification);
+
+        public void ShowSignal(SignalAlert alert) => Signals.Enqueue(alert);
+
+        public void DismissSignal(Guid signalId) => Dismissed.Add(signalId);
     }
 
     private async Task WaitForTradingAsync() =>

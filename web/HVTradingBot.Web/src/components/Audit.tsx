@@ -17,7 +17,7 @@ export function Audit({ refreshKey }: { refreshKey: unknown }) {
       {data && data.length > 0 && (
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Time (UTC)</th><th>Actor</th><th>Action</th><th>Details</th></tr></thead>
+            <thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Details</th></tr></thead>
             <tbody>
               {data.map((a) => (
                 <tr key={a.id}>

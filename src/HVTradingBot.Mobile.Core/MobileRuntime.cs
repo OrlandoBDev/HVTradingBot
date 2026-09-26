@@ -44,6 +44,13 @@ public sealed class MobileRuntime : IAsyncDisposable
         Engine = _dashboard.GetRequiredService<EngineSupervisor>();
         Api = _dashboard.GetRequiredService<LocalApi>();
         Live = _dashboard.GetRequiredService<LiveUpdates>();
+        if (phone is not null)
+        {
+            Live.SignalAlerted += phone.ShowSignal;
+            Live.SignalCleared += phone.DismissSignal;
+            Live.SignalNotice += phone.Show;
+        }
+
         _dashboard.GetRequiredService<EventFeed>(); // subscribes to live updates from the start
         Bridge = _dashboard.GetRequiredService<WebBridge>();
     }

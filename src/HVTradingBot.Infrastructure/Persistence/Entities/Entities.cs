@@ -125,6 +125,7 @@ public sealed class SystemStateEntity
     public DateOnly? PnlDay { get; set; }
     public decimal DailyRealizedPnl { get; set; }
     public decimal DerivedDailyRealizedPnl { get; set; }
+    public decimal SignalDailyRealizedPnl { get; set; }
     public DateOnly? PnlWeekStart { get; set; }
     public decimal WeeklyRealizedPnl { get; set; }
     public DateTime? LastBarTimeUtc { get; set; }
@@ -374,4 +375,49 @@ public sealed class BrokerContractEntity
     public decimal? ExitSpot { get; set; }
     public string? Description { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
+}
+
+/// <summary>A setup sent to the user as a signal, and what became of it (traded, skipped, expired).</summary>
+public sealed class SignalEntity
+{
+    public Guid Id { get; set; }
+    /// <summary>The setup's key (unique per setup and hour); the order's client id is "SIG-" + this.</summary>
+    public required string SetupId { get; set; }
+    public required string Kind { get; set; }
+    public required string Instrument { get; set; }
+    public required string Direction { get; set; }
+    public required string Strategy { get; set; }
+    public int Score { get; set; }
+    public string? Regime { get; set; }
+    public decimal Entry { get; set; }
+    public decimal StopLoss { get; set; }
+    public decimal TakeProfit { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
+    public DateTime ExpiresAtUtc { get; set; }
+    public Guid DecisionId { get; set; }
+    /// <summary>Pending, Accepted, Placing, NeedsReview, Placed, Skipped, Expired, Failed.</summary>
+    public required string Status { get; set; }
+    public string? Message { get; set; }
+    /// <summary>The latest risk check (JSON list of rule, passed, detail, overridden, kind).</summary>
+    public required string Checks { get; set; }
+    /// <summary>Money at risk if traded now (from the latest check).</summary>
+    public decimal? RiskAmount { get; set; }
+    /// <summary>Failed rules the user accepted (JSON list).</summary>
+    public required string AcceptedRules { get; set; }
+    public DateTime? DecidedAtUtc { get; set; }
+    public string? DecidedBy { get; set; }
+    public Guid? PositionId { get; set; }
+    public decimal? FillPrice { get; set; }
+    /// <summary>True once the phone has been notified (so each signal is announced once).</summary>
+    public bool Notified { get; set; }
+}
+
+/// <summary>Signal settings from the Settings page (single row, JSON).</summary>
+public sealed class SignalSettingsEntity
+{
+    public int Id { get; set; }
+    public required string Settings { get; set; }
+    public int Version { get; set; }
+    public DateTime UpdatedAtUtc { get; set; }
+    public string? UpdatedBy { get; set; }
 }

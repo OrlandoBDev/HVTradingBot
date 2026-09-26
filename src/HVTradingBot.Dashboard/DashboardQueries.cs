@@ -11,6 +11,7 @@ using HVTradingBot.Infrastructure.Markets;
 using HVTradingBot.Infrastructure.Persistence;
 using HVTradingBot.Infrastructure.Persistence.Entities;
 using HVTradingBot.Infrastructure.Settings;
+using HVTradingBot.Infrastructure.Signals;
 using HVTradingBot.Infrastructure.Trades;
 using Microsoft.EntityFrameworkCore;
 
@@ -64,6 +65,8 @@ public sealed class DashboardQueries(
         var unrealized = positions.Sum(p => p.UnrealizedPnl ?? 0);
         var balance = account.Balance;
         var now = clock.UtcNow;
+        var waitingSignals = await db.Signals.CountAsync(s => (s.Status == SignalStatus.Pending || s.Status == SignalStatus.NeedsReview) && s.ExpiresAtUtc > now,
+            cancellationToken);
 
         return new SystemStatusDto(
             state.Mode.ToString().ToUpperInvariant(),
@@ -81,7 +84,8 @@ public sealed class DashboardQueries(
             state.WeeklyRealizedPnl,
             state.ConsecutiveLosses,
             state.CooldownUntilUtc,
-            now);
+            now,
+            waitingSignals);
     }
 
     /// <summary>A market with no price for this long is treated as closed and hidden from the market tables.</summary>
@@ -218,7 +222,7 @@ public sealed class DashboardQueries(
         var positions = await WithBrokerContractsAsync(db, state, await OpenPositionsAsync(db, BrokerOf(state), cancellationToken), cancellationToken);
 
         // Show "closing…" (or why a close failed) next to positions the user asked to close.
-        var requests = await closeRequests.LatestForAsync(positions.Where(p => p.Source == AppSource).Select(p => p.Id).ToList(), cancellationToken);
+        var requests = await closeRequests.LatestForAsync(positions.Where(p => p.Source != ExternalSource).Select(p => p.Id).ToList(), cancellationToken);
         return positions.Select(p => requests.TryGetValue(p.Id, out var r) && r.Status != CloseRequestStatus.Closed
             ? p with { CloseStatus = r.Status, CloseMessage = r.Message }
             : p).ToList();
@@ -320,6 +324,9 @@ public sealed class DashboardQueries(
     public const string AppSource = "App";
     public const string ExternalSource = "External";
 
+    /// <summary>A trade the user placed from a signal (kept out of the bot's App profit).</summary>
+    public const string SignalSource = "Signal";
+
     /// <summary>Contracts on the connected broker account that this app did not open (synced by the worker).</summary>
     private static IQueryable<BrokerContractEntity> ExternalContracts(TradingDbContext db, TradingSystemState state)
     {
@@ -354,8 +361,14 @@ public sealed class DashboardQueries(
         return result;
     }
 
-    /// <summary>Realized profit today, this week (from Monday) and this month, all UTC, plus open profit.</summary>
-    public async Task<ProfitSummaryDto> GetProfitSummaryAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Realized profit today, this week (from Monday) and this month, plus open profit. The periods start at midnight in
+    /// <paramref name="timeZone"/> (an IANA id such as "America/New_York", sent by the dashboard); UTC when missing or unknown.
+    /// </summary>
+    public async Task<ProfitSummaryDto> GetProfitSummaryAsync(CancellationToken cancellationToken) =>
+        await GetProfitSummaryAsync(null, cancellationToken);
+
+    public async Task<ProfitSummaryDto> GetProfitSummaryAsync(string? timeZone, CancellationToken cancellationToken)
     {
         var state = await stateStore.GetAsync(cancellationToken);
         var broker = BrokerOf(state);
@@ -363,20 +376,25 @@ public sealed class DashboardQueries(
         var account = await AccountAsync(db, state, cancellationToken);
         var open = await WithBrokerContractsAsync(db, state, await OpenPositionsAsync(db, broker, cancellationToken), cancellationToken);
 
-        var now = clock.UtcNow;
-        var today = now.Date;
-        var week = today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
-        var month = new DateTime(today.Year, today.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var (today, week, month) = PeriodStarts(clock.UtcNow, ResolveTimeZone(timeZone));
         var since = month < week ? month : week;
 
-        var appClosed = db.Positions.AsNoTracking().Where(p => !p.IsOpen && p.Broker == broker);
-        var appRecent = await appClosed.Where(p => p.ClosedAtUtc >= since)
-            .Select(p => new ClosedAmount(p.ClosedAtUtc!.Value, p.RealizedPnl ?? 0)).ToListAsync(cancellationToken);
-        var appAll = await appClosed.SumAsync(p => p.RealizedPnl ?? 0, cancellationToken);
-        var appCount = await appClosed.CountAsync(cancellationToken);
-        var appWins = await appClosed.CountAsync(p => p.RealizedPnl > 0, cancellationToken);
-        var appOpen = open.Where(p => p.Source == AppSource).ToList();
-        var app = Periods(appRecent, today, week, month, appAll, appOpen, appCount, appWins);
+        var closedHere = db.Positions.AsNoTracking().Where(p => !p.IsOpen && p.Broker == broker);
+        async Task<PnlPeriodsDto> OwnPeriodsAsync(IQueryable<PositionEntity> closed, string source)
+        {
+            var recentClosed = await closed.Where(p => p.ClosedAtUtc >= since)
+                .Select(p => new ClosedAmount(p.ClosedAtUtc!.Value, p.RealizedPnl ?? 0)).ToListAsync(cancellationToken);
+            return Periods(recentClosed, today, week, month, await closed.SumAsync(p => p.RealizedPnl ?? 0, cancellationToken),
+                open.Where(p => p.Source == source).ToList(), await closed.CountAsync(cancellationToken),
+                await closed.CountAsync(p => p.RealizedPnl > 0, cancellationToken));
+        }
+
+        // The bot's own trades; trades the user took from signals are counted on their own.
+        var app = await OwnPeriodsAsync(closedHere.Where(p => !p.ClientOrderId.StartsWith(SignalOrders.Prefix)), AppSource);
+        var signalTrades = closedHere.Where(p => p.ClientOrderId.StartsWith(SignalOrders.Prefix));
+        var signals = await signalTrades.AnyAsync(cancellationToken) || open.Any(p => p.Source == SignalSource)
+            ? await OwnPeriodsAsync(signalTrades, SignalSource)
+            : null;
 
         var synced = state.BrokerAccountId is { } accountId
             ? await db.BrokerContracts.AsNoTracking().Where(c => c.BrokerAccountId == accountId).MaxAsync(c => (DateTime?)c.UpdatedAtUtc, cancellationToken)
@@ -384,7 +402,7 @@ public sealed class DashboardQueries(
         if (synced is null)
         {
             // Paper trading, or no broker sync yet: the account's trades are the app's.
-            return new ProfitSummaryDto(account.Currency, app, app, false, null);
+            return new ProfitSummaryDto(account.Currency, app, app, false, null, signals);
         }
 
         var accountClosed = db.BrokerContracts.AsNoTracking().Where(c => c.BrokerAccountId == state.BrokerAccountId && !c.IsOpen && c.SellTimeUtc != null);
@@ -394,7 +412,36 @@ public sealed class DashboardQueries(
         var wins = await accountClosed.CountAsync(c => c.Profit > 0, cancellationToken);
         // All time is unknown for the account: the sync reaches back about a month, and older trades may not be the app's.
         var accountPeriods = Periods(recent, today, week, month, null, open, count, wins);
-        return new ProfitSummaryDto(account.Currency, accountPeriods, app, true, synced);
+        return new ProfitSummaryDto(account.Currency, accountPeriods, app, true, synced, signals);
+    }
+
+    private static TimeZoneInfo ResolveTimeZone(string? id)
+    {
+        if (!string.IsNullOrWhiteSpace(id) && TimeZoneInfo.TryFindSystemTimeZoneById(id, out var zone))
+        {
+            return zone;
+        }
+
+        return TimeZoneInfo.Utc;
+    }
+
+    /// <summary>Local midnight today, on Monday and on the 1st, as UTC instants.</summary>
+    internal static (DateTime Today, DateTime Week, DateTime Month) PeriodStarts(DateTime utcNow, TimeZoneInfo zone)
+    {
+        var local = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcNow, DateTimeKind.Utc), zone).Date;
+        DateTime ToUtc(DateTime localMidnight)
+        {
+            var unspecified = DateTime.SpecifyKind(localMidnight, DateTimeKind.Unspecified);
+            // A few zones skip midnight when daylight saving starts; the day then begins an hour later.
+            while (zone.IsInvalidTime(unspecified))
+            {
+                unspecified = unspecified.AddMinutes(30);
+            }
+
+            return TimeZoneInfo.ConvertTimeToUtc(unspecified, zone);
+        }
+
+        return (ToUtc(local), ToUtc(local.AddDays(-(((int)local.DayOfWeek + 6) % 7))), ToUtc(new DateTime(local.Year, local.Month, 1)));
     }
 
     private sealed record ClosedAmount(DateTime ClosedAtUtc, decimal Profit);
@@ -456,7 +503,8 @@ public sealed class DashboardQueries(
     private static PositionDto ToDto(PositionEntity p, decimal? currentPrice, decimal? unrealized) => new(
         p.Id, p.ClientOrderId, p.Instrument, p.Direction, p.Units, p.EntryPrice, p.StopLoss, p.TakeProfit, p.InitialRiskAmount,
         p.OpenedAtUtc, p.Strategy, p.Score, currentPrice, unrealized, p.ClosedAtUtc, p.ExitPrice, p.ExitReason, p.RealizedPnl,
-        p.RMultiple, p.MaePips, p.MfePips, Commission: p.Commission, ContractId: p.BrokerContractId);
+        p.RMultiple, p.MaePips, p.MfePips, Commission: p.Commission, ContractId: p.BrokerContractId,
+        Source: SignalOrders.IsSignal(p.ClientOrderId) ? SignalSource : AppSource);
 
     /// <summary>A contract opened outside this app, as the broker reports it.</summary>
     private static PositionDto ToDto(BrokerContractEntity c) => new(

@@ -22,6 +22,15 @@ internal sealed class RiskRules(RiskOptions options, ExecutionCostOptions costs)
     public Task<RiskDecision> EvaluateAsync(TradeProposal proposal, PortfolioState portfolio, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (proposal.Signal is { } signal)
+        {
+            return Task.FromResult(EvaluateSignal(proposal, portfolio, signal));
+        }
+
+        // Signal trades use their own slots; the bot's slot rules count only its own positions. Currency exposure
+        // (account-wide risk) still counts every position.
+        var all = portfolio;
+        portfolio = portfolio.WithoutSignalTrades();
         var size = PositionSizer.Calculate(proposal, portfolio, options, costs.SlippagePips);
         var overrideCheck = HighScoreOverride(proposal, portfolio, size);
         var checks = new List<RiskCheck>
@@ -41,7 +50,7 @@ internal sealed class RiskRules(RiskOptions options, ExecutionCostOptions costs)
             DerivedDailyLoss(proposal, portfolio),
             WeeklyLoss(portfolio),
             Cooldown(portfolio),
-            CurrencyExposure(proposal, portfolio),
+            CurrencyExposure(proposal, all),
             Tradable(proposal),
             NewsEvents(proposal),
             Sizing(proposal, size)
@@ -53,6 +62,59 @@ internal sealed class RiskRules(RiskOptions options, ExecutionCostOptions costs)
 
         var approved = checks.All(c => c.Passed);
         return Task.FromResult(new RiskDecision(approved, approved ? size.Units : 0, approved ? size.RiskAmount : 0, checks));
+    }
+
+    /// <summary>
+    /// A signal trade the user accepted: sized with the signal risk, limited by the signal slots and the signal daily
+    /// loss budget, and not by the bot's slots, loss limits or cooldown. Failed rules the user accepted pass as
+    /// overridden when they may be (<see cref="RiskRuleKinds"/>); hard rules always block.
+    /// </summary>
+    private RiskDecision EvaluateSignal(TradeProposal proposal, PortfolioState portfolio, SignalLimits signal)
+    {
+        var sized = options.Clone();
+        sized.MaxRiskPerTradePercent = signal.RiskPerTradePercent;
+        sized.DerivedRiskPerTradePercent = signal.RiskPerTradePercent;
+        var size = PositionSizer.Calculate(proposal, portfolio, sized, costs.SlippagePips);
+        var rules = new RiskRules(sized, costs);
+
+        var checks = new List<RiskCheck>
+        {
+            TradingMode(portfolio),
+            KillSwitch(portfolio),
+            MarketDataFreshness(portfolio),
+            portfolio.OpenPositions.Any(x => x.ClientOrderId == proposal.ClientOrderId)
+                ? Fail(RiskRuleKinds.AlreadyExecuted, "This signal was already traded.")
+                : Pass(RiskRuleKinds.AlreadyExecuted, "Not traded yet."),
+            RewardToRisk(proposal),
+            StopDistance(proposal),
+            Spread(proposal),
+            Slippage(),
+            portfolio.SignalOpenPositions < signal.MaxOpenPositions
+                ? Pass(RiskRuleKinds.SignalPositions, $"{portfolio.SignalOpenPositions}/{signal.MaxOpenPositions} signal trades open.")
+                : Fail(RiskRuleKinds.SignalPositions, $"Maximum of {signal.MaxOpenPositions} signal trade(s) open."),
+            portfolio.OpenPositions.Any(x => x.Instrument == proposal.Instrument)
+                ? Fail(nameof(DuplicateInstrument), $"A position on {proposal.Instrument} is already open.")
+                : Pass(nameof(DuplicateInstrument), "No existing position."),
+            SignalDailyLoss(portfolio, signal),
+            CurrencyExposure(proposal, portfolio),
+            Tradable(proposal),
+            NewsEvents(proposal),
+            rules.Sizing(proposal, size)
+        };
+
+        checks = checks.Select(c => !c.Passed && signal.AcceptedRules.Contains(c.Rule) && RiskRuleKinds.MayOverride(c.Rule, signal)
+            ? c with { Passed = true, Overridden = true, Detail = $"Accepted by you: {c.Detail}" }
+            : c).ToList();
+        var approved = checks.All(c => c.Passed);
+        return new RiskDecision(approved, approved ? size.Units : 0, approved ? size.RiskAmount : 0, checks);
+    }
+
+    private static RiskCheck SignalDailyLoss(PortfolioState p, SignalLimits signal)
+    {
+        var limit = p.Balance * signal.DailyLossLimitPercent / 100m;
+        return -p.SignalDailyRealizedPnl >= limit
+            ? Fail(RiskRuleKinds.SignalDailyLoss, $"Signal trades lost {-p.SignalDailyRealizedPnl:F2} today, reaching their limit {limit:F2}.")
+            : Pass(RiskRuleKinds.SignalDailyLoss, $"Signal P&L today {p.SignalDailyRealizedPnl:F2} (limit -{limit:F2}).");
     }
 
     private static RiskCheck TradingMode(PortfolioState p) => p.Mode == Common.TradingMode.Paper

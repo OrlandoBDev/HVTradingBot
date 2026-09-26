@@ -1,4 +1,4 @@
-export type PageId = "overview" | "markets" | "trades" | "decisions" | "learning" | "news" | "performance" | "backtest" | "risk" | "audit" | "settings";
+export type PageId = "overview" | "markets" | "trades" | "signals" | "decisions" | "learning" | "news" | "performance" | "backtest" | "risk" | "audit" | "settings";
 
 export interface PageInfo {
   id: PageId;
@@ -48,6 +48,19 @@ export const PAGES: PageInfo[] = [
       "Open: every position with its entry, broker-side stop loss and take profit, and live unrealized P&L. Use Close to exit a position early at the market price.",
       "History: how each trade ended (stop, target or manual), its result in money and in R (multiples of the amount risked).",
       "MAE / MFE show how far a trade went against and in favour of you while it was open.",
+    ],
+  },
+  {
+    id: "signals",
+    label: "Signals",
+    icon: "☍",
+    group: "Trading",
+    summary: "Setups the bot sends you to decide on — trade them or skip them. They never use the bot's own slots or loss budget.",
+    details: [
+      "Signals come from markets set to “Signals only” (Settings › Signals) and, if you turn it on, near misses that score just below the automatic threshold.",
+      "Trading a signal re-prices it at the live quote and runs the same risk rules as the bot. A signal expires after a few minutes, or when the price has already moved too far.",
+      "If a rule fails you see why and can accept the risk — except safety rules (kill switch, stale data, closed market, sizing), which always block. Loss limits need a typed ACCEPT and are off by default.",
+      "Signal trades have their own slots, risk per trade and daily loss budget, and are reported separately (overridden ones on their own). Skipped signals are followed as virtual trades so you can see what you missed.",
     ],
   },
   {
@@ -146,6 +159,7 @@ export const PAGES: PageInfo[] = [
       "Markets: what the engine analyses and trades. Saving restarts the worker.",
       "Risk limits: applied within seconds, within safe ranges.",
       "Notifications: your SMTP (e.g. Gmail) settings and recipients; an email for every trade opened and closed.",
+      "Signals: which markets send signals instead of trading, near misses, signal limits, expiry and quiet hours.",
     ],
   },
 ];

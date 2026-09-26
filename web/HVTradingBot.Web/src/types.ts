@@ -28,6 +28,8 @@ export interface SystemStatus {
   consecutiveLosses: number;
   cooldownUntilUtc: string | null;
   serverTimeUtc: string;
+  /** Signals waiting for your decision. */
+  waitingSignals: number;
 }
 
 export interface IndicatorSnapshot {
@@ -106,7 +108,7 @@ export interface Position {
   /** What the broker charged for the trade; already included in the P&L. */
   commission: number | null;
   /** "App" for trades this app placed, "External" for contracts opened elsewhere on the broker account. */
-  source: "App" | "External";
+  source: "App" | "External" | "Signal";
   contractId: string | null;
   /** Stake paid (external contracts). */
   stake: number | null;
@@ -131,6 +133,8 @@ export interface ProfitSummary {
   app: PnlPeriods;
   accountFromBroker: boolean;
   syncedAtUtc: string | null;
+  /** Trades you took from signals (not part of app); null until there are any. */
+  signals: PnlPeriods | null;
 }
 
 export interface RiskStatus {
@@ -276,4 +280,80 @@ export interface LiveBar {
   low: number;
   close: number;
   volume: number;
+}
+
+export type SignalStatus = "Pending" | "Accepted" | "Placing" | "NeedsReview" | "Placed" | "Skipped" | "Expired" | "Failed";
+
+export interface SignalCheck {
+  rule: string;
+  passed: boolean;
+  detail: string;
+  overridden: boolean;
+  /** Hard (never accepted), LossLimit (accepted only if allowed in settings, with a typed ACCEPT) or Soft. */
+  kind: "Hard" | "LossLimit" | "Soft";
+  mayAccept: boolean;
+}
+
+export interface Signal {
+  id: string;
+  setupId: string;
+  kind: "SignalsOnlyMarket" | "NearMiss";
+  instrument: string;
+  direction: "Long" | "Short";
+  strategy: string;
+  score: number;
+  regime: string | null;
+  entry: number;
+  stopLoss: number;
+  takeProfit: number;
+  rewardToRisk: number;
+  createdAtUtc: string;
+  expiresAtUtc: string;
+  status: SignalStatus;
+  message: string | null;
+  checks: SignalCheck[];
+  riskAmount: number | null;
+  acceptedRules: string[];
+  decidedAtUtc: string | null;
+  decidedBy: string | null;
+  positionId: string | null;
+  fillPrice: number | null;
+  decisionId: string;
+  result: { taken: boolean; open: boolean; pnl: number | null; rMultiple: number | null; exitReason: string | null } | null;
+}
+
+export interface SignalStats {
+  active: number;
+  taken: number;
+  takenClosed: number;
+  takenWins: number;
+  takenPnl: number;
+  overridden: number;
+  overriddenPnl: number;
+  skipped: number;
+  expired: number;
+  missedResolved: number;
+  missedWins: number;
+  missedR: number;
+  takenR: number;
+}
+
+export interface SignalSettings {
+  enabled: boolean;
+  signalOnlyInstruments: string[];
+  nearMissEnabled: boolean;
+  nearMissMinScore: number;
+  maxOpenPositions: number;
+  riskPerTradePercent: number;
+  dailyLossLimitPercent: number;
+  expiryMinutes: number;
+  maxPriceMoveFraction: number;
+  oneTapFromNotification: boolean;
+  allowLossLimitOverride: boolean;
+  quietHoursStart: string | null;
+  quietHoursEnd: string | null;
+  timeZone: string | null;
+  version: number;
+  updatedAtUtc: string | null;
+  updatedBy: string | null;
 }

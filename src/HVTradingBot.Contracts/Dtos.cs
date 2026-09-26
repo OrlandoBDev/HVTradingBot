@@ -23,7 +23,8 @@ public sealed record SystemStatusDto(
     decimal WeeklyRealizedPnl,
     int ConsecutiveLosses,
     DateTime? CooldownUntilUtc,
-    DateTime ServerTimeUtc);
+    DateTime ServerTimeUtc,
+    int WaitingSignals = 0);
 
 /// <param name="IsOpen">False when no price has arrived for 10+ minutes (weekend, daily break, exchange hours).</param>
 /// <param name="IsPaused">Derived market waiting because Forex is open ("Derived only while Forex is closed").</param>
@@ -105,8 +106,10 @@ public sealed record PnlPeriodsDto(decimal Today, decimal Week, decimal Month, d
 /// <summary>
 /// Profit for the whole broker account (every contract, also ones opened outside the app) and for the app's own
 /// trades. Without a broker account (paper trading) both are the app's trades.
+/// <see cref="Signals"/> is trades the user took from signals (not part of App), null until there are any.
 /// </summary>
-public sealed record ProfitSummaryDto(string Currency, PnlPeriodsDto Account, PnlPeriodsDto App, bool AccountFromBroker, DateTime? SyncedAtUtc);
+public sealed record ProfitSummaryDto(string Currency, PnlPeriodsDto Account, PnlPeriodsDto App, bool AccountFromBroker, DateTime? SyncedAtUtc,
+    PnlPeriodsDto? Signals = null);
 
 public sealed record RiskLimitStatusDto(string Name, string Current, string Limit, bool Breached);
 
@@ -295,3 +298,84 @@ public sealed record LiveBarDto(
 
 /// <summary>The latest quote for a market, pushed over the hub's "ticks" message when it changes.</summary>
 public sealed record LiveTickDto(string Instrument, DateTime TimeUtc, decimal Bid, decimal Ask, decimal SpreadPips);
+
+/// <summary>One risk rule as checked for a signal. <see cref="Kind"/> is Hard (never accepted), LossLimit or Soft.</summary>
+public sealed record SignalCheckDto(string Rule, bool Passed, string Detail, bool Overridden, string Kind, bool MayAccept);
+
+/// <summary>
+/// A trade setup sent to the user. <see cref="Status"/>: Pending, Accepted, Placing, NeedsReview, Placed, Skipped,
+/// Expired or Failed. <see cref="Checks"/> is the latest risk check (a preview until the user accepts).
+/// </summary>
+public sealed record SignalDto(
+    Guid Id,
+    string SetupId,
+    string Kind,
+    string Instrument,
+    string Direction,
+    string Strategy,
+    int Score,
+    string? Regime,
+    decimal Entry,
+    decimal StopLoss,
+    decimal TakeProfit,
+    decimal RewardToRisk,
+    DateTime CreatedAtUtc,
+    DateTime ExpiresAtUtc,
+    string Status,
+    string? Message,
+    IReadOnlyList<SignalCheckDto> Checks,
+    decimal? RiskAmount,
+    IReadOnlyList<string> AcceptedRules,
+    DateTime? DecidedAtUtc,
+    string? DecidedBy,
+    Guid? PositionId,
+    decimal? FillPrice,
+    Guid DecisionId,
+    SignalResultDto? Result);
+
+/// <summary>
+/// How a signal turned out: for a placed one the trade's profit (open or realized); for one skipped or expired, what it
+/// would have made (the learning system's virtual trade, in R), once known.
+/// </summary>
+public sealed record SignalResultDto(bool Taken, bool Open, decimal? Pnl, decimal? RMultiple, string? ExitReason);
+
+/// <summary>
+/// Accepts a signal. <see cref="AcceptedRules"/> lists failed rules the user accepts the risk of; accepting a loss limit
+/// also needs <see cref="Confirmation"/> "ACCEPT".
+/// </summary>
+public sealed record AcceptSignalRequest(IReadOnlyList<string>? AcceptedRules, string? Confirmation);
+
+/// <summary>Signal results: trades taken (overridden ones separately) and what skipped or expired signals would have made.</summary>
+public sealed record SignalStatsDto(
+    int Active,
+    int Taken,
+    int TakenClosed,
+    int TakenWins,
+    decimal TakenPnl,
+    int Overridden,
+    decimal OverriddenPnl,
+    int Skipped,
+    int Expired,
+    int MissedResolved,
+    int MissedWins,
+    decimal MissedR,
+    decimal TakenR);
+
+public sealed record SignalSettingsDto(
+    bool Enabled,
+    IReadOnlyList<string> SignalOnlyInstruments,
+    bool NearMissEnabled,
+    int NearMissMinScore,
+    int MaxOpenPositions,
+    decimal RiskPerTradePercent,
+    decimal DailyLossLimitPercent,
+    int ExpiryMinutes,
+    decimal MaxPriceMoveFraction,
+    bool OneTapFromNotification,
+    bool AllowLossLimitOverride,
+    string? QuietHoursStart,
+    string? QuietHoursEnd,
+    string? TimeZone,
+    int Version = 0,
+    DateTime? UpdatedAtUtc = null,
+    string? UpdatedBy = null);

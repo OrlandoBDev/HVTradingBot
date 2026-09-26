@@ -19,7 +19,9 @@ const external = (p: Position) => p.source === "External";
 function SourceBadge({ p }: { p: Position }) {
   return external(p)
     ? <span title="Opened outside this app on the same broker account"><Badge tone="neutral">External</Badge></span>
-    : <span title="Placed by this app"><Badge tone="info">App</Badge></span>;
+    : p.source === "Signal"
+      ? <span title="A signal you chose to trade (its own slots and loss budget)"><Badge tone="warn">Signal</Badge></span>
+      : <span title="Placed by this app"><Badge tone="info">App</Badge></span>;
 }
 
 /** Trades page: open positions and closed-trade history. */

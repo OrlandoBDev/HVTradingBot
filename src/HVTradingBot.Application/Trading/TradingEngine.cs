@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using Instrument = HVTradingBot.Domain.MarketData.Instrument;
 using HVTradingBot.Application.Abstractions;
+using HVTradingBot.Application.Signals;
 using HVTradingBot.Application.Learning;
 using HVTradingBot.Application.News;
 using HVTradingBot.Application.Notifications;
@@ -53,6 +54,8 @@ public sealed class TradingEngine
     private readonly ILogger<TradingEngine> _logger;
     private readonly ITradeDecisionNotifier? _notifier;
     private readonly NewsService? _news;
+    private readonly ISignalStore? _signals;
+    private readonly ISignalSettingsSource? _signalSettings;
     private MarketIntelligenceInputs? _intelligence;
 
     public TradingEngine(
@@ -71,7 +74,9 @@ public sealed class TradingEngine
         RegimeOptions regimeOptions,
         ILogger<TradingEngine> logger,
         ITradeDecisionNotifier? notifier = null,
-        NewsService? news = null)
+        NewsService? news = null,
+        ISignalStore? signals = null,
+        ISignalSettingsSource? signalSettings = null)
     {
         _evaluator = evaluator;
         _riskManager = riskManager;
@@ -89,6 +94,8 @@ public sealed class TradingEngine
         _logger = logger;
         _notifier = notifier;
         _news = news;
+        _signals = signals;
+        _signalSettings = signalSettings;
     }
 
     public IReadOnlyCollection<Instrument> TradedInstruments => _series.Keys;
@@ -300,7 +307,9 @@ public sealed class TradingEngine
                     "Position {ClientOrderId} {Instrument} closed by {Reason} at {ExitPrice}: P&L {Pnl} ({R}R)",
                     closed.Position.ClientOrderId, instrument.Symbol, closed.Reason, closed.ExitPrice, closed.RealizedPnl, closed.RMultiple);
 
-                await _state.UpdateAsync(s => s.WithClosedTrade(closed.RealizedPnl, marketTime, _risk.Current, RiskOptions.IsDerived(instrument)),
+                await _state.UpdateAsync(s => SignalOrders.IsSignal(closed.Position.ClientOrderId)
+                        ? s.WithClosedSignalTrade(closed.RealizedPnl, marketTime)
+                        : s.WithClosedTrade(closed.RealizedPnl, marketTime, _risk.Current, RiskOptions.IsDerived(instrument)),
                     cancellationToken);
                 if (_notifier is not null)
                 {
@@ -430,8 +439,16 @@ public sealed class TradingEngine
                 NewsBlackout = best.News.BlackoutReason
             };
 
-            risk = await _riskManager.EvaluateAsync(proposal, await BuildPortfolioAsync(dataStatus, cancellationToken), cancellationToken);
-            if (!risk.IsApproved)
+            if (_signals is not null && _signalSettings?.Current.IsSignalOnly(instrument.Symbol) == true)
+            {
+                // A "signals only" market: the user decides; the bot does not trade it.
+                state = DecisionState.ApprovalRequired;
+                reasons.Add(await CreateSignalAsync(SignalKinds.SignalsOnlyMarket, instrument, best, context, signalBarClose, decisionId, dataStatus,
+                    cancellationToken));
+                clientOrderId = null;
+            }
+            else if ((risk = await _riskManager.EvaluateAsync(proposal, await BuildPortfolioAsync(dataStatus, cancellationToken), cancellationToken))
+                     is { IsApproved: false })
             {
                 state = DecisionState.RejectedByRisk;
                 reasons.Add(risk.RejectionReason!);
@@ -464,6 +481,15 @@ public sealed class TradingEngine
                     await _state.UpdateAsync(st => st.WithKillSwitch(true, why, _clock.UtcNow), cancellationToken);
                 }
             }
+        }
+
+        // Near misses: a setup just below the automatic threshold may be sent as a signal on any market.
+        if (_signals is not null && _signalSettings?.Current is { Enabled: true, NearMissEnabled: true } signalSettings
+            && signal.State == DecisionState.Observe && signal.Best is { } nearMiss && instrument.IsTradable
+            && nearMiss.Score.Total >= signalSettings.NearMissMinScore)
+        {
+            reasons.Add(await CreateSignalAsync(SignalKinds.NearMiss, instrument, nearMiss, context, series.Closed(TimeFrame.H1)[^1].CloseTimeUtc,
+                decisionId, dataStatus, cancellationToken));
         }
 
         await _learning.RecordAsync(signal, state, decisionId, series.Closed(TimeFrame.H1)[^1].CloseTimeUtc, cancellationToken);
@@ -665,6 +691,152 @@ public sealed class TradingEngine
         }
     }
 
+    /// <summary>Records a signal with a preview of the risk check; returns the reason line for the decision journal.</summary>
+    private async Task<string> CreateSignalAsync(string kind, Instrument instrument, ScoredCandidate best, MarketContext context,
+        DateTime signalBarClose, Guid decisionId, MarketDataStatus dataStatus, CancellationToken cancellationToken)
+    {
+        var settings = _signalSettings!.Current;
+        var setupId = IdempotencyKey.For(instrument, best.Result.Strategy, best.Setup.Direction, signalBarClose);
+        var proposal = new TradeProposal(instrument, best.Setup, context.Quote, context.AverageSpread, best.Result.Strategy, best.Score.Total,
+            SignalOrders.Prefix + setupId)
+        {
+            NewsRiskMultiplier = best.News.RiskMultiplier,
+            NewsBlackout = best.News.BlackoutReason,
+            Signal = settings.ToLimits()
+        };
+        var preview = await _riskManager.EvaluateAsync(proposal, await BuildPortfolioAsync(dataStatus, cancellationToken), cancellationToken);
+        var now = _clock.UtcNow;
+        var added = await _signals!.AddAsync(new NewSignal(Guid.NewGuid(), setupId, kind, instrument.Symbol, best.Setup.Direction, best.Result.Strategy,
+            best.Score.Total, context.Regime.ToString(), best.Setup.Entry, best.Setup.StopLoss, best.Setup.TakeProfit, now,
+            now.AddMinutes(settings.ExpiryMinutes), decisionId, preview), cancellationToken);
+        var label = kind == SignalKinds.NearMiss ? "near-miss signal" : "signal";
+        return added
+            ? $"Sent as a {label} (score {best.Score.Total}); expires in {settings.ExpiryMinutes} min unless you trade it."
+            : $"This setup was already sent as a {label}.";
+    }
+
+    /// <summary>
+    /// Places a signal the user accepted. The entry is re-priced at the live quote (stop and target stay where the signal
+    /// put them) and refused if the price has already moved too far toward either. Then the signal risk rules run: any
+    /// failed rule the user has not accepted comes back for review; hard rules always block.
+    /// </summary>
+    public async Task<SignalOutcome> PlaceSignalTradeAsync(SignalRequest request, MarketDataStatus dataStatus, string correlationId,
+        CancellationToken cancellationToken, IReadOnlyCollection<Quote>? liveQuotes = null)
+    {
+        if (!IsReady)
+        {
+            return new SignalOutcome(SignalOutcomeStatus.Failed, "The trading engine is still starting.", []);
+        }
+
+        var settings = _signalSettings?.Current ?? new SignalSettings();
+        await _cycleLock.WaitAsync(cancellationToken);
+        try
+        {
+            foreach (var live in liveQuotes ?? [])
+            {
+                if (_series.ContainsKey(live.Instrument) && live.Ask > live.Bid)
+                {
+                    _quotes[live.Instrument] = live;
+                }
+            }
+
+            _broker.UpdateQuotes(_quotes.Values);
+            if (!Instruments.TryGet(request.Instrument, out var instrument) || !_series.TryGetValue(instrument, out var series)
+                || !_quotes.TryGetValue(instrument, out var quote))
+            {
+                return new SignalOutcome(SignalOutcomeStatus.Failed, $"{request.Instrument} is no longer one of the selected markets.", []);
+            }
+
+            var direction = request.Direction;
+            var sign = direction.Sign();
+            var entry = direction == Direction.Long ? quote.Ask : quote.Bid;
+            var moved = sign * (entry - request.Entry);
+            var toStop = Math.Abs(request.Entry - request.StopLoss);
+            var toTarget = Math.Abs(request.TakeProfit - request.Entry);
+            if (sign * (entry - request.StopLoss) <= 0 || sign * (request.TakeProfit - entry) <= 0
+                || -moved > toStop * settings.MaxPriceMoveFraction || moved > toTarget * settings.MaxPriceMoveFraction)
+            {
+                return new SignalOutcome(SignalOutcomeStatus.Failed,
+                    $"The price has moved too far since the signal (now {entry}, signal entry {request.Entry}); not traded.", [], Entry: entry);
+            }
+
+            var context = MarketContext.Build(series, quote, _regimeOptions,
+                dataStatus.IsStale(_clock.UtcNow, TimeSpan.FromSeconds(_risk.Current.MaxMarketDataAgeSeconds)));
+            var setup = new TradeSetup(direction, entry, request.StopLoss, request.TakeProfit);
+            await RefreshIntelligenceAsync(context.AsOfUtc, cancellationToken);
+            var news = _intelligence is { } inputs ? MarketIntelligence.Assess(instrument, direction, context.AsOfUtc, inputs) : NewsAssessment.None;
+            var proposal = new TradeProposal(instrument, setup, quote, context.AverageSpread, request.Strategy, request.Score, request.ClientOrderId)
+            {
+                NewsRiskMultiplier = news.RiskMultiplier,
+                NewsBlackout = news.BlackoutReason,
+                Signal = settings.ToLimits(request.AcceptedRules)
+            };
+
+            var risk = await _riskManager.EvaluateAsync(proposal, await BuildPortfolioAsync(dataStatus, cancellationToken), cancellationToken);
+            if (!risk.IsApproved)
+            {
+                var failed = risk.Checks.Where(c => !c.Passed).ToList();
+                var reviewable = failed.All(c => RiskRuleKinds.MayOverride(c.Rule, proposal.Signal));
+                return new SignalOutcome(reviewable ? SignalOutcomeStatus.NeedsReview : SignalOutcomeStatus.Failed,
+                    reviewable
+                        ? $"{failed.Count} risk rule(s) failed; review and accept the risk to trade."
+                        : $"Not traded: {string.Join("; ", failed.Where(c => !RiskRuleKinds.MayOverride(c.Rule, proposal.Signal)).Select(c => $"{c.Rule}: {c.Detail}"))}",
+                    risk.Checks, Entry: entry);
+            }
+
+            var decisionId = Guid.NewGuid();
+            var (checkedRisk, order) = await _execution.ExecuteAsync(proposal, ct => BuildPortfolioAsync(dataStatus, ct), decisionId, correlationId,
+                cancellationToken);
+            var filled = order.Status == OrderStatus.Filled;
+            var overridden = checkedRisk.Checks.Where(c => c.Overridden).Select(c => c.Rule).ToList();
+            var reasons = new List<string>
+            {
+                $"Signal accepted by {request.RequestedBy}.",
+                overridden.Count == 0 ? "Every risk rule passed." : $"Risk accepted for: {string.Join(", ", overridden)}.",
+                filled ? $"{_broker.Descriptor.Name} order filled at {order.FillPrice}." : order.RejectReason ?? $"Order {order.Status}."
+            };
+
+            await _journal.RecordDecisionAsync(new DecisionRecord(decisionId, correlationId, instrument.Symbol, context.AsOfUtc,
+                filled ? DecisionState.Executed : DecisionState.RejectedByRisk, context.Regime, request.Strategy, direction, request.Score, null, setup,
+                context.Primary, context.Structural, [], checkedRisk, reasons, request.ClientOrderId, order), cancellationToken);
+            await _journal.RecordAuditAsync(request.RequestedBy, overridden.Count == 0 ? "SignalTraded" : "SignalTradedWithOverrides",
+                string.Join(" ", reasons), correlationId, cancellationToken);
+
+            if (order.Status == OrderStatus.Unknown)
+            {
+                var why = $"Uncertain broker order state for {order.ClientOrderId}.";
+                _logger.LogCritical("{Reason} Kill switch activated.", why);
+                await _state.UpdateAsync(st => st.WithKillSwitch(true, why, _clock.UtcNow), cancellationToken);
+            }
+
+            if (_notifier is not null && filled)
+            {
+                var broker = _broker.Descriptor;
+                await _notifier.NotifyAsync(new TradeDecisionNotification(decisionId, instrument.DisplayName, request.Strategy, DecisionState.Executed,
+                    _options.Mode, new DateTimeOffset(context.AsOfUtc, TimeSpan.Zero), reasons)
+                {
+                    Setup = setup,
+                    Score = request.Score,
+                    Regime = context.Regime.ToString(),
+                    Quantity = checkedRisk.Units,
+                    BrokerOrderId = order.OrderId?.ToString(),
+                    Broker = $"{broker.Name}{(broker.IsDemo ? " (demo)" : "")} {broker.AccountId}".Trim(),
+                    DedupeKey = request.ClientOrderId
+                }, cancellationToken);
+            }
+
+            return filled
+                ? new SignalOutcome(SignalOutcomeStatus.Placed,
+                    $"{Side(direction)} {instrument.DisplayName} filled at {order.FillPrice}; risk {checkedRisk.RiskAmount:F2} {_options.AccountCurrency}.",
+                    checkedRisk.Checks, checkedRisk.RiskAmount, order.PositionId, order.FillPrice, entry)
+                : new SignalOutcome(SignalOutcomeStatus.Failed, string.Join(" ", reasons.Skip(2)), checkedRisk.Checks, Entry: entry);
+        }
+        finally
+        {
+            _cycleLock.Release();
+        }
+    }
+
     private static string Side(Direction d) => d == Direction.Long ? "BUY" : "SELL";
 
     public async Task<PortfolioState> BuildPortfolioAsync(MarketDataStatus dataStatus, CancellationToken cancellationToken)
@@ -695,6 +867,7 @@ public sealed class TradingEngine
             converter)
         {
             DerivedDailyRealizedPnl = state.PnlDay == DateOnly.FromDateTime(marketTime) ? state.DerivedDailyRealizedPnl : 0,
+            SignalDailyRealizedPnl = state.PnlDay == DateOnly.FromDateTime(marketTime) ? state.SignalDailyRealizedPnl : 0,
             // While Forex is closed, Derived may use every position slot.
             ForexMarketOpen = IsForexOpen(marketTime)
         };

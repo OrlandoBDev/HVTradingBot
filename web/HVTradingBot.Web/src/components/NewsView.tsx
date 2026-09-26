@@ -112,7 +112,7 @@ export function NewsView({ refreshKey }: { refreshKey: unknown }) {
                 <div className="table-wrap">
                   <table>
                     <thead>
-                      <tr><th>Time (UTC)</th><th>Currency</th><th>Release</th><th>Impact</th></tr>
+                      <tr><th>Time</th><th>Currency</th><th>Release</th><th>Impact</th></tr>
                     </thead>
                     <tbody>
                       {data.events.map((e) => (
@@ -160,7 +160,7 @@ export function NewsView({ refreshKey }: { refreshKey: unknown }) {
               <div className="table-wrap">
                 <table>
                   <thead>
-                    <tr><th>Time (UTC)</th><th>Headline</th><th>Reads as</th><th>Source</th></tr>
+                    <tr><th>Time</th><th>Headline</th><th>Reads as</th><th>Source</th></tr>
                   </thead>
                   <tbody>
                     {data.headlines.map((h) => (

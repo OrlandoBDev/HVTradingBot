@@ -42,10 +42,21 @@ public static class TradingEndpoints
         api.MapPost("/positions/{id:guid}/close", async (Guid id, DashboardActions actions, HttpContext http, CancellationToken ct) =>
             (await actions.RequestCloseAsync(id, http.Caller(), ct)).ToHttp());
 
+        // Signals: accepting only records the decision; the worker places the trade after re-checking the risk rules.
+        api.MapGet("/signals", (SignalDashboard signals, bool? active, int? page, int? pageSize, CancellationToken ct) =>
+            signals.ListAsync(active ?? false, page, pageSize, ct));
+        api.MapGet("/signals/stats", (SignalDashboard signals, CancellationToken ct) => signals.GetStatsAsync(ct));
+        api.MapGet("/signals/{id:guid}", async (Guid id, SignalDashboard signals, CancellationToken ct) =>
+            await signals.GetAsync(id, ct) is { } s ? Results.Ok(s) : Results.NotFound());
+        api.MapPost("/signals/{id:guid}/accept", async (Guid id, AcceptSignalRequest request, SignalDashboard signals, HttpContext http,
+            CancellationToken ct) => (await signals.AcceptAsync(id, request, http.Caller(), ct)).ToHttp());
+        api.MapPost("/signals/{id:guid}/skip", async (Guid id, SignalDashboard signals, HttpContext http, CancellationToken ct) =>
+            (await signals.SkipAsync(id, http.Caller(), ct)).ToHttp());
+
         api.MapGet("/trades", (DashboardQueries q, int? limit, CancellationToken ct) => q.GetTradeHistoryAsync(limit ?? 200, ct));
         api.MapGet("/risk", (DashboardQueries q, CancellationToken ct) => q.GetRiskStatusAsync(ct));
         api.MapGet("/performance", (DashboardQueries q, CancellationToken ct) => q.GetPerformanceAsync(ct));
-        api.MapGet("/profit", (DashboardQueries q, CancellationToken ct) => q.GetProfitSummaryAsync(ct));
+        api.MapGet("/profit", (DashboardQueries q, string? tz, CancellationToken ct) => q.GetProfitSummaryAsync(tz, ct));
         api.MapGet("/audit", (DashboardQueries q, int? limit, CancellationToken ct) => q.GetAuditAsync(limit ?? 100, ct));
         api.MapGet("/learning", (DashboardActions actions, CancellationToken ct) => actions.GetLearningAsync(ct));
         api.MapGet("/news", (NewsQueries news, CancellationToken ct) => news.GetNewsAsync(ct));

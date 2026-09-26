@@ -136,6 +136,22 @@ public abstract class BrokerAccountSyncTests(DatabaseFixture fixture) : IAsyncLi
     }
 
     [Fact]
+    public async Task Today_week_and_month_start_at_local_midnight_in_the_viewers_time_zone()
+    {
+        await SyncAsync();
+
+        // 12:00 UTC on Wednesday 7 January is 21:00 in Tokyo, whose day began at 15:00 UTC on Tuesday: contract 90
+        // (sold at exactly 15:00 UTC Tuesday, +5) is "today" there but not in UTC.
+        var tokyo = await Queries().GetProfitSummaryAsync("Asia/Tokyo", CancellationToken.None);
+        var utc = await Queries().GetProfitSummaryAsync(null, CancellationToken.None);
+        var unknown = await Queries().GetProfitSummaryAsync("Not/AZone", CancellationToken.None);
+
+        Assert.Equal((-3m, 5m), (tokyo.Account.Today, tokyo.App.Today));
+        Assert.Equal((-8m, 0m), (utc.Account.Today, utc.App.Today));
+        Assert.Equal(utc, unknown with { SyncedAtUtc = utc.SyncedAtUtc }); // unknown zones fall back to UTC
+    }
+
+    [Fact]
     public async Task Contract_sold_since_the_last_sync_is_recorded_with_its_result()
     {
         await SyncAsync();

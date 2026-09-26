@@ -114,7 +114,7 @@ export function Markets({ refreshKey, navigate, compact = false }: { refreshKey:
               ))}
             </select>
           }
-          actions={<span className="muted small">5-minute bars · UTC</span>}
+          actions={<span className="muted small">5-minute bars · local time</span>}
         >
           <MarketChart market={charted} refreshKey={refreshKey} />
         </Card>

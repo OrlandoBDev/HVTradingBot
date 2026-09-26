@@ -4,6 +4,7 @@ import { api } from "../api";
 import { time } from "../format";
 import { Badge, Card, ErrorNote } from "./Ui";
 import { MarketSettings } from "./MarketSettings";
+import { SignalSettings } from "./SignalSettings";
 import { RiskSettings } from "./RiskSettings";
 import { NotificationSettings } from "./NotificationSettings";
 import { SecuritySettings } from "./SecuritySettings";
@@ -186,6 +187,7 @@ const SECTIONS = [
   { id: "account", label: "Broker account", summary: "Connect your Deriv demo account. The token is stored encrypted and never shown again." },
   { id: "markets", label: "Markets", summary: "Pick the markets to analyse and trade. Saving restarts the trading worker." },
   { id: "risk", label: "Risk limits", summary: "How much each trade may risk and when trading stops for the day or week." },
+  { id: "signals", label: "Signals", summary: "Markets that send you signals instead of trading, near misses, signal limits and quiet hours." },
   { id: "notifications", label: "Notifications", summary: "Email me when a trade opens or closes. The app password is stored encrypted and never shown again." },
   { id: "security", label: "Login & security", summary: "The username and password that protect this dashboard." },
   { id: "engine", label: "Engine & log", summary: "The trading engine running on this phone." },
@@ -213,6 +215,7 @@ export function Settings({ section, navigate }: { section?: string; navigate: (p
         <p className="section-summary">{info.summary}</p>
         {current === "account" && <BrokerAccountSettings />}
         {current === "markets" && <MarketSettings />}
+        {current === "signals" && <SignalSettings />}
         {current === "risk" && <RiskSettings />}
         {current === "notifications" && <NotificationSettings />}
         {current === "security" && <SecuritySettings />}
