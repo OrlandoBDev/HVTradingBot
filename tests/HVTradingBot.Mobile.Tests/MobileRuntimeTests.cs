@@ -146,6 +146,29 @@ public sealed class MobileRuntimeTests : IAsyncLifetime
         Assert.NotNull(_runtime.Live.Learning);
     }
 
+    [Fact]
+    public async Task WebView_requests_carry_their_body_in_a_header_and_live_updates_long_poll()
+    {
+        await WaitForTradingAsync();
+        var origin = new Uri(WebBridge.Origin);
+
+        var body = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("""{"active":true,"reason":"from the WebView"}"""));
+        var saved = await _runtime.Bridge.HandleApiAsync("POST", new Uri(origin, "/api/kill-switch"),
+            new Dictionary<string, string> { ["x-hv-body"] = body }, CancellationToken.None);
+        Assert.True(saved.Status == 200, saved.Body);
+
+        var events = await _runtime.Bridge.HandleApiAsync("GET", new Uri(origin, "/api/app/events?after=0"), new Dictionary<string, string>(),
+            CancellationToken.None);
+        using var json = JsonDocument.Parse(events.Body!);
+        var names = json.RootElement.GetProperty("events").EnumerateArray().Select(e => e.GetProperty("name").GetString()).ToList();
+        Assert.Contains(LiveUpdates.StatusEvent, names);
+        Assert.Contains(LiveUpdates.LearningEvent, names);
+
+        var bad = await _runtime.Bridge.HandleApiAsync("PUT", new Uri(origin, "/api/settings/risk"),
+            new Dictionary<string, string> { [WebBridge.BodyHeader] = "%%%" }, CancellationToken.None);
+        Assert.Equal(400, bad.Status);
+    }
+
     private async Task WaitForTradingAsync() =>
         await WaitUntilAsync(async () =>
         {

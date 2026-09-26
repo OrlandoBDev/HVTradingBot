@@ -37,11 +37,15 @@ public sealed class MobileRuntime : IAsyncDisposable
         services.AddSingleton(log);
         services.AddSingleton<LiveUpdates>();
         services.AddSingleton<LocalApi>();
+        services.AddSingleton<EventFeed>();
+        services.AddSingleton<WebBridge>();
         _dashboard = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true });
 
         Engine = _dashboard.GetRequiredService<EngineSupervisor>();
         Api = _dashboard.GetRequiredService<LocalApi>();
         Live = _dashboard.GetRequiredService<LiveUpdates>();
+        _dashboard.GetRequiredService<EventFeed>(); // subscribes to live updates from the start
+        Bridge = _dashboard.GetRequiredService<WebBridge>();
     }
 
     public MobileSettings Settings { get; }
@@ -53,6 +57,9 @@ public sealed class MobileRuntime : IAsyncDisposable
     public LocalApi Api { get; }
 
     public LiveUpdates Live { get; }
+
+    /// <summary>Answers the WebView's dashboard requests.</summary>
+    public WebBridge Bridge { get; }
 
     public bool IsRunning => !_running.IsCompleted;
 
