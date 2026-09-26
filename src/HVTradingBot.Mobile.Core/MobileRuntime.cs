@@ -35,6 +35,8 @@ public sealed class MobileRuntime : IAsyncDisposable
         services.AddTradingCore(configuration).AddDashboard();
         services.AddSingleton(sp => new EngineSupervisor(() => CreateEngineHost(configuration, log, phone), sp.GetRequiredService<ILogger<EngineSupervisor>>()));
         services.AddSingleton(log);
+        services.AddSingleton(settings);
+        services.AddSingleton<DataBackup>();
         services.AddSingleton<LiveUpdates>();
         services.AddSingleton<LocalApi>();
         services.AddSingleton<EventFeed>();
@@ -56,6 +58,9 @@ public sealed class MobileRuntime : IAsyncDisposable
     }
 
     public MobileSettings Settings { get; }
+
+    /// <summary>Exports the data to a file the user keeps, and restores it (with the engine stopped).</summary>
+    public DataBackup Backup => _dashboard.GetRequiredService<DataBackup>();
 
     public AppLog Log { get; }
 

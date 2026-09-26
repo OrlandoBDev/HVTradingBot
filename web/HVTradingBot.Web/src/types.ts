@@ -194,7 +194,27 @@ export interface BacktestRun {
     metrics: Metrics;
     byStrategy: Record<string, Metrics>;
     decisionCounts: Record<string, number>;
+    /** Missing on runs made before the analysis existed. */
+    robustness?: Robustness;
   };
+}
+
+export interface Robustness {
+  periods: { index: number; fromUtc: string; toUtc: string; trades: number; netPnl: number; averageR: number; winRate: number; profitFactor: number | null }[];
+  profitablePeriods: number;
+  monteCarlo: {
+    simulations: number;
+    tradesPerRun: number;
+    totalRWorst5: number;
+    totalRMedian: number;
+    totalRBest5: number;
+    maxDrawdownRMedian: number;
+    maxDrawdownRWorst5: number;
+    probabilityOfLossPercent: number;
+    averageRLowerBound: number;
+  } | null;
+  verdict: "TooFewTrades" | "NoEdge" | "Unproven" | "Holds";
+  summary: string;
 }
 
 export interface DerivAccount {

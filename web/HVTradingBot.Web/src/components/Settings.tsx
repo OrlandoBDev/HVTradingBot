@@ -190,7 +190,7 @@ const SECTIONS = [
   { id: "signals", label: "Signals", summary: "Markets that send you signals instead of trading, near misses, signal limits and quiet hours." },
   { id: "notifications", label: "Notifications", summary: "Email me when a trade opens or closes. The app password is stored encrypted and never shown again." },
   { id: "security", label: "Login & security", summary: "The username and password that protect this dashboard." },
-  { id: "engine", label: "Engine & log", summary: "The trading engine running on this phone." },
+  { id: "engine", label: "Engine & backup", summary: "The trading engine running on this phone, its log, and backups of its data." },
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]["id"];
