@@ -10,7 +10,7 @@ using HVTradingBot.Infrastructure.Persistence;
 using HVTradingBot.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace HVTradingBot.Api.Services;
+namespace HVTradingBot.Dashboard;
 
 public sealed class BacktestService(
     BacktestEngine engine,

@@ -10,7 +10,14 @@ public sealed record TradeProposal(
     decimal AverageSpread,
     string Strategy,
     int Score,
-    string ClientOrderId);
+    string ClientOrderId)
+{
+    /// <summary>
+    /// A test trade requested from the dashboard. It may use a Derived market even when every Derived slot is taken
+    /// (it is closed after a minute); every other rule applies as usual.
+    /// </summary>
+    public bool IsTestTrade { get; init; }
+}
 
 public sealed record RiskCheck(string Rule, bool Passed, string Detail);
 

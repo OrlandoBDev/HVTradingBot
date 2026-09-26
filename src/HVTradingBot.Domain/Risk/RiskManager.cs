@@ -128,6 +128,11 @@ internal sealed class RiskRules(RiskOptions options, ExecutionCostOptions costs)
             return Pass(nameof(DerivedPositions), $"{p.DerivedOpenPositions}/{options.MaxDerivedOpenPositions} Derived open.");
         }
 
+        if (proposal.IsTestTrade)
+        {
+            return Pass(nameof(DerivedPositions), $"{p.DerivedOpenPositions} Derived open; the Derived limit does not apply to test trades.");
+        }
+
         return highScoreOverride is { Passed: true }
             ? Pass(nameof(DerivedPositions), $"{p.DerivedOpenPositions} Derived open; allowed as a high-score extra.")
             : Fail(nameof(DerivedPositions), $"Maximum of {options.MaxDerivedOpenPositions} Derived position(s) reached; remaining slots are kept for Forex.");
@@ -141,7 +146,9 @@ internal sealed class RiskRules(RiskOptions options, ExecutionCostOptions costs)
     private RiskCheck? HighScoreOverride(TradeProposal proposal, PortfolioState p, PositionSize size)
     {
         var sameMarketOpen = p.OpenPositions.Any(x => x.Instrument == proposal.Instrument);
-        if (!RiskOptions.IsDerived(proposal.Instrument) || (p.DerivedOpenPositions < options.MaxDerivedOpenPositions && !sameMarketOpen))
+        // Test trades have no score; they are exempt from the Derived limit instead (see DerivedPositions).
+        if (proposal.IsTestTrade || !RiskOptions.IsDerived(proposal.Instrument)
+            || (p.DerivedOpenPositions < options.MaxDerivedOpenPositions && !sameMarketOpen))
         {
             return null;
         }

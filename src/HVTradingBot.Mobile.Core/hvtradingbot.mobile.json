@@ -1,0 +1,17 @@
+{
+  "Notifications": {
+    "Email": {
+      "Enabled": false,
+      "SmtpHost": "smtp.gmail.com",
+      "SmtpPort": 587,
+      "Username": "",
+      "Password": "",
+      "FromAddress": "",
+      "FromName": "HVTradingBot",
+      "ToAddresses": [],
+      "SubjectPrefix": "[HVTradingBot]",
+      "NotifyOnStatuses": [ "RejectedByRisk", "ApprovalRequired", "Approved", "Executed" ],
+      "MaxSendAttempts": 3
+    }
+  }
+}

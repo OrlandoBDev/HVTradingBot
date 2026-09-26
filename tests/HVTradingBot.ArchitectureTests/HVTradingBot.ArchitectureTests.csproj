@@ -22,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\HVTradingBot.Api\HVTradingBot.Api.csproj" />
     <ProjectReference Include="..\..\src\HVTradingBot.Worker\HVTradingBot.Worker.csproj" />
+    <ProjectReference Include="..\..\src\HVTradingBot.Dashboard\HVTradingBot.Dashboard.csproj" />
     <ProjectReference Include="..\..\src\HVTradingBot.App.Core\HVTradingBot.App.Core.csproj" />
   </ItemGroup>
 

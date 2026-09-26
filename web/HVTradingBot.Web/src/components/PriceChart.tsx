@@ -145,8 +145,9 @@ export function PriceChart({ instrument, priceDecimals, positions }: { instrumen
     const first = bars[0]?.time as number | undefined;
     for (const p of positions) {
       const long = p.direction === "Long";
-      const line = (price: number, color: string, title: string, lineStyle: LineStyle) =>
-        lines.push(current.series.createPriceLine({ price, color, title, lineStyle, lineWidth: 1, axisLabelVisible: true }));
+      // External contracts may have no known entry, stop or target: draw only the levels there are.
+      const line = (price: number | null, color: string, title: string, lineStyle: LineStyle) =>
+        price != null && lines.push(current.series.createPriceLine({ price, color, title, lineStyle, lineWidth: 1, axisLabelVisible: true }));
       line(p.entryPrice, c.accent, `${long ? "Long" : "Short"} entry`, LineStyle.Solid);
       line(p.stopLoss, c.bad, "Stop", LineStyle.Dashed);
       line(p.takeProfit, c.good, "Target", LineStyle.Dashed);

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Dark window behind the WebView so starting the app does not flash white. -->
+  <style name="AppTheme" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+    <item name="android:windowBackground">@color/background</item>
+    <item name="android:statusBarColor">@color/background</item>
+    <item name="android:navigationBarColor">@color/background</item>
+  </style>
+  <color name="background">#0F172A</color>
+</resources>

@@ -18,6 +18,8 @@ import { KillSwitch } from "./components/KillSwitch";
 import { Settings } from "./components/Settings";
 import { LearningView } from "./components/LearningView";
 import { Login } from "./components/Login";
+import { inApp } from "./platform";
+import { AccountBar } from "./components/AccountBar";
 
 /** Shows the sign-in page until there is a session, then the dashboard. */
 export function App() {
@@ -47,12 +49,13 @@ export function App() {
 }
 
 function Dashboard({ username, onSignOut }: { username: string; onSignOut: () => void }) {
-  const { status, connected, setStatus } = useStatus();
+  const { status, learning, connected, setStatus } = useStatus();
   const [route, navigate] = useRoute();
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Tables refetch when the market advances (a new bar) or the kill switch changes, not on every status push.
-  const refreshKey = `${status?.marketData.lastBarTimeUtc}|${status?.killSwitchActive}|${status?.openPositions}`;
+  // In the Android app a learning pulse (setup added or resolved) refreshes too, so the Learning page updates live.
+  const refreshKey = `${status?.marketData.lastBarTimeUtc}|${status?.killSwitchActive}|${status?.openPositions}|${learning?.version}`;
   const refreshStatus = () => api.get<SystemStatus>("/api/status").then(setStatus).catch(() => undefined);
   const page = pageInfo(route.page);
 
@@ -78,18 +81,20 @@ function Dashboard({ username, onSignOut }: { username: string; onSignOut: () =>
                 {status.broker.name === "Deriv" ? (status.broker.isDemo ? " demo" : " REAL") : ""}
               </Badge>
             </span>
-            <span className="health" title={`Worker ${status.workerHealthy ? "running" : "not running"} · data ${status.marketData.isStale ? "stale" : "fresh"} · dashboard ${connected ? "live" : "reconnecting"}`}>
-              <span className={`dot ${status.workerHealthy ? "ok" : "bad"}`} />worker
+            <span className="health" title={`${inApp ? "Engine" : "Worker"} ${status.workerHealthy ? "running" : "not running"} · data ${status.marketData.isStale ? "stale" : "fresh"} · dashboard ${connected ? "live" : "reconnecting"}`}>
+              <span className={`dot ${status.workerHealthy ? "ok" : "bad"}`} />{inApp ? "engine" : "worker"}
               <span className={`dot ${status.marketData.isStale ? "bad" : "ok"}`} />data
               <span className={`dot ${connected ? "ok" : "warn"}`} />live
             </span>
             <KillSwitch status={status} onChanged={refreshStatus} />
           </div>
         )}
-        <div className="user-menu">
-          <span className="user-name" title="Signed in">{username}</span>
-          <button onClick={onSignOut}>Sign out</button>
-        </div>
+        {!inApp && (
+          <div className="user-menu">
+            <span className="user-name" title="Signed in">{username}</span>
+            <button onClick={onSignOut}>Sign out</button>
+          </div>
+        )}
       </header>
 
       <div className="body">
@@ -129,6 +134,7 @@ function Dashboard({ username, onSignOut }: { username: string; onSignOut: () =>
           {route.page === "settings" && <Settings section={route.section} navigate={go} />}
         </main>
       </div>
+      {status && <AccountBar status={status} onOpen={() => go("trades")} />}
     </div>
   );
 }

@@ -11,7 +11,7 @@ using HVTradingBot.Infrastructure.Settings;
 using Microsoft.EntityFrameworkCore;
 using Serilog.Context;
 
-namespace HVTradingBot.Worker;
+namespace HVTradingBot.Hosting;
 
 /// <summary>
 /// Hosts the paper-trading loop: take the single-instance lock, migrate, warm up, reconcile, then process each new bar.
@@ -31,7 +31,7 @@ public sealed class TradingWorker(
     TradingUniverse universe,
     TradingEngineOptions engineOptions,
     RiskOptionsSource riskSource,
-    WorkerInstanceLock instanceLock,
+    IWorkerInstanceLock instanceLock,
     IHostApplicationLifetime lifetime,
     ILogger<TradingWorker> logger) : BackgroundService
 {

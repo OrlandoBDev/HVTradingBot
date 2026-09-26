@@ -1,4 +1,5 @@
 using HVTradingBot.Api.Services;
+using HVTradingBot.Dashboard;
 using Microsoft.AspNetCore.SignalR;
 
 namespace HVTradingBot.Api.Hubs;

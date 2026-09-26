@@ -3,6 +3,7 @@ using HVTradingBot.Api.Services;
 using HVTradingBot.Application.Abstractions;
 using HVTradingBot.Application.Trading;
 using HVTradingBot.Contracts;
+using HVTradingBot.Dashboard;
 using HVTradingBot.Infrastructure.Markets;
 using HVTradingBot.Infrastructure.Persistence.Entities;
 using Microsoft.AspNetCore.Hosting;

@@ -7,8 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace HVTradingBot.IntegrationTests;
 
-[Collection(PostgresCollection.Name)]
-public class EmailSettingsTests(PostgresFixture fixture) : IAsyncLifetime
+public abstract class EmailSettingsTests(DatabaseFixture fixture) : IAsyncLifetime
 {
     private const string AppPassword = "abcd efgh ijkl mnop";
 
@@ -80,3 +79,9 @@ public class EmailSettingsTests(PostgresFixture fixture) : IAsyncLifetime
         public DateTime UtcNow => new(2026, 1, 5, 12, 0, 0, DateTimeKind.Utc);
     }
 }
+
+[Collection(PostgresCollection.Name)]
+public sealed class EmailSettingsTestsOnPostgres(PostgresFixture fixture) : EmailSettingsTests(fixture);
+
+[Collection(SqliteCollection.Name)]
+public sealed class EmailSettingsTestsOnSqlite(SqliteFixture fixture) : EmailSettingsTests(fixture);

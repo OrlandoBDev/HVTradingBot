@@ -5,8 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HVTradingBot.IntegrationTests;
 
-[Collection(PostgresCollection.Name)]
-public class RiskSettingsTests(PostgresFixture fixture) : IAsyncLifetime
+public abstract class RiskSettingsTests(DatabaseFixture fixture) : IAsyncLifetime
 {
     private static readonly RiskOptions Configured = new() { MaxRiskPerTradePercent = 1, MaxDailyLossPercent = 3, MaxWeeklyLossPercent = 8, MaxOpenPositions = 2 };
 
@@ -89,3 +88,9 @@ public class RiskSettingsTests(PostgresFixture fixture) : IAsyncLifetime
         public DateTime UtcNow => new(2026, 1, 5, 12, 0, 0, DateTimeKind.Utc);
     }
 }
+
+[Collection(PostgresCollection.Name)]
+public sealed class RiskSettingsTestsOnPostgres(PostgresFixture fixture) : RiskSettingsTests(fixture);
+
+[Collection(SqliteCollection.Name)]
+public sealed class RiskSettingsTestsOnSqlite(SqliteFixture fixture) : RiskSettingsTests(fixture);

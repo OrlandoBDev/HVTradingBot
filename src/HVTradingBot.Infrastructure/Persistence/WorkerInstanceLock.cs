@@ -9,7 +9,7 @@ namespace HVTradingBot.Infrastructure.Persistence;
 /// life of the process. PostgreSQL releases the lock when the connection ends, so a crashed worker never blocks the
 /// next one. Advisory locks are per database, so a worker on another database (e.g. ./run.sh dev) is not affected.
 /// </summary>
-public sealed class WorkerInstanceLock(string connectionString, ILogger<WorkerInstanceLock> logger) : IAsyncDisposable
+public sealed class WorkerInstanceLock(string connectionString, ILogger<WorkerInstanceLock> logger) : IWorkerInstanceLock, IAsyncDisposable
 {
     /// <summary>Advisory lock key shared by all worker versions ("HVTB" + 1). Never change it.</summary>
     public const long LockKey = 0x4856_5442_0000_0001;

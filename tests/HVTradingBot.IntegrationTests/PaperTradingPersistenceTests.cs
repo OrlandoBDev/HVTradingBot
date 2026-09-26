@@ -6,8 +6,7 @@ using HVTradingBot.Infrastructure.Persistence.Stores;
 
 namespace HVTradingBot.IntegrationTests;
 
-[Collection(PostgresCollection.Name)]
-public class PaperTradingPersistenceTests(PostgresFixture fixture) : IAsyncLifetime
+public abstract class PaperTradingPersistenceTests(DatabaseFixture fixture) : IAsyncLifetime
 {
     private static readonly DateTime T0 = new(2026, 1, 5, 10, 0, 0, DateTimeKind.Utc);
     private static readonly CurrencyConverter Converter = new("USD", new Dictionary<string, decimal> { ["EUR/USD"] = 1.1m });
@@ -85,3 +84,9 @@ public class PaperTradingPersistenceTests(PostgresFixture fixture) : IAsyncLifet
         Assert.Equal(TradingMode.Paper, state.Mode);
     }
 }
+
+[Collection(PostgresCollection.Name)]
+public sealed class PaperTradingPersistenceTestsOnPostgres(PostgresFixture fixture) : PaperTradingPersistenceTests(fixture);
+
+[Collection(SqliteCollection.Name)]
+public sealed class PaperTradingPersistenceTestsOnSqlite(SqliteFixture fixture) : PaperTradingPersistenceTests(fixture);

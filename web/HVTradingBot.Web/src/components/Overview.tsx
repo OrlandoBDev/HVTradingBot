@@ -1,7 +1,8 @@
-import type { SystemStatus } from "../types";
+import type { PnlPeriods, ProfitSummary, SystemStatus } from "../types";
 import type { PageId } from "../pages";
 import { ago, money, signClass, time } from "../format";
-import { Badge, Stat } from "./Ui";
+import { Badge, Card, Stat } from "./Ui";
+import { useData } from "../useData";
 import { Markets } from "./Markets";
 import { OpenPositions } from "./Positions";
 
@@ -9,16 +10,21 @@ type Navigate = (page: PageId, section?: string) => void;
 
 export function Overview({ status, refreshKey, navigate }: { status: SystemStatus; refreshKey: unknown; navigate: Navigate }) {
   const a = status.account;
-  const totalReturn = a.balance - a.startingBalance;
+  const { data: profit } = useData<ProfitSummary>("/api/profit", refreshKey);
+  const account = profit?.account;
+  const scope = profit?.accountFromBroker ? "whole account" : "all trades";
   return (
     <div className="stack">
+      {/* The whole broker account: every contract, including ones opened outside this app. */}
       <div className="grid-stats">
         <Stat label="Equity" value={money(a.equity, a.currency)} sub={`balance ${money(a.balance, a.currency)}`} />
         <Stat label="Open P&L" value={money(a.unrealizedPnl, a.currency)} tone={signClass(a.unrealizedPnl)} sub={`${status.openPositions} open position(s)`} />
-        <Stat label="Today" value={money(status.dailyRealizedPnl, a.currency)} tone={signClass(status.dailyRealizedPnl)} sub="realized, market day" />
-        <Stat label="This week" value={money(status.weeklyRealizedPnl, a.currency)} tone={signClass(status.weeklyRealizedPnl)} sub="realized" />
-        <Stat label="Since start" value={money(totalReturn, a.currency)} tone={signClass(totalReturn)} sub={`from ${money(a.startingBalance, a.currency)}`} />
+        <Stat label="Today" value={money(account?.today, a.currency)} tone={signClass(account?.today)} sub={`realized, ${scope}`} />
+        <Stat label="This week" value={money(account?.week, a.currency)} tone={signClass(account?.week)} sub={`realized since Monday, ${scope}`} />
+        <Stat label="This month" value={money(account?.month, a.currency)} tone={signClass(account?.month)} sub={`realized, ${scope}`} />
       </div>
+
+      {profit && <AppPnl app={profit.app} currency={profit.currency} fromBroker={profit.accountFromBroker} />}
 
       <div className="status-strip">
         <span>
@@ -42,5 +48,25 @@ export function Overview({ status, refreshKey, navigate }: { status: SystemStatu
       <Markets refreshKey={refreshKey} navigate={navigate} compact />
       <OpenPositions refreshKey={refreshKey} compact onMore={() => navigate("trades")} />
     </div>
+  );
+}
+
+/** The only app-specific numbers on the overview: profit from trades this app placed. */
+function AppPnl({ app, currency, fromBroker }: { app: PnlPeriods; currency: string; fromBroker: boolean }) {
+  const winRate = app.closedTrades === 0 ? null : (app.wins / app.closedTrades) * 100;
+  return (
+    <Card title="App P/L">
+      <p className="hint">
+        Only trades placed by this app{fromBroker ? "; the figures above cover every trade on the broker account" : ""}. Days and weeks in UTC.
+      </p>
+      <div className="grid-stats">
+        <Stat label="Today" value={money(app.today, currency)} tone={signClass(app.today)} sub="realized" />
+        <Stat label="This week" value={money(app.week, currency)} tone={signClass(app.week)} sub="realized since Monday" />
+        <Stat label="This month" value={money(app.month, currency)} tone={signClass(app.month)} sub="realized" />
+        <Stat label="All time" value={money(app.allTime, currency)} tone={signClass(app.allTime)}
+          sub={`${app.closedTrades} trade(s)${winRate == null ? "" : `, ${winRate.toFixed(0)}% won`}`} />
+        <Stat label="Open" value={money(app.open, currency)} tone={signClass(app.open)} sub={`${app.openTrades} open position(s)`} />
+      </div>
+    </Card>
   );
 }

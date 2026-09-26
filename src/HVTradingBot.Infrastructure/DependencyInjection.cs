@@ -48,7 +48,8 @@ public static class DependencyInjection
                 "Set ConnectionStrings__TradingDb (./run.sh does this from .env; IDE runs in Development read .env directly - run ./run.sh once to create it), or use dotnet user-secrets.");
         }
 
-        services.AddDbContextFactory<TradingDbContext>(o => DatabaseSetup.Configure(o, connectionString));
+        var provider = DatabaseSetup.ProviderFrom(configuration);
+        services.AddDbContextFactory<TradingDbContext>(o => DatabaseSetup.Configure(o, provider, connectionString));
 
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton<ITradingStateStore, EfTradingStateStore>();
@@ -111,6 +112,7 @@ public static class DependencyInjection
             sp.GetRequiredService<DerivOptions>()));
         services.AddSingleton<DerivSession>();
         services.AddSingleton<DerivMarketDiscovery>();
+        services.AddSingleton<DerivAccountSync>();
 
         if (marketData.Provider == MarketDataProvider.Deriv)
         {
@@ -141,6 +143,17 @@ public static class DependencyInjection
     {
         var factory = services.GetRequiredService<IDbContextFactory<TradingDbContext>>();
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        await MigrateAsync(db, cancellationToken);
+    }
+
+    /// <summary>Applies migrations; on SQLite also switches to WAL so dashboard reads never wait for engine writes.</summary>
+    public static async Task MigrateAsync(TradingDbContext db, CancellationToken cancellationToken)
+    {
+        if (db.Database.IsSqlite())
+        {
+            await db.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;", cancellationToken);
+        }
+
         // EF Core takes a database lock during migration, so the API and worker can both call this safely.
         await db.Database.MigrateAsync(cancellationToken);
     }

@@ -1,0 +1,63 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Android app: the whole trading bot on the phone, no server. The engine, the dashboard's API and SQLite run in this
+    process (src/HVTradingBot.Mobile.Core); this project only adds the foreground service that keeps the engine alive,
+    the WebView that shows the dashboard, and notifications.
+
+    Not part of HVTradingBot.sln: it needs the `android` workload and the Android SDK (the android-apk CI job builds it).
+    Build: apps/HVTradingBot.Android/build-apk.sh
+  -->
+
+  <PropertyGroup>
+    <!-- Singular TargetFramework overrides the net10.0 from Directory.Build.props. -->
+    <TargetFramework>net10.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>HVTradingBot.Android</RootNamespace>
+    <AssemblyName>HVTradingBot</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Android toolchain warnings vary with the installed SDK; do not fail the build on them. -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+
+    <ApplicationTitle>HVTradingBot</ApplicationTitle>
+    <ApplicationId>com.hvtradingbot.android</ApplicationId>
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+
+    <!-- A single installable file for sideloading. -->
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <!--
+      Phones (arm64) and the Android emulator on PCs (x64). -p:AppRuntimeIdentifiers=android-arm64 builds a smaller,
+      phone-only APK (RuntimeIdentifiers itself cannot be set on the command line: it would flow into the libraries).
+    -->
+    <AppRuntimeIdentifiers Condition="'$(AppRuntimeIdentifiers)' == ''">android-arm64;android-x64</AppRuntimeIdentifiers>
+    <RuntimeIdentifiers>$(AppRuntimeIdentifiers)</RuntimeIdentifiers>
+    <!--
+      No trimming: EF Core, System.Text.Json and the options binder use reflection over the trading code, and a trimmed
+      member would only fail at runtime on the phone.
+    -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <AndroidLinkMode>None</AndroidLinkMode>
+    <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
+    <RunAOTCompilation>false</RunAOTCompilation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\HVTradingBot.Mobile.Core\HVTradingBot.Mobile.Core.csproj" />
+  </ItemGroup>
+
+  <!-- The web dashboard (npm run build in web/HVTradingBot.Web writes it to the API's wwwroot), packed as app assets. -->
+  <PropertyGroup>
+    <DashboardBuildDir>$(MSBuildThisFileDirectory)..\..\src\HVTradingBot.Api\wwwroot\</DashboardBuildDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <AndroidAsset Include="$(DashboardBuildDir)**\*" Link="Assets\wwwroot\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+  <Target Name="RequireDashboardBuild" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(DashboardBuildDir)index.html')"
+           Text="The dashboard is not built. Run 'npm ci &amp;&amp; npm run build' in web/HVTradingBot.Web first (build-apk.sh does this)." />
+  </Target>
+
+</Project>

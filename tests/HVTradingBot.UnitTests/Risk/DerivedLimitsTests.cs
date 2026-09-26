@@ -51,6 +51,48 @@ public class DerivedLimitsTests
         Assert.True(forex.IsApproved, forex.RejectionReason);
     }
 
+    private static readonly Instrument Vol10 = Instruments.Register(new Instrument("R_10X", "R_10X", "USD", 0.01m, 2)
+    {
+        AssetClass = AssetClass.SyntheticIndex, Name = "Volatility 10 test"
+    });
+
+    private static OpenPosition OpenOn(Instrument instrument, string clientOrderId) =>
+        Bars.Position(instrument, Direction.Long, entry: 1000m, stop: 990m, target: 1030m, units: 5, clientOrderId: clientOrderId);
+
+    [Fact]
+    public async Task Test_trade_may_use_a_derived_market_when_every_derived_slot_is_taken()
+    {
+        var portfolio = Bars.Portfolio(balance: 10_000m, positions: [OpenOn(Vol10, "d1")]);
+        var test = DerivedProposal() with { Score = 0, ClientOrderId = "TEST-1", IsTestTrade = true };
+
+        var decision = await _risk.EvaluateAsync(test, portfolio, CancellationToken.None);
+        var normal = await _risk.EvaluateAsync(test with { IsTestTrade = false }, portfolio, CancellationToken.None);
+
+        Assert.True(decision.IsApproved, decision.RejectionReason);
+        Assert.DoesNotContain(decision.Checks, c => c.Rule == "HighScoreOverride");
+        Assert.False(normal.IsApproved); // the same trade from a strategy stays blocked
+    }
+
+    [Fact]
+    public async Task Test_trade_still_obeys_the_other_rules()
+    {
+        // Three open positions (one Derived, two Forex) fill MaxOpenPositions = 3.
+        var full = Bars.Portfolio(balance: 10_000m, positions:
+        [
+            OpenOn(Vol10, "d1"),
+            Bars.Position(Instruments.GbpUsd, Direction.Long, entry: 1.25m, stop: 1.24m, target: 1.28m, units: 1000, clientOrderId: "f1"),
+            Bars.Position(Instruments.UsdJpy, Direction.Long, entry: 150m, stop: 149m, target: 153m, units: 1000, clientOrderId: "f2")
+        ]);
+        var test = DerivedProposal() with { Score = 0, ClientOrderId = "TEST-2", IsTestTrade = true };
+
+        var tooMany = await _risk.EvaluateAsync(test, full, CancellationToken.None);
+        var killed = await _risk.EvaluateAsync(test, Bars.Portfolio(balance: 10_000m) with { KillSwitchActive = true, KillSwitchReason = "manual" },
+            CancellationToken.None);
+
+        Assert.Contains(tooMany.Checks, c => c.Rule == "OpenPositions" && !c.Passed);
+        Assert.Contains(killed.Checks, c => c.Rule == "KillSwitch" && !c.Passed);
+    }
+
     private static OpenPosition OpenDerived(string clientOrderId, decimal risk = 50m) =>
         Bars.Position(Vol75, Direction.Long, entry: 1000m, stop: 990m, target: 1030m, units: 5, clientOrderId: clientOrderId) with { InitialRiskAmount = risk };
 

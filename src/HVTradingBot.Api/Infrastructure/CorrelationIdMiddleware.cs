@@ -1,3 +1,4 @@
+using HVTradingBot.Dashboard;
 using HVTradingBot.Infrastructure.Observability;
 using Serilog.Context;
 
@@ -28,4 +29,17 @@ public static class HttpContextExtensions
 {
     public static string CorrelationId(this HttpContext context) =>
         context.Items[CorrelationIdMiddleware.HeaderName] as string ?? context.TraceIdentifier;
+
+    /// <summary>The audit identity of a dashboard request.</summary>
+    public static DashboardCaller Caller(this HttpContext context) =>
+        new($"dashboard@{context.Connection.RemoteIpAddress}", context.CorrelationId());
+
+    public static IResult ToHttp(this DashboardResult result) => result switch
+    {
+        DashboardResult.OkResult ok => Results.Ok(ok.Value),
+        DashboardResult.NoContentResult => Results.NoContent(),
+        DashboardResult.NotFoundResult => Results.NotFound(),
+        DashboardResult.InvalidResult invalid => Results.ValidationProblem(invalid.Errors),
+        _ => throw new ArgumentOutOfRangeException(nameof(result), result, null)
+    };
 }

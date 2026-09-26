@@ -31,3 +31,11 @@ export function onReconnected(listener: () => void) {
   reconnectListeners.add(listener);
   return () => void reconnectListeners.delete(listener);
 }
+
+/**
+ * Asks charts to reload their candles. The Android app has no SignalR connection; it calls this when a new bar has
+ * been processed, so charts stay current there too.
+ */
+export function reloadCharts() {
+  reconnectListeners.forEach((l) => l());
+}

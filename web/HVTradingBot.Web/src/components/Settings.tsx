@@ -7,6 +7,8 @@ import { MarketSettings } from "./MarketSettings";
 import { RiskSettings } from "./RiskSettings";
 import { NotificationSettings } from "./NotificationSettings";
 import { SecuritySettings } from "./SecuritySettings";
+import { AppEngineSettings } from "./AppEngineSettings";
+import { inApp } from "../platform";
 import type { PageId } from "../pages";
 
 const connectionTone = (s: DerivSettings["connection"]) =>
@@ -186,18 +188,22 @@ const SECTIONS = [
   { id: "risk", label: "Risk limits", summary: "How much each trade may risk and when trading stops for the day or week." },
   { id: "notifications", label: "Notifications", summary: "Email me when a trade opens or closes. The app password is stored encrypted and never shown again." },
   { id: "security", label: "Login & security", summary: "The username and password that protect this dashboard." },
+  { id: "engine", label: "Engine & log", summary: "The trading engine running on this phone." },
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]["id"];
 
+/** The Android app has no dashboard login (the phone's lock screen protects it) but shows its engine instead. */
+const VISIBLE = SECTIONS.filter((s) => (inApp ? s.id !== "security" : s.id !== "engine"));
+
 /** Settings page: one focused section at a time instead of one long page. */
 export function Settings({ section, navigate }: { section?: string; navigate: (page: PageId, section?: string) => void }) {
-  const current: SectionId = SECTIONS.some((s) => s.id === section) ? (section as SectionId) : "account";
-  const info = SECTIONS.find((s) => s.id === current)!;
+  const current: SectionId = VISIBLE.some((s) => s.id === section) ? (section as SectionId) : "account";
+  const info = VISIBLE.find((s) => s.id === current)!;
   return (
     <div className="settings-layout">
       <nav className="subnav">
-        {SECTIONS.map((s) => (
+        {VISIBLE.map((s) => (
           <button key={s.id} className={s.id === current ? "active" : ""} onClick={() => navigate("settings", s.id)}>
             {s.label}
           </button>
@@ -210,6 +216,7 @@ export function Settings({ section, navigate }: { section?: string; navigate: (p
         {current === "risk" && <RiskSettings />}
         {current === "notifications" && <NotificationSettings />}
         {current === "security" && <SecuritySettings />}
+        {current === "engine" && <AppEngineSettings />}
       </div>
     </div>
   );

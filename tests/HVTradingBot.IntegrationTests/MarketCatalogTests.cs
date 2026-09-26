@@ -4,8 +4,7 @@ using HVTradingBot.Infrastructure.Persistence.Entities;
 
 namespace HVTradingBot.IntegrationTests;
 
-[Collection(PostgresCollection.Name)]
-public class MarketCatalogTests(PostgresFixture fixture) : IAsyncLifetime
+public abstract class MarketCatalogTests(DatabaseFixture fixture) : IAsyncLifetime
 {
     public async Task InitializeAsync()
     {
@@ -67,3 +66,9 @@ public class MarketCatalogTests(PostgresFixture fixture) : IAsyncLifetime
         public DateTime UtcNow => new(2026, 1, 5, 12, 0, 0, DateTimeKind.Utc);
     }
 }
+
+[Collection(PostgresCollection.Name)]
+public sealed class MarketCatalogTestsOnPostgres(PostgresFixture fixture) : MarketCatalogTests(fixture);
+
+[Collection(SqliteCollection.Name)]
+public sealed class MarketCatalogTestsOnSqlite(SqliteFixture fixture) : MarketCatalogTests(fixture);

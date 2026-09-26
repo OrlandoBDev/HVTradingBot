@@ -9,7 +9,6 @@ using HVTradingBot.Infrastructure.Persistence;
 using HVTradingBot.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Npgsql;
 
 namespace HVTradingBot.Infrastructure.Brokers;
 
@@ -118,7 +117,7 @@ public sealed class PaperTradingBroker(
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        catch (DbUpdateException ex) when (DatabaseSetup.IsUniqueViolation(ex))
         {
             // A concurrent or retried submission won the race; report the existing order instead of creating a second one.
             await using var fresh = await dbFactory.CreateDbContextAsync(cancellationToken);

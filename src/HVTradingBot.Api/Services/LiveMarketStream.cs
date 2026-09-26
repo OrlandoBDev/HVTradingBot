@@ -3,6 +3,7 @@ using HVTradingBot.Contracts;
 using HVTradingBot.Domain.MarketData;
 using HVTradingBot.Infrastructure.Markets;
 using HVTradingBot.Infrastructure.Persistence;
+using HVTradingBot.Dashboard;
 using Microsoft.EntityFrameworkCore;
 
 namespace HVTradingBot.Api.Services;
