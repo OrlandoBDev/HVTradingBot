@@ -23,7 +23,12 @@ const TIME_FRAME = "M5";
 const BAR_SECONDS = 5 * 60;
 const HISTORY_BARS = 500;
 
-const toTime = (iso: string) => Math.floor(Date.parse(iso) / 1000) as UTCTimestamp;
+// The chart library shows timestamps as UTC; shifting them by the local offset shows local time on the axis. Offsets are
+// whole quarter hours, so 5-minute bars stay aligned.
+const toTime = (iso: string) => {
+  const ms = Date.parse(iso);
+  return (Math.floor(ms / 1000) - new Date(ms).getTimezoneOffset() * 60) as UTCTimestamp;
+};
 const toBar = (c: Pick<CandleBar, "openTimeUtc" | "open" | "high" | "low" | "close">): CandlestickData<Time> => ({ time: toTime(c.openTimeUtc), open: c.open, high: c.high, low: c.low, close: c.close });
 
 /** The browser's language when Intl accepts it (some report tags like "en-US@posix" that make the chart throw). */

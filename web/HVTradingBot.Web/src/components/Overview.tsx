@@ -1,6 +1,6 @@
 import type { PnlPeriods, ProfitSummary, SystemStatus } from "../types";
 import type { PageId } from "../pages";
-import { ago, money, signClass, time } from "../format";
+import { ago, localTimeZone, money, signClass, time } from "../format";
 import { Badge, Card, Stat } from "./Ui";
 import { useData } from "../useData";
 import { Markets } from "./Markets";
@@ -10,7 +10,7 @@ type Navigate = (page: PageId, section?: string) => void;
 
 export function Overview({ status, refreshKey, navigate }: { status: SystemStatus; refreshKey: unknown; navigate: Navigate }) {
   const a = status.account;
-  const { data: profit } = useData<ProfitSummary>("/api/profit", refreshKey);
+  const { data: profit } = useData<ProfitSummary>(`/api/profit?tz=${encodeURIComponent(localTimeZone())}`, refreshKey);
   const account = profit?.account;
   const scope = profit?.accountFromBroker ? "whole account" : "all trades";
   return (
@@ -57,7 +57,7 @@ function AppPnl({ app, currency, fromBroker }: { app: PnlPeriods; currency: stri
   return (
     <Card title="App P/L">
       <p className="hint">
-        Only trades placed by this app{fromBroker ? "; the figures above cover every trade on the broker account" : ""}. Days and weeks in UTC.
+        Only trades placed by this app{fromBroker ? "; the figures above cover every trade on the broker account" : ""}. Days and weeks in your local time.
       </p>
       <div className="grid-stats">
         <Stat label="Today" value={money(app.today, currency)} tone={signClass(app.today)} sub="realized" />

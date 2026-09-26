@@ -354,8 +354,14 @@ public sealed class DashboardQueries(
         return result;
     }
 
-    /// <summary>Realized profit today, this week (from Monday) and this month, all UTC, plus open profit.</summary>
-    public async Task<ProfitSummaryDto> GetProfitSummaryAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Realized profit today, this week (from Monday) and this month, plus open profit. The periods start at midnight in
+    /// <paramref name="timeZone"/> (an IANA id such as "America/New_York", sent by the dashboard); UTC when missing or unknown.
+    /// </summary>
+    public async Task<ProfitSummaryDto> GetProfitSummaryAsync(CancellationToken cancellationToken) =>
+        await GetProfitSummaryAsync(null, cancellationToken);
+
+    public async Task<ProfitSummaryDto> GetProfitSummaryAsync(string? timeZone, CancellationToken cancellationToken)
     {
         var state = await stateStore.GetAsync(cancellationToken);
         var broker = BrokerOf(state);
@@ -363,10 +369,7 @@ public sealed class DashboardQueries(
         var account = await AccountAsync(db, state, cancellationToken);
         var open = await WithBrokerContractsAsync(db, state, await OpenPositionsAsync(db, broker, cancellationToken), cancellationToken);
 
-        var now = clock.UtcNow;
-        var today = now.Date;
-        var week = today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
-        var month = new DateTime(today.Year, today.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var (today, week, month) = PeriodStarts(clock.UtcNow, ResolveTimeZone(timeZone));
         var since = month < week ? month : week;
 
         var appClosed = db.Positions.AsNoTracking().Where(p => !p.IsOpen && p.Broker == broker);
@@ -395,6 +398,35 @@ public sealed class DashboardQueries(
         // All time is unknown for the account: the sync reaches back about a month, and older trades may not be the app's.
         var accountPeriods = Periods(recent, today, week, month, null, open, count, wins);
         return new ProfitSummaryDto(account.Currency, accountPeriods, app, true, synced);
+    }
+
+    private static TimeZoneInfo ResolveTimeZone(string? id)
+    {
+        if (!string.IsNullOrWhiteSpace(id) && TimeZoneInfo.TryFindSystemTimeZoneById(id, out var zone))
+        {
+            return zone;
+        }
+
+        return TimeZoneInfo.Utc;
+    }
+
+    /// <summary>Local midnight today, on Monday and on the 1st, as UTC instants.</summary>
+    internal static (DateTime Today, DateTime Week, DateTime Month) PeriodStarts(DateTime utcNow, TimeZoneInfo zone)
+    {
+        var local = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcNow, DateTimeKind.Utc), zone).Date;
+        DateTime ToUtc(DateTime localMidnight)
+        {
+            var unspecified = DateTime.SpecifyKind(localMidnight, DateTimeKind.Unspecified);
+            // A few zones skip midnight when daylight saving starts; the day then begins an hour later.
+            while (zone.IsInvalidTime(unspecified))
+            {
+                unspecified = unspecified.AddMinutes(30);
+            }
+
+            return TimeZoneInfo.ConvertTimeToUtc(unspecified, zone);
+        }
+
+        return (ToUtc(local), ToUtc(local.AddDays(-(((int)local.DayOfWeek + 6) % 7))), ToUtc(new DateTime(local.Year, local.Month, 1)));
     }
 
     private sealed record ClosedAmount(DateTime ClosedAtUtc, decimal Profit);
