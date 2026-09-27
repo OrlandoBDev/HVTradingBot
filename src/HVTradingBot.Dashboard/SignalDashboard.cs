@@ -158,7 +158,8 @@ public sealed class SignalDashboard(
             AllowLossLimitOverride = request.AllowLossLimitOverride,
             QuietHoursStart = start,
             QuietHoursEnd = end,
-            TimeZone = string.IsNullOrWhiteSpace(request.TimeZone) ? null : request.TimeZone.Trim()
+            TimeZone = string.IsNullOrWhiteSpace(request.TimeZone) ? null : request.TimeZone.Trim(),
+            MaxNotificationsPerHour = request.MaxNotificationsPerHour
         };
         foreach (var (field, message) in settings.Validate())
         {
@@ -244,5 +245,6 @@ public sealed class SignalDashboard(
         v.Settings.Enabled, v.Settings.SignalOnlyInstruments, v.Settings.NearMissEnabled, v.Settings.NearMissMinScore, v.Settings.MaxOpenPositions,
         v.Settings.RiskPerTradePercent, v.Settings.DailyLossLimitPercent, v.Settings.ExpiryMinutes, v.Settings.MaxPriceMoveFraction,
         v.Settings.OneTapFromNotification, v.Settings.AllowLossLimitOverride, v.Settings.QuietHoursStart?.ToString("HH:mm"),
-        v.Settings.QuietHoursEnd?.ToString("HH:mm"), v.Settings.TimeZone, v.Version, v.UpdatedAtUtc, v.UpdatedBy);
+        v.Settings.QuietHoursEnd?.ToString("HH:mm"), v.Settings.TimeZone, v.Version, v.UpdatedAtUtc, v.UpdatedBy,
+        v.Settings.MaxNotificationsPerHour);
 }

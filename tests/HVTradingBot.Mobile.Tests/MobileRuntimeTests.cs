@@ -257,6 +257,10 @@ public sealed class MobileRuntimeTests : IAsyncLifetime
             Assert.Contains(status, new[] { "Placed", "NeedsReview", "Failed" });
         }
 
+        // At most 3 new-signal notifications an hour (the default); the rest wait on the Signals page, with one notice.
+        await WaitUntilAsync(() => Task.FromResult(_phone.Shown.Any(n => n.Title == "More signals are waiting")), "the 'more signals waiting' notice");
+        Assert.True(_phone.Signals.Count(a => a.Title.StartsWith("Signal: ", StringComparison.Ordinal)) <= 3);
+
         Assert.Equal(404, (await _runtime.Api.HandleAsync("POST", $"/api/signals/{Guid.NewGuid()}/skip", null, CancellationToken.None)).Status);
         Assert.Equal(400, (await _runtime.Api.HandleAsync("POST", $"/api/signals/{skip}/accept", """{"acceptedRules":["KillSwitch"]}""",
             CancellationToken.None)).Status);

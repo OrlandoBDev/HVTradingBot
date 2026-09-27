@@ -180,8 +180,10 @@ Production strategies remain gated by deterministic validation and risk controls
 account selection only picks demo accounts, and the Settings page says so. The plumbing for real accounts already
 exists (account type, demo/real WebSocket check, red REAL badge), so unlocking is small; switching safely is the work.
 
-**When:** only after months of demo results on the Performance page (enough trades, positive expectancy, acceptable
-drawdowns), and only in a country where Deriv offers real multiplier accounts.
+**When:** only once every check in Performance › "Ready for real money?" passes (200 closed Forex trades by the bot, an
+average trade above 0R with 95% confidence after the Monte Carlo reshuffle, profitable in at least three of four
+periods, largest drop under 10%, on the evaluation setup: Forex only, no high-score extras), and only in a country
+where Deriv offers real multiplier accounts. The switch should refuse to turn on while those checks fail.
 
 **Design:**
 1. **Separate records per account first** (worth doing before the switch): history, performance, App P/L, learning

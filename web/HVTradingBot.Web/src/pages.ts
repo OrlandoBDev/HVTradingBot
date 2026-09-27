@@ -106,8 +106,9 @@ export const PAGES: PageInfo[] = [
     label: "Performance",
     icon: "↗",
     group: "Analysis",
-    summary: "Results of closed trades: win rate, profit factor, drawdown — overall, per strategy and per market.",
+    summary: "Whether the demo results support real money, and the results of closed trades — overall, per strategy and per market.",
     details: [
+      "Ready for real money? The bot's own Forex trades, judged over 200 trades on the average trade (and whether it is more than luck) and the largest drop — not on win rate or a good week.",
       "Profit factor = gross profit ÷ gross loss; expectancy = average result per trade.",
       "Max drawdown is the largest fall from a previous equity peak.",
       "Small samples are unreliable — judge results over many trades.",

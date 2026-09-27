@@ -38,6 +38,10 @@ public sealed class LiveUpdates(
     private readonly HashSet<Guid> _alerted = [];
     private readonly HashSet<Guid> _placing = [];
 
+    // New-signal notifications in the last hour, for the hourly cap, and when the "more waiting" notice was last shown.
+    private readonly Queue<DateTime> _announced = new();
+    private DateTime? _overflowNoticeUtc;
+
     public SignalPulse? Signals { get; private set; }
 
     /// <summary>A signal to show on the phone.</summary>
@@ -114,7 +118,7 @@ public sealed class LiveUpdates(
             // Quiet hours only silence the phone; the signal is still on the Signals page.
             if (signal.Status == SignalStatus.Pending && signal.ExpiresAtUtc > now && !settings.IsQuiet(now))
             {
-                Alert(NewSignalAlert(signal, settings));
+                AnnounceWithinCap(signal, settings, now);
             }
         }
 
@@ -176,6 +180,28 @@ public sealed class LiveUpdates(
             {
                 Clear(id);
             }
+        }
+    }
+
+    /// <summary>At most <see cref="SignalSettings.MaxNotificationsPerHour"/> new signals an hour; then one "more waiting" notice.</summary>
+    private void AnnounceWithinCap(SignalEntity signal, SignalSettings settings, DateTime now)
+    {
+        while (_announced.Count > 0 && now - _announced.Peek() >= TimeSpan.FromHours(1))
+        {
+            _announced.Dequeue();
+        }
+
+        if (_announced.Count < settings.MaxNotificationsPerHour)
+        {
+            _announced.Enqueue(now);
+            Alert(NewSignalAlert(signal, settings));
+        }
+        else if (_overflowNoticeUtc is not { } shown || now - shown >= TimeSpan.FromHours(1))
+        {
+            _overflowNoticeUtc = now;
+            Notice(new PhoneNotification("More signals are waiting",
+                $"You get at most {settings.MaxNotificationsPerHour} signal notifications an hour. Open the Signals page to see the rest.",
+                HVTradingBot.Application.Notifications.NotificationKind.ApprovalRequired));
         }
     }
 

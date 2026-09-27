@@ -28,7 +28,8 @@ public sealed partial class LocalApi
     private readonly ILogger<LocalApi> _logger;
 
     public LocalApi(DashboardQueries queries, DashboardActions actions, BacktestService backtests, CandleQueryService candles,
-        EngineSupervisor engine, AppLog log, ILogger<LocalApi> logger, NewsQueries news, SignalDashboard signals, DataBackup backup)
+        EngineSupervisor engine, AppLog log, ILogger<LocalApi> logger, NewsQueries news, SignalDashboard signals, DataBackup backup,
+        EvaluationService evaluation)
     {
         _logger = logger;
 
@@ -75,6 +76,8 @@ public sealed partial class LocalApi
         Get("/api/trades", r => Ok(queries.GetTradeHistoryAsync(r.Int("limit") ?? 200, r.Ct)));
         Get("/api/risk", r => Ok(queries.GetRiskStatusAsync(r.Ct)));
         Get("/api/performance", r => Ok(queries.GetPerformanceAsync(r.Ct)));
+        Get("/api/evaluation", r => Ok(evaluation.GetAsync(r.Ct)));
+        Post("/api/evaluation/setup", r => evaluation.ApplySetupAsync(r.Caller, r.Ct));
         Get("/api/profit", r => Ok(queries.GetProfitSummaryAsync(r.Query("tz"), r.Ct)));
         Get("/api/audit", r => Ok(queries.GetAuditAsync(r.Int("limit") ?? 100, r.Ct)));
         Get("/api/learning", r => Ok(actions.GetLearningAsync(r.Ct)));

@@ -19,7 +19,7 @@ public class DerivedLimitsTests
     private static readonly RiskOptions Options = new()
     {
         MaxRiskPerTradePercent = 1, MaxOpenPositions = 3, MaxDerivedOpenPositions = 1, DerivedRiskPerTradePercent = 0.5m,
-        MaxDerivedDailyLossPercent = 1, MaxDailyLossPercent = 3, MinUnits = 1, UnitStep = 1
+        MaxDerivedDailyLossPercent = 1, MaxDailyLossPercent = 3, MaxExtraDerivedPositions = 2, MinUnits = 1, UnitStep = 1
     };
 
     private readonly RiskManager _risk = new(Options, new ExecutionCostOptions { SlippagePips = 0 });

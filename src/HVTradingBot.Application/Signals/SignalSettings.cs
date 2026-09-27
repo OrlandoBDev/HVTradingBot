@@ -16,7 +16,7 @@ public sealed record SignalSettings
     /// <summary>Also send setups that score just below the automatic threshold, on any market.</summary>
     public bool NearMissEnabled { get; init; }
 
-    public int NearMissMinScore { get; init; } = 60;
+    public int NearMissMinScore { get; init; } = 65;
 
     public int MaxOpenPositions { get; init; } = 2;
 
@@ -35,6 +35,12 @@ public sealed record SignalSettings
 
     /// <summary>Allow accepting a signal trade beyond the signal daily loss limit (needs a typed confirmation).</summary>
     public bool AllowLossLimitOverride { get; init; }
+
+    /// <summary>
+    /// At most this many new-signal notifications per hour; more signals still appear on the Signals page, with one
+    /// "more signals waiting" notification. Reviews and failures of signals you accepted are always announced.
+    /// </summary>
+    public int MaxNotificationsPerHour { get; init; } = 3;
 
     /// <summary>No phone notifications between these local times (signals still appear on the Signals page).</summary>
     public TimeOnly? QuietHoursStart { get; init; }
@@ -78,6 +84,7 @@ public sealed record SignalSettings
         if (MaxOpenPositions is < 0 or > 10) errors["maxOpenPositions"] = "Between 0 and 10.";
         if (RiskPerTradePercent is < 0.05m or > 2m) errors["riskPerTradePercent"] = "Between 0.05% and 2%.";
         if (DailyLossLimitPercent is < 0.1m or > 10m) errors["dailyLossLimitPercent"] = "Between 0.1% and 10%.";
+        if (MaxNotificationsPerHour is < 1 or > 30) errors["maxNotificationsPerHour"] = "Between 1 and 30.";
         if (ExpiryMinutes is < 1 or > 120) errors["expiryMinutes"] = "Between 1 and 120 minutes.";
         if (MaxPriceMoveFraction is < 0.05m or > 1m) errors["maxPriceMoveFraction"] = "Between 0.05 and 1.";
         if ((QuietHoursStart is null) != (QuietHoursEnd is null)) errors["quietHoursEnd"] = "Set both start and end, or neither.";

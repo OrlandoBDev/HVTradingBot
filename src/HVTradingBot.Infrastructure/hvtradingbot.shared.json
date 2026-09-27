@@ -22,7 +22,7 @@
     "MaxDerivedOpenPositions": 1,
     "DerivedRiskPerTradePercent": 0.5,
     "MaxDerivedDailyLossPercent": 1,
-    "MaxExtraDerivedPositions": 2,
+    "MaxExtraDerivedPositions": 0,
     "HighScoreOverrideMinScore": 90,
     "MinRewardToRisk": 2,
     "MaxSpreadPips": 3,

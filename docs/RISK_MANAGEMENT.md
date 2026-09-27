@@ -93,6 +93,14 @@ No new trade on a market from 30 minutes before to 30 minutes after a high-impac
 medium- or high-impact releases within two hours, and headlines clearly against the trade, shrink the position. News
 can only tighten risk. See [NEWS_AND_TRENDS.md](NEWS_AND_TRENDS.md).
 
+### Evaluation Before Real Money
+
+Performance › "Ready for real money?" (`EvaluationService`) judges the bot's own closed Forex trades on the demo
+account; signal trades, test trades and other markets are reported apart. It passes only when all hold: 200 trades,
+an average trade above 0R with 95% confidence (Monte Carlo), profitable in at least three of four periods, largest
+drop under 10%, high-score extras off and only Forex markets selected. "Use the evaluation setup" applies the last two
+through the normal, audited settings paths. High-score extras are off by default (`MaxExtraDerivedPositions` 0).
+
 ### Signal Trades
 
 Signals are setups the engine sends to the user instead of trading them (markets set to "Signals", and optional near

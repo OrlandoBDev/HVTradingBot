@@ -378,4 +378,5 @@ public sealed record SignalSettingsDto(
     string? TimeZone,
     int Version = 0,
     DateTime? UpdatedAtUtc = null,
-    string? UpdatedBy = null);
+    string? UpdatedBy = null,
+    int MaxNotificationsPerHour = 3);
