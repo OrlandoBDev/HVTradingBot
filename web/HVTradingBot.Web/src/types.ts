@@ -376,4 +376,5 @@ export interface SignalSettings {
   version: number;
   updatedAtUtc: string | null;
   updatedBy: string | null;
+  maxNotificationsPerHour: number;
 }

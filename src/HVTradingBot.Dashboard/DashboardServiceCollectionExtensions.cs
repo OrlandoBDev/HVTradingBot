@@ -10,6 +10,7 @@ public static class DashboardServiceCollectionExtensions
         services.AddSingleton<DashboardQueries>();
         services.AddSingleton<DashboardActions>();
         services.AddSingleton<SignalDashboard>();
+        services.AddSingleton<EvaluationService>();
         services.AddSingleton<NewsQueries>();
         services.AddSingleton<BacktestService>();
         return services;

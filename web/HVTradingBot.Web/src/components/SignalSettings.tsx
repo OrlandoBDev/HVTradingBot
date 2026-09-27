@@ -9,7 +9,7 @@ interface MarketSelection {
   selected: string[];
 }
 
-type NumberKey = "nearMissMinScore" | "maxOpenPositions" | "riskPerTradePercent" | "dailyLossLimitPercent" | "expiryMinutes" | "maxPriceMoveFraction";
+type NumberKey = "maxNotificationsPerHour" | "nearMissMinScore" | "maxOpenPositions" | "riskPerTradePercent" | "dailyLossLimitPercent" | "expiryMinutes" | "maxPriceMoveFraction";
 
 const LIMITS: { key: NumberKey; label: string; step: number; min: number; max: number; unit: string; what: string }[] = [
   { key: "maxOpenPositions", label: "Signal slots", step: 1, min: 0, max: 10, unit: "positions",
@@ -177,6 +177,19 @@ export function SignalSettings() {
           </span>
         </label>
         <div className="risk-fields">
+          <div className="risk-field">
+            <label className="risk-input">
+              <span className="strong">Signal notifications per hour</span>
+              <span className="input-unit">
+                <input type="number" min={1} max={30} step={1} value={form.maxNotificationsPerHour}
+                  onChange={(e) => set({ maxNotificationsPerHour: Number(e.target.value) })} />
+                <span className="muted">at most</span>
+              </span>
+            </label>
+            <div className="risk-help">
+              More signals than this in an hour still appear on the Signals page; you get one "more signals waiting" notification instead.
+            </div>
+          </div>
           <div className="risk-field">
             <label className="risk-input">
               <span className="strong">Quiet hours</span>

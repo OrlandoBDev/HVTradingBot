@@ -45,7 +45,7 @@ public sealed class RiskOptions
     /// this many extra positions in total. An extra must fit in today's remaining loss budget (Derived: also the
     /// Derived budget) if every open trade and the new one hit their stops. 0 turns it off.
     /// </summary>
-    [Range(0, 10)] public int MaxExtraDerivedPositions { get; set; } = 2;
+    [Range(0, 10)] public int MaxExtraDerivedPositions { get; set; } = 0;
 
     /// <summary>Most positions open at once: the normal limit plus the high-score extras.</summary>
     public int MaxTotalPositions => MaxOpenPositions + MaxExtraDerivedPositions;

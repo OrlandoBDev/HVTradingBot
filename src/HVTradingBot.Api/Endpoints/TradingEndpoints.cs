@@ -56,6 +56,9 @@ public static class TradingEndpoints
         api.MapGet("/trades", (DashboardQueries q, int? limit, CancellationToken ct) => q.GetTradeHistoryAsync(limit ?? 200, ct));
         api.MapGet("/risk", (DashboardQueries q, CancellationToken ct) => q.GetRiskStatusAsync(ct));
         api.MapGet("/performance", (DashboardQueries q, CancellationToken ct) => q.GetPerformanceAsync(ct));
+        api.MapGet("/evaluation", (EvaluationService evaluation, CancellationToken ct) => evaluation.GetAsync(ct));
+        api.MapPost("/evaluation/setup", async (EvaluationService evaluation, HttpContext http, CancellationToken ct) =>
+            (await evaluation.ApplySetupAsync(http.Caller(), ct)).ToHttp());
         api.MapGet("/profit", (DashboardQueries q, string? tz, CancellationToken ct) => q.GetProfitSummaryAsync(tz, ct));
         api.MapGet("/audit", (DashboardQueries q, int? limit, CancellationToken ct) => q.GetAuditAsync(limit ?? 100, ct));
         api.MapGet("/learning", (DashboardActions actions, CancellationToken ct) => actions.GetLearningAsync(ct));

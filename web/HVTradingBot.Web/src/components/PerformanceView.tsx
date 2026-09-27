@@ -2,12 +2,14 @@ import type { Performance } from "../types";
 import { useData } from "../useData";
 import { Card, ErrorNote } from "./Ui";
 import { MetricsByGroup, MetricsSummary } from "./MetricsTable";
+import { EvaluationCard } from "./EvaluationCard";
 
 export function PerformanceView({ refreshKey }: { refreshKey: unknown }) {
   const { data, error } = useData<Performance>("/api/performance", refreshKey);
   return (
     <>
       <ErrorNote error={error} />
+      <EvaluationCard refreshKey={refreshKey} />
       {data && (
         <>
           <div className="two-col">
