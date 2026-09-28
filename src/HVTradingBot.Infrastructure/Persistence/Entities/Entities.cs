@@ -126,6 +126,8 @@ public sealed class SystemStateEntity
     public decimal DailyRealizedPnl { get; set; }
     public decimal DerivedDailyRealizedPnl { get; set; }
     public decimal SignalDailyRealizedPnl { get; set; }
+    public decimal? CapitalBase { get; set; }
+    public decimal CapitalPnl { get; set; }
     public DateOnly? PnlWeekStart { get; set; }
     public decimal WeeklyRealizedPnl { get; set; }
     public DateTime? LastBarTimeUtc { get; set; }

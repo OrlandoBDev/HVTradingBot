@@ -52,6 +52,22 @@ public abstract class RiskSettingsTests(DatabaseFixture fixture) : IAsyncLifetim
     }
 
     [Fact]
+    public async Task A_trading_capital_is_stored_validated_and_cleared()
+    {
+        var store = Store();
+        var source = new RiskOptionsSource(Configured, store, NullLogger<RiskOptionsSource>.Instance);
+
+        Assert.Contains(nameof(RiskLimits.TradingCapital), (Limits() with { TradingCapital = 5m }).Validate().Keys);
+        await store.SaveAsync(Limits() with { TradingCapital = 100m }, "test", CancellationToken.None);
+        await source.RefreshAsync(CancellationToken.None);
+        Assert.Equal(100m, source.Current.TradingCapital);
+
+        await store.SaveAsync(Limits(), "test", CancellationToken.None); // left empty: the whole balance again
+        await source.RefreshAsync(CancellationToken.None);
+        Assert.Null(source.Current.TradingCapital);
+    }
+
+    [Fact]
     public async Task Invalid_stored_limits_are_ignored()
     {
         var store = Store();

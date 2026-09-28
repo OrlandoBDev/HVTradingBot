@@ -91,6 +91,8 @@ public sealed class EfTradingStateStore(IDbContextFactory<TradingDbContext> dbFa
         DailyRealizedPnl = e.DailyRealizedPnl,
         DerivedDailyRealizedPnl = e.DerivedDailyRealizedPnl,
         SignalDailyRealizedPnl = e.SignalDailyRealizedPnl,
+        CapitalBase = e.CapitalBase,
+        CapitalPnl = e.CapitalPnl,
         PnlWeekStart = e.PnlWeekStart,
         WeeklyRealizedPnl = e.WeeklyRealizedPnl,
         LastBarTimeUtc = e.LastBarTimeUtc,
@@ -114,6 +116,8 @@ public sealed class EfTradingStateStore(IDbContextFactory<TradingDbContext> dbFa
         e.DailyRealizedPnl = s.DailyRealizedPnl;
         e.DerivedDailyRealizedPnl = s.DerivedDailyRealizedPnl;
         e.SignalDailyRealizedPnl = s.SignalDailyRealizedPnl;
+        e.CapitalBase = s.CapitalBase;
+        e.CapitalPnl = s.CapitalPnl;
         e.PnlWeekStart = s.PnlWeekStart;
         e.WeeklyRealizedPnl = s.WeeklyRealizedPnl;
         e.LastBarTimeUtc = s.LastBarTimeUtc;

@@ -842,7 +842,16 @@ public sealed class TradingEngine
     public async Task<PortfolioState> BuildPortfolioAsync(MarketDataStatus dataStatus, CancellationToken cancellationToken)
     {
         var state = await _state.GetAsync(cancellationToken);
+        var capital = _risk.Current.TradingCapital;
+        if (capital != state.CapitalBase)
+        {
+            // A new (or removed) trading capital starts fresh from now.
+            state = await _state.UpdateAsync(s => s.CapitalBase == capital ? s : s.WithCapital(capital), cancellationToken);
+            _logger.LogInformation("Trading capital set to {Capital}", capital?.ToString("F2") ?? "the whole balance");
+        }
+
         var account = await _broker.GetAccountAsync(cancellationToken);
+        var balance = state.SizingBalance(account.Balance, capital);
         var positions = (await _broker.GetPositionsAsync(cancellationToken)).ToList();
         var converter = Converter();
         var unrealized = positions
@@ -852,8 +861,8 @@ public sealed class TradingEngine
 
         return new PortfolioState(
             _options.Mode,
-            account.Balance,
-            account.Balance + unrealized,
+            balance,
+            balance + unrealized,
             state.PnlDay == DateOnly.FromDateTime(marketTime) ? state.DailyRealizedPnl : 0,
             state.WeeklyRealizedPnl,
             positions,
