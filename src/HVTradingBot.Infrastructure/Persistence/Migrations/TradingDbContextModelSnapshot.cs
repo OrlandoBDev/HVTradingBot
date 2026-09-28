@@ -690,6 +690,113 @@ namespace HVTradingBot.Infrastructure.Persistence.Migrations
                     b.ToTable("market_snapshots", (string)null);
                 });
 
+            modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.Mt5SettingsEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AccountId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("account_id");
+
+                    b.Property<decimal>("CommissionPercent")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("numeric(28,10)")
+                        .HasColumnName("commission_percent");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<string>("Region")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("region");
+
+                    b.Property<decimal?>("StatusBalance")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("numeric(28,10)")
+                        .HasColumnName("status_balance");
+
+                    b.Property<string>("StatusBroker")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("status_broker");
+
+                    b.Property<DateTime?>("StatusCheckedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("status_checked_at_utc");
+
+                    b.Property<string>("StatusCurrency")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("status_currency");
+
+                    b.Property<bool?>("StatusIsDemo")
+                        .HasColumnType("boolean")
+                        .HasColumnName("status_is_demo");
+
+                    b.Property<string>("StatusLogin")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("status_login");
+
+                    b.Property<string>("StatusMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("status_message");
+
+                    b.Property<string>("StatusServer")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("status_server");
+
+                    b.Property<string>("StatusState")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status_state");
+
+                    b.Property<int>("StatusVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("status_version");
+
+                    b.Property<string>("SymbolSuffix")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("symbol_suffix");
+
+                    b.Property<string>("TokenHint")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("token_hint");
+
+                    b.Property<string>("TokenProtected")
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)")
+                        .HasColumnName("token_protected");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_mt5_settings");
+
+                    b.ToTable("mt5_settings", (string)null);
+                });
+
             modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.NotificationSettingsEntity", b =>
                 {
                     b.Property<int>("Id")

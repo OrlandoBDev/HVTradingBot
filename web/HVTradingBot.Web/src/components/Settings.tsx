@@ -9,6 +9,7 @@ import { RiskSettings } from "./RiskSettings";
 import { NotificationSettings } from "./NotificationSettings";
 import { SecuritySettings } from "./SecuritySettings";
 import { AppEngineSettings } from "./AppEngineSettings";
+import { Mt5SettingsCard } from "./Mt5Settings";
 import { inApp } from "../platform";
 import type { PageId } from "../pages";
 
@@ -179,12 +180,13 @@ function BrokerAccountSettings() {
         )}
       </Card>
       </div>
+      <Mt5SettingsCard />
     </>
   );
 }
 
 const SECTIONS = [
-  { id: "account", label: "Broker account", summary: "Connect your Deriv demo account. The token is stored encrypted and never shown again." },
+  { id: "account", label: "Broker account", summary: "Connect your Deriv demo account, and optionally an MT5 demo account for Forex. Tokens are stored encrypted and never shown again." },
   { id: "markets", label: "Markets", summary: "Pick the markets to analyse and trade. Saving restarts the trading worker." },
   { id: "risk", label: "Risk limits", summary: "How much each trade may risk and when trading stops for the day or week." },
   { id: "signals", label: "Signals", summary: "Markets that send you signals instead of trading, near misses, signal limits and quiet hours." },

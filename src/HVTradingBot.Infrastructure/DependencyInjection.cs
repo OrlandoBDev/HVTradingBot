@@ -74,6 +74,7 @@ public static class DependencyInjection
         services.AddSingleton<DerivSettingsStore>();
         services.AddSingleton<IDerivCredentialsProvider>(sp => sp.GetRequiredService<DerivSettingsStore>());
         services.AddSingleton<IDerivStatusSink>(sp => sp.GetRequiredService<DerivSettingsStore>());
+        services.AddSingleton<Mt5SettingsStore>();
 
         services.AddSingleton<MarketCatalogStore>();
         services.AddSingleton<TestTrades.TestTradeStore>();
@@ -136,7 +137,16 @@ public static class DependencyInjection
 
         if (broker.Provider == BrokerProvider.Deriv)
         {
-            services.AddSingleton<IExecutionBroker, DerivBroker>();
+            // Forex on MT5 (through MetaApi) when it is switched on in Settings › Broker account, otherwise Deriv
+            // multipliers. Chosen when the worker starts; saving the MT5 settings restarts the worker.
+            services.AddSingleton(_ => new Brokers.Mt5.MetaApiClient(
+                new HttpClient(new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(5) }) { Timeout = TimeSpan.FromSeconds(60) }));
+            services.AddSingleton<DerivBroker>();
+            services.AddSingleton<Brokers.Mt5.Mt5Broker>();
+            services.AddSingleton<IExecutionBroker>(sp =>
+                sp.GetRequiredService<Mt5SettingsStore>().IsActiveAsync(CancellationToken.None).GetAwaiter().GetResult()
+                    ? sp.GetRequiredService<Brokers.Mt5.Mt5Broker>()
+                    : sp.GetRequiredService<DerivBroker>());
         }
         else
         {

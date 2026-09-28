@@ -14,6 +14,7 @@ public sealed class TradingDbContext(DbContextOptions<TradingDbContext> options)
     public DbSet<PaperAccountEntity> PaperAccounts => Set<PaperAccountEntity>();
     public DbSet<BrokerAccountEntity> BrokerAccounts => Set<BrokerAccountEntity>();
     public DbSet<BrokerSettingsEntity> BrokerSettings => Set<BrokerSettingsEntity>();
+    public DbSet<Mt5SettingsEntity> Mt5Settings => Set<Mt5SettingsEntity>();
     public DbSet<MarketEntity> Markets => Set<MarketEntity>();
     public DbSet<RiskSettingsEntity> RiskSettings => Set<RiskSettingsEntity>();
     public DbSet<NotificationSettingsEntity> NotificationSettings => Set<NotificationSettingsEntity>();
@@ -172,6 +173,24 @@ public sealed class TradingDbContext(DbContextOptions<TradingDbContext> options)
             e.Property(x => x.Id).ValueGeneratedNever();
             e.Property(x => x.Instruments).HasColumnType(json);
             e.Property(x => x.DerivedOnlyWhenForexClosed).HasDefaultValue(true);
+        });
+
+        modelBuilder.Entity<Mt5SettingsEntity>(e =>
+        {
+            e.ToTable("mt5_settings");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.TokenProtected).HasMaxLength(8000);
+            e.Property(x => x.TokenHint).HasMaxLength(8);
+            e.Property(x => x.AccountId).HasMaxLength(64);
+            e.Property(x => x.Region).HasMaxLength(32);
+            e.Property(x => x.SymbolSuffix).HasMaxLength(16);
+            e.Property(x => x.StatusState).HasMaxLength(32);
+            e.Property(x => x.StatusMessage).HasMaxLength(2000);
+            e.Property(x => x.StatusLogin).HasMaxLength(64);
+            e.Property(x => x.StatusServer).HasMaxLength(128);
+            e.Property(x => x.StatusBroker).HasMaxLength(128);
+            e.Property(x => x.StatusCurrency).HasMaxLength(8);
         });
 
         modelBuilder.Entity<BrokerSettingsEntity>(e =>
