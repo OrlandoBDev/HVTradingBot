@@ -9,14 +9,30 @@ export function AccountBar({ status, onOpen }: { status: SystemStatus; onOpen: (
   const a = status.account;
   return (
     <button className="account-bar" onClick={onOpen} title="Open positions">
-      <span className="account-item">
-        <span className="account-label">Balance</span>
-        <span className="account-value">{money(a.balance, a.currency)}</span>
-      </span>
-      <span className="account-item">
-        <span className="account-label">Equity</span>
-        <span className="account-value">{money(a.equity, a.currency)}</span>
-      </span>
+      {status.tradingCapital != null ? (
+        // Trading with a set amount: show that first, the whole account after it.
+        <>
+          <span className="account-item" title="The money the app trades with (Settings › Risk limits)">
+            <span className="account-label">Trading capital</span>
+            <span className="account-value">{money(status.tradingCapital, a.currency)}</span>
+          </span>
+          <span className="account-item">
+            <span className="account-label">Account balance</span>
+            <span className="account-value">{money(a.balance, a.currency)}</span>
+          </span>
+        </>
+      ) : (
+        <>
+          <span className="account-item">
+            <span className="account-label">Balance</span>
+            <span className="account-value">{money(a.balance, a.currency)}</span>
+          </span>
+          <span className="account-item">
+            <span className="account-label">Equity</span>
+            <span className="account-value">{money(a.equity, a.currency)}</span>
+          </span>
+        </>
+      )}
       <span className="account-item">
         <span className="account-label">Open P/L · {status.openPositions} open</span>
         <span className={`account-value ${signClass(a.unrealizedPnl)}`}>{money(a.unrealizedPnl, a.currency)}</span>

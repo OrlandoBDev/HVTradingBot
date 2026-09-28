@@ -19,6 +19,8 @@ interface RiskLimits {
   assumedCommissionPercent: number;
   maxExtraDerivedPositions: number;
   highScoreOverrideMinScore: number;
+  /** The money the app trades with; null: the whole balance. */
+  tradingCapital: number | null;
 }
 
 interface RiskSettingsData {
@@ -36,7 +38,7 @@ type Ctx = { v: number; f: RiskLimits; b: number; c: string };
 const pct = (b: number, p: number, c: string) => money((b * p) / 100, c);
 
 type Field = {
-  key: keyof RiskLimits;
+  key: Exclude<keyof RiskLimits, "tradingCapital">;
   label: string;
   step: number;
   min: number;
@@ -190,7 +192,9 @@ export function RiskSettings() {
     }
   };
 
-  const dirty = !!data && !!form && GROUPS.flatMap((g) => g.fields).some((f) => form[f.key] !== data.effective[f.key]);
+  const dirty = !!data && !!form && (GROUPS.flatMap((g) => g.fields).some((f) => form[f.key] !== data.effective[f.key])
+    || (form.tradingCapital ?? null) !== (data.effective.tradingCapital ?? null));
+  const capital = form?.tradingCapital ?? null;
 
   return (
     <Card
@@ -198,9 +202,43 @@ export function RiskSettings() {
       actions={data && <Badge tone={data.isCustomized ? "info" : "neutral"}>{data.isCustomized ? "custom" : "defaults"}</Badge>}
     >
       <p className="hint">
-        Dollar amounts use the current balance{data ? ` (${money(data.balance, data.currency)})` : ""}. Changes apply within a few seconds;
-        ranges are restricted so limits can be tuned but not switched off.
+        Dollar amounts use {data?.effective.tradingCapital != null ? "the trading capital" : "the current balance"}
+        {data ? ` (${money(data.balance, data.currency)})` : ""}. Changes apply within a few seconds; ranges are restricted so limits can be
+        tuned but not switched off.
       </p>
+      {form && data && (
+        <section className="risk-group">
+          <h3>Trading capital</h3>
+          <p className="muted small">
+            Trade with a set amount instead of the whole account, e.g. $100 on a $10,000 demo to trade exactly as a small real account would.
+          </p>
+          <div className="risk-fields">
+            <div className="risk-field">
+              <label className="risk-input">
+                <span className="strong">Trade with</span>
+                <span className="input-unit">
+                  <input type="number" min={10} step={10} placeholder="whole balance" value={capital ?? ""}
+                    onChange={(e) => setForm({ ...form, tradingCapital: e.target.value === "" ? null : Number(e.target.value) })} />
+                  <span className="muted">{data.currency}</span>
+                </span>
+                {capital != null && <button className="link" onClick={() => setForm({ ...form, tradingCapital: null })}>use whole balance</button>}
+              </label>
+              <div className="risk-help">
+                <div>
+                  Position sizes and every loss limit use this amount instead of the balance. It then grows and shrinks with the app's own
+                  results (bot, signal and test trades), like a real account of that size, and never goes above the real balance. Changing it
+                  starts it fresh. Empty: the whole balance.
+                </div>
+                <div className="risk-example">
+                  Example: {capital != null
+                    ? `trading ${money(capital, data.currency)} at ${form.maxRiskPerTradePercent}% risks ${money(capital * form.maxRiskPerTradePercent / 100, data.currency)} a trade; the daily limit stops at ${money(capital * form.maxDailyLossPercent / 100, data.currency)}. Small trades can be refused when the broker's minimum stake or commission is too large for them.`
+                    : `the whole balance is used: ${form.maxRiskPerTradePercent}% of it per trade.`}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
       {form && data &&
         GROUPS.map((group) => (
           <section key={group.title} className="risk-group">

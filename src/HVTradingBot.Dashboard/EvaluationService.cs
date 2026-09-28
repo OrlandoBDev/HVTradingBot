@@ -69,7 +69,8 @@ public sealed class EvaluationService(
         // apart): the window spans every time either one shows.
         var times = forexTrades.SelectMany(t => new[] { t.OpenedAtUtc, t.ClosedAtUtc }).ToList();
         var since = times.Count == 0 ? (DateTime?)null : times.Min();
-        var metrics = PerformanceCalculator.Calculate(forexTrades, status.Account.StartingBalance);
+        // Drawdown is measured against the money actually traded: the trading capital when one is set.
+        var metrics = PerformanceCalculator.Calculate(forexTrades, state.CapitalBase ?? status.Account.StartingBalance);
         var until = times.Count == 0 ? clock.UtcNow : new[] { clock.UtcNow, times.Max() }.Max();
         var robustness = RobustnessAnalysis.Analyze(forexTrades, since ?? until, until);
         var risk = (await actions.GetRiskSettingsAsync(ct)).Effective;

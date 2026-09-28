@@ -1398,6 +1398,16 @@ namespace HVTradingBot.Infrastructure.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("broker_name");
 
+                    b.Property<double?>("CapitalBase")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("REAL")
+                        .HasColumnName("capital_base");
+
+                    b.Property<double>("CapitalPnl")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("REAL")
+                        .HasColumnName("capital_pnl");
+
                     b.Property<int>("ConsecutiveLosses")
                         .HasColumnType("INTEGER")
                         .HasColumnName("consecutive_losses");

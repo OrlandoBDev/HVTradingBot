@@ -24,12 +24,13 @@ public sealed record RiskLimits(
     decimal? MaxDerivedDailyLossPercent = null,
     decimal? AssumedCommissionPercent = null,
     int? MaxExtraDerivedPositions = null,
-    int? HighScoreOverrideMinScore = null)
+    int? HighScoreOverrideMinScore = null,
+    decimal? TradingCapital = null)
 {
     public static RiskLimits From(RiskOptions o) => new(o.MaxRiskPerTradePercent, o.MaxDailyLossPercent, o.MaxWeeklyLossPercent,
         o.MaxOpenPositions, o.MinRewardToRisk, o.MaxConsecutiveLosses, o.CooldownMinutes, o.MaxCurrencyExposure, o.MaxCommissionShareOfRisk,
         o.MaxDerivedOpenPositions, o.DerivedRiskPerTradePercent, o.MaxDerivedDailyLossPercent, o.AssumedCommissionPercent,
-        o.MaxExtraDerivedPositions, o.HighScoreOverrideMinScore);
+        o.MaxExtraDerivedPositions, o.HighScoreOverrideMinScore, o.TradingCapital);
 
     /// <summary>Limits saved before the Derived limits existed take the configured Derived defaults.</summary>
     public RiskLimits WithDefaultsFrom(RiskOptions defaults) => this with
@@ -60,6 +61,7 @@ public sealed record RiskLimits(
         o.AssumedCommissionPercent = AssumedCommissionPercent ?? defaults.AssumedCommissionPercent;
         o.MaxExtraDerivedPositions = MaxExtraDerivedPositions ?? defaults.MaxExtraDerivedPositions;
         o.HighScoreOverrideMinScore = HighScoreOverrideMinScore ?? defaults.HighScoreOverrideMinScore;
+        o.TradingCapital = TradingCapital; // null: the whole balance
         return o;
     }
 
@@ -95,6 +97,11 @@ public sealed record RiskLimits(
         {
             Check(derivedRisk >= 0.1m && derivedRisk <= MaxRiskPerTradePercent, nameof(DerivedRiskPerTradePercent),
                 "Derived risk per trade must be between 0.1% and the risk per trade.");
+        }
+
+        if (TradingCapital is { } capital)
+        {
+            Check(capital is >= 10m and <= 100_000_000m, nameof(TradingCapital), "Trading capital must be at least 10 (or empty to use the whole balance).");
         }
 
         if (MaxExtraDerivedPositions is { } extra)

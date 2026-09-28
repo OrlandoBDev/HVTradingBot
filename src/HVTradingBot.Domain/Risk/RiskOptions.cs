@@ -56,6 +56,13 @@ public sealed class RiskOptions
     /// </summary>
     public int DerivedSlots(bool forexOpen) => forexOpen ? Math.Min(MaxDerivedOpenPositions, MaxOpenPositions) : MaxOpenPositions;
 
+    /// <summary>
+    /// The money the app trades with, when it should not use the whole broker balance (e.g. $100 on a $10,000 demo, to
+    /// trade as a small real account would). Sizing and every loss limit then use this amount plus the app's realized
+    /// results since it was set, never more than the balance. Null: the whole balance.
+    /// </summary>
+    [Range(10, 100_000_000)] public decimal? TradingCapital { get; set; }
+
     /// <summary>Minimum score for the high-score override.</summary>
     [Range(75, 100)] public int HighScoreOverrideMinScore { get; set; } = 90;
 

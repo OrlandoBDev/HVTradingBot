@@ -24,7 +24,8 @@ public sealed record SystemStatusDto(
     int ConsecutiveLosses,
     DateTime? CooldownUntilUtc,
     DateTime ServerTimeUtc,
-    int WaitingSignals = 0);
+    int WaitingSignals = 0,
+    decimal? TradingCapital = null);
 
 /// <param name="IsOpen">False when no price has arrived for 10+ minutes (weekend, daily break, exchange hours).</param>
 /// <param name="IsPaused">Derived market waiting because Forex is open ("Derived only while Forex is closed").</param>
@@ -198,7 +199,8 @@ public sealed record RiskLimitsDto(
     decimal? MaxDerivedDailyLossPercent = null,
     decimal? AssumedCommissionPercent = null,
     int? MaxExtraDerivedPositions = null,
-    int? HighScoreOverrideMinScore = null);
+    int? HighScoreOverrideMinScore = null,
+    decimal? TradingCapital = null);
 
 public sealed record RiskSettingsDto(
     RiskLimitsDto Effective,

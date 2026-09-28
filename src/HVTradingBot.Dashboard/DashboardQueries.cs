@@ -65,6 +65,9 @@ public sealed class DashboardQueries(
         var unrealized = positions.Sum(p => p.UnrealizedPnl ?? 0);
         var balance = account.Balance;
         var now = clock.UtcNow;
+        // With a trading capital set, the app trades as if the account held only that (plus its results since).
+        var configuredCapital = (await riskSource.RefreshAsync(cancellationToken)).Effective.TradingCapital;
+        decimal? capital = configuredCapital is null ? null : state.SizingBalance(balance, configuredCapital);
         var waitingSignals = await db.Signals.CountAsync(s => (s.Status == SignalStatus.Pending || s.Status == SignalStatus.NeedsReview) && s.ExpiresAtUtc > now,
             cancellationToken);
 
@@ -85,7 +88,8 @@ public sealed class DashboardQueries(
             state.ConsecutiveLosses,
             state.CooldownUntilUtc,
             now,
-            waitingSignals);
+            waitingSignals,
+            capital);
     }
 
     /// <summary>A market with no price for this long is treated as closed and hidden from the market tables.</summary>
@@ -245,7 +249,7 @@ public sealed class DashboardQueries(
         var positions = await GetOpenPositionsAsync(cancellationToken);
         var state = await stateStore.GetAsync(cancellationToken);
         var derivedOpen = positions.Count(p => Instruments.TryGet(p.Instrument, out var i) && RiskOptions.IsDerived(i));
-        var balance = status.Account.Balance;
+        var balance = status.TradingCapital ?? status.Account.Balance;
         var dailyLimit = balance * risk.MaxDailyLossPercent / 100m;
         var weeklyLimit = balance * risk.MaxWeeklyLossPercent / 100m;
         var marketTime = status.MarketData.LastBarTimeUtc ?? status.ServerTimeUtc;

@@ -93,6 +93,15 @@ No new trade on a market from 30 minutes before to 30 minutes after a high-impac
 medium- or high-impact releases within two hours, and headlines clearly against the trade, shrink the position. News
 can only tighten risk. See [NEWS_AND_TRENDS.md](NEWS_AND_TRENDS.md).
 
+### Trading Capital
+
+Settings › Risk limits › Trading capital (`RiskOptions.TradingCapital`, stored with the risk limits): trade a set amount
+instead of the whole balance, e.g. $100 on a $10,000 demo to trade as a small real account would. Sizing and every loss
+limit (daily, weekly, Derived, signals) then use the capital plus the realized results of every app trade since it was
+set (`TradingSystemState.CapitalBase`/`CapitalPnl`), never more than the real balance. Changing the amount starts it
+fresh; empty uses the whole balance. The account bar shows the capital next to the account balance. Small capitals
+make the broker's minimum stake and commission matter: such trades are refused, not enlarged.
+
 ### Evaluation Before Real Money
 
 Performance › "Ready for real money?" (`EvaluationService`) judges the bot's own closed Forex trades on the demo

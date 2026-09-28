@@ -30,6 +30,8 @@ export interface SystemStatus {
   serverTimeUtc: string;
   /** Signals waiting for your decision. */
   waitingSignals: number;
+  /** The money the app trades with when a trading capital is set (its results included); null: the whole balance. */
+  tradingCapital: number | null;
 }
 
 export interface IndicatorSnapshot {
