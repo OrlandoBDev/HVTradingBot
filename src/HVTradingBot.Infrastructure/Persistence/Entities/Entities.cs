@@ -202,6 +202,12 @@ public sealed class Mt5SettingsEntity
     public string Region { get; set; } = "new-york";
     public string SymbolSuffix { get; set; } = "";
     public decimal CommissionPercent { get; set; }
+
+    /// <summary>"MetaApi" (cloud) or "Bridge" (the HVTradingBot Expert Advisor in MT5 on this computer).</summary>
+    public string Connection { get; set; } = "MetaApi";
+
+    /// <summary>The key the Expert Advisor sends with every request (encrypted).</summary>
+    public string? BridgeKeyProtected { get; set; }
     public int Version { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
     public string? UpdatedBy { get; set; }
@@ -215,6 +221,30 @@ public sealed class Mt5SettingsEntity
     public decimal? StatusBalance { get; set; }
     public string? StatusCurrency { get; set; }
     public DateTime? StatusCheckedAtUtc { get; set; }
+}
+
+/// <summary>What the MT5 Expert Advisor last reported (bridge connection): account, open positions and recent deals.</summary>
+public sealed class Mt5BridgeStateEntity
+{
+    public int Id { get; set; }
+    public DateTime LastSeenUtc { get; set; }
+    public string? EaVersion { get; set; }
+    public required string AccountJson { get; set; }
+    public required string PositionsJson { get; set; }
+    public required string DealsJson { get; set; }
+}
+
+/// <summary>An order or close for the Expert Advisor. Status: Pending → Sent (delivered) → Done; Expired if never delivered.</summary>
+public sealed class Mt5BridgeCommandEntity
+{
+    public long Id { get; set; }
+    public required string Type { get; set; }
+    public required string Payload { get; set; }
+    public required string Status { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
+    public DateTime? SentAtUtc { get; set; }
+    public DateTime? DoneAtUtc { get; set; }
+    public string? ResultJson { get; set; }
 }
 
 /// <summary>Result of the worker's latest attempt to connect with the stored settings.</summary>

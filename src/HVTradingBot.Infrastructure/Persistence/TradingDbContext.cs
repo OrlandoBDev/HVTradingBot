@@ -15,6 +15,8 @@ public sealed class TradingDbContext(DbContextOptions<TradingDbContext> options)
     public DbSet<BrokerAccountEntity> BrokerAccounts => Set<BrokerAccountEntity>();
     public DbSet<BrokerSettingsEntity> BrokerSettings => Set<BrokerSettingsEntity>();
     public DbSet<Mt5SettingsEntity> Mt5Settings => Set<Mt5SettingsEntity>();
+    public DbSet<Mt5BridgeStateEntity> Mt5BridgeState => Set<Mt5BridgeStateEntity>();
+    public DbSet<Mt5BridgeCommandEntity> Mt5BridgeCommands => Set<Mt5BridgeCommandEntity>();
     public DbSet<MarketEntity> Markets => Set<MarketEntity>();
     public DbSet<RiskSettingsEntity> RiskSettings => Set<RiskSettingsEntity>();
     public DbSet<NotificationSettingsEntity> NotificationSettings => Set<NotificationSettingsEntity>();
@@ -191,6 +193,26 @@ public sealed class TradingDbContext(DbContextOptions<TradingDbContext> options)
             e.Property(x => x.StatusServer).HasMaxLength(128);
             e.Property(x => x.StatusBroker).HasMaxLength(128);
             e.Property(x => x.StatusCurrency).HasMaxLength(8);
+            e.Property(x => x.Connection).HasMaxLength(16);
+            e.Property(x => x.BridgeKeyProtected).HasMaxLength(4000);
+        });
+
+        modelBuilder.Entity<Mt5BridgeStateEntity>(e =>
+        {
+            e.ToTable("mt5_bridge_state");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.EaVersion).HasMaxLength(32);
+        });
+
+        modelBuilder.Entity<Mt5BridgeCommandEntity>(e =>
+        {
+            e.ToTable("mt5_bridge_commands");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Type).HasMaxLength(16);
+            e.Property(x => x.Status).HasMaxLength(16);
+            e.Property(x => x.Payload).HasMaxLength(1000);
+            e.HasIndex(x => x.Status);
         });
 
         modelBuilder.Entity<BrokerSettingsEntity>(e =>

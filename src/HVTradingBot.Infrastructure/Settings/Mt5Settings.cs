@@ -35,7 +35,9 @@ public sealed record Mt5SettingsView(
     int Version,
     DateTime? UpdatedAtUtc,
     string? UpdatedBy,
-    Mt5Status? Status);
+    Mt5Status? Status,
+    string Connection = Mt5SettingsStore.MetaApiConnection,
+    string? BridgeKey = null);
 
 /// <summary>
 /// MetaTrader 5 settings, entered on the Settings page. When enabled and complete, the worker trades Forex on this MT5
@@ -49,6 +51,12 @@ public sealed class Mt5SettingsStore(IDbContextFactory<TradingDbContext> dbFacto
 
     public const string MetaApiRegionDefault = "new-york";
 
+    /// <summary>Through MetaApi's cloud (works from the phone).</summary>
+    public const string MetaApiConnection = "MetaApi";
+
+    /// <summary>Through the HVTradingBot Expert Advisor in MT5 on the computer running the bot (free; Mac/PC version).</summary>
+    public const string BridgeConnection = "Bridge";
+
     /// <summary>MetaApi regions (the account's region is shown in the MetaApi web app).</summary>
     public static readonly IReadOnlyList<string> Regions = ["new-york", "london", "singapore", "vint-hill"];
 
@@ -57,6 +65,7 @@ public sealed class Mt5SettingsStore(IDbContextFactory<TradingDbContext> dbFacto
 
     private const int RowId = 1;
     private readonly IDataProtector _protector = dataProtection.CreateProtector("HVTradingBot.Mt5.MetaApiToken.v1");
+    private readonly IDataProtector _bridgeProtector = dataProtection.CreateProtector("HVTradingBot.Mt5.BridgeKey.v1");
 
     public async Task<Mt5SettingsView> GetViewAsync(CancellationToken cancellationToken)
     {
@@ -64,14 +73,14 @@ public sealed class Mt5SettingsStore(IDbContextFactory<TradingDbContext> dbFacto
         return row is null
             ? new Mt5SettingsView(false, false, null, null, MetaApiRegionDefault, "", DefaultCommissionPercent, 0, null, null, null)
             : new Mt5SettingsView(row.Enabled, row.TokenProtected is not null, row.TokenHint, row.AccountId, row.Region, row.SymbolSuffix,
-                row.CommissionPercent, row.Version, row.UpdatedAtUtc, row.UpdatedBy, Status(row));
+                row.CommissionPercent, row.Version, row.UpdatedAtUtc, row.UpdatedBy, Status(row), row.Connection, BridgeKey(row));
     }
 
     /// <summary>The settings to trade with, or null when MT5 is off or incomplete (Deriv multipliers are used).</summary>
     public async Task<Mt5Credentials?> GetActiveAsync(CancellationToken cancellationToken)
     {
         var row = await RowAsync(cancellationToken);
-        if (row is not { Enabled: true, TokenProtected: { } protectedToken, AccountId: { } accountId })
+        if (row is not { Enabled: true, Connection: MetaApiConnection, TokenProtected: { } protectedToken, AccountId: { } accountId })
         {
             return null;
         }
@@ -91,18 +100,55 @@ public sealed class Mt5SettingsStore(IDbContextFactory<TradingDbContext> dbFacto
     }
 
     /// <summary>Whether MT5 is switched on with a token and account (read at worker start to choose the broker).</summary>
-    public async Task<bool> IsActiveAsync(CancellationToken cancellationToken) =>
-        await RowAsync(cancellationToken) is { Enabled: true, TokenProtected: not null, AccountId: not null };
+    public async Task<bool> IsActiveAsync(CancellationToken cancellationToken) => IsActive(await RowAsync(cancellationToken));
+
+    /// <summary>"MetaApi" or "Bridge": how the worker reaches MT5.</summary>
+    public async Task<string> GetConnectionAsync(CancellationToken cancellationToken) =>
+        (await RowAsync(cancellationToken))?.Connection ?? MetaApiConnection;
+
+    /// <summary>The symbol suffix of the MT5 account (e.g. ".r"), empty for none.</summary>
+    public async Task<string> GetSymbolSuffixAsync(CancellationToken cancellationToken) => (await RowAsync(cancellationToken))?.SymbolSuffix ?? "";
+
+    /// <summary>
+    /// Whether <paramref name="key"/> is the bridge key of an MT5 bridge that is switched on (checked on every request from the
+    /// Expert Advisor; compared in constant time).
+    /// </summary>
+    public async Task<bool> IsValidBridgeKeyAsync(string? key, CancellationToken cancellationToken)
+    {
+        var row = await RowAsync(cancellationToken);
+        if (string.IsNullOrEmpty(key) || row is not { Enabled: true, Connection: BridgeConnection } || BridgeKey(row) is not { } expected)
+        {
+            return false;
+        }
+
+        return CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(key), System.Text.Encoding.UTF8.GetBytes(expected));
+    }
+
+    private static bool IsActive(Mt5SettingsEntity? row) => row is { Enabled: true } && (row.Connection == BridgeConnection
+        ? row.BridgeKeyProtected is not null
+        : row is { TokenProtected: not null, AccountId: not null });
+
+    private string? BridgeKey(Mt5SettingsEntity row)
+    {
+        try
+        {
+            return row.BridgeKeyProtected is null ? null : _bridgeProtector.Unprotect(row.BridgeKeyProtected);
+        }
+        catch (CryptographicException)
+        {
+            return null; // keys changed (e.g. a backup restored elsewhere): a new bridge key is made on the next save
+        }
+    }
 
     /// <summary>MT5's commission for position sizing while MT5 is active; null otherwise.</summary>
     public async Task<decimal?> GetActiveCommissionAsync(CancellationToken cancellationToken) =>
-        await RowAsync(cancellationToken) is { Enabled: true, TokenProtected: not null, AccountId: not null } row ? row.CommissionPercent : null;
+        await RowAsync(cancellationToken) is { } row && IsActive(row) ? row.CommissionPercent : null;
 
     public async Task<int> GetVersionAsync(CancellationToken cancellationToken) => (await RowAsync(cancellationToken))?.Version ?? 0;
 
     /// <summary>Saves settings. A null <paramref name="token"/> keeps the stored token.</summary>
     public async Task<Mt5SettingsView> SaveAsync(bool enabled, string? token, string? accountId, string region, string symbolSuffix,
-        decimal commissionPercent, string actor, CancellationToken cancellationToken)
+        decimal commissionPercent, string actor, CancellationToken cancellationToken, string connection = MetaApiConnection, bool newBridgeKey = false)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var row = await db.Mt5Settings.SingleOrDefaultAsync(s => s.Id == RowId, cancellationToken);
@@ -116,6 +162,13 @@ public sealed class Mt5SettingsStore(IDbContextFactory<TradingDbContext> dbFacto
         {
             row.TokenProtected = _protector.Protect(token.Trim());
             row.TokenHint = token.Trim().Length <= 4 ? "••••" : token.Trim()[^4..];
+        }
+
+        row.Connection = connection;
+        if (connection == BridgeConnection && (newBridgeKey || BridgeKey(row) is null))
+        {
+            // A random key the Expert Advisor sends with every request: nothing else on the computer can trade through the bridge.
+            row.BridgeKeyProtected = _bridgeProtector.Protect(Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant());
         }
 
         row.Enabled = enabled;

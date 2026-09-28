@@ -75,6 +75,7 @@ public static class DependencyInjection
         services.AddSingleton<IDerivCredentialsProvider>(sp => sp.GetRequiredService<DerivSettingsStore>());
         services.AddSingleton<IDerivStatusSink>(sp => sp.GetRequiredService<DerivSettingsStore>());
         services.AddSingleton<Mt5SettingsStore>();
+        services.AddSingleton<Bridge.Mt5BridgeStore>();
 
         services.AddSingleton<MarketCatalogStore>();
         services.AddSingleton<TestTrades.TestTradeStore>();
@@ -142,6 +143,12 @@ public static class DependencyInjection
             services.AddSingleton(_ => new Brokers.Mt5.MetaApiClient(
                 new HttpClient(new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(5) }) { Timeout = TimeSpan.FromSeconds(60) }));
             services.AddSingleton<DerivBroker>();
+            services.AddSingleton(sp => new Brokers.Mt5.MetaApiGateway(sp.GetRequiredService<Brokers.Mt5.MetaApiClient>(), sp.GetRequiredService<Mt5SettingsStore>()));
+            services.AddSingleton(sp => new Brokers.Mt5.BridgeGateway(sp.GetRequiredService<Bridge.Mt5BridgeStore>(), sp.GetRequiredService<IClock>()));
+            services.AddSingleton<Brokers.Mt5.IMt5Gateway>(sp =>
+                sp.GetRequiredService<Mt5SettingsStore>().GetConnectionAsync(CancellationToken.None).GetAwaiter().GetResult() == Mt5SettingsStore.BridgeConnection
+                    ? sp.GetRequiredService<Brokers.Mt5.BridgeGateway>()
+                    : sp.GetRequiredService<Brokers.Mt5.MetaApiGateway>());
             services.AddSingleton<Brokers.Mt5.Mt5Broker>();
             services.AddSingleton<IExecutionBroker>(sp =>
                 sp.GetRequiredService<Mt5SettingsStore>().IsActiveAsync(CancellationToken.None).GetAwaiter().GetResult()

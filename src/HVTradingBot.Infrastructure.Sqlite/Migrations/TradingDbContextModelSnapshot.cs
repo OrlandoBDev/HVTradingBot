@@ -683,6 +683,92 @@ namespace HVTradingBot.Infrastructure.Sqlite.Migrations
                     b.ToTable("market_snapshots", (string)null);
                 });
 
+            modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.Mt5BridgeCommandEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTime?>("DoneAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("done_at_utc");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("payload");
+
+                    b.Property<string>("ResultJson")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("result_json");
+
+                    b.Property<DateTime?>("SentAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("sent_at_utc");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_mt5_bridge_commands");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_mt5_bridge_commands_status");
+
+                    b.ToTable("mt5_bridge_commands", (string)null);
+                });
+
+            modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.Mt5BridgeStateEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AccountJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("account_json");
+
+                    b.Property<string>("DealsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("deals_json");
+
+                    b.Property<string>("EaVersion")
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ea_version");
+
+                    b.Property<DateTime>("LastSeenUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("last_seen_utc");
+
+                    b.Property<string>("PositionsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("positions_json");
+
+                    b.HasKey("Id")
+                        .HasName("pk_mt5_bridge_state");
+
+                    b.ToTable("mt5_bridge_state", (string)null);
+                });
+
             modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.Mt5SettingsEntity", b =>
                 {
                     b.Property<int>("Id")
@@ -694,10 +780,21 @@ namespace HVTradingBot.Infrastructure.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("account_id");
 
+                    b.Property<string>("BridgeKeyProtected")
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("bridge_key_protected");
+
                     b.Property<double>("CommissionPercent")
                         .HasPrecision(28, 10)
                         .HasColumnType("REAL")
                         .HasColumnName("commission_percent");
+
+                    b.Property<string>("Connection")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("connection");
 
                     b.Property<bool>("Enabled")
                         .HasColumnType("INTEGER")

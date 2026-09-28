@@ -62,8 +62,12 @@ try
     app.UseDefaultFiles();
     // index.html is always revalidated so a rebuilt dashboard shows up on the next load; the hashed assets it points
     // to never change and may be cached for good.
+    // The MT5 bridge Expert Advisor (/mt5/HVTradingBotBridge.mq5) is offered for download as plain text.
+    var contentTypes = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
+    contentTypes.Mappings[".mq5"] = "text/plain; charset=utf-8";
     var dashboardFiles = new StaticFileOptions
     {
+        ContentTypeProvider = contentTypes,
         OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl =
             ctx.File.Name == "index.html" ? "no-cache" : ctx.Context.Request.Path.StartsWithSegments("/assets") ? "public, max-age=31536000, immutable" : "no-cache"
     };
@@ -73,6 +77,7 @@ try
     app.MapAuthEndpoints();
     app.MapTradingEndpoints();
     app.MapSettingsEndpoints();
+    app.MapBridgeEndpoints();
     app.MapHub<DashboardHub>(DashboardHub.Path);
     app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
     app.MapHealthChecks("/health/ready", new HealthCheckOptions
