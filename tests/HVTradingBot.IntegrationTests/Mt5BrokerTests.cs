@@ -43,7 +43,7 @@ public abstract class Mt5BrokerTests(DatabaseFixture fixture) : IAsyncLifetime
     private async Task<Mt5Broker> BrokerAsync(bool connect = true)
     {
         await Store().SaveAsync(true, "metaapi-token-0123456789abcdef", "acc-1", "london", "", 0.007m, "tester", CancellationToken.None);
-        var broker = new Mt5Broker(new MetaApiClient(new HttpClient(_api)), Store(), fixture.DbFactory, new TradingEngineOptions { Instruments = ["EUR/USD"] },
+        var broker = new Mt5Broker(new MetaApiGateway(new MetaApiClient(new HttpClient(_api)), Store()), Store(), fixture.DbFactory, new TradingEngineOptions { Instruments = ["EUR/USD"] },
             _clock, NullLogger<Mt5Broker>.Instance);
         if (connect)
         {

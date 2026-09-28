@@ -15,13 +15,14 @@ using Microsoft.Extensions.Logging;
 namespace HVTradingBot.Infrastructure.Brokers.Mt5;
 
 /// <summary>
-/// Executes Forex trades on a MetaTrader 5 demo account through MetaApi: market orders with broker-side stop loss and
-/// take profit, sized in lots from the risk engine's units. Same rules as the Deriv broker: every submission is recorded
+/// Executes Forex trades on a MetaTrader 5 demo account, through MetaApi's cloud or the Expert Advisor bridge on this
+/// computer (<see cref="IMt5Gateway"/>): market orders with broker-side stop loss and take profit, sized in lots from
+/// the risk engine's units. Same rules as the Deriv broker: every submission is recorded
 /// first (a signal is never sent twice), a timeout means "outcome unknown" (the engine turns on the kill switch until
 /// it is reconciled), the broker is authoritative for open positions, and real accounts are refused.
 /// </summary>
 public sealed class Mt5Broker(
-    MetaApiClient api,
+    IMt5Gateway gateway,
     Mt5SettingsStore settings,
     IDbContextFactory<TradingDbContext> dbFactory,
     TradingEngineOptions engineOptions,
@@ -32,9 +33,8 @@ public sealed class Mt5Broker(
     private static readonly TimeSpan UnknownMatchWindow = TimeSpan.FromMinutes(5);
 
     private readonly Dictionary<Instrument, Quote> _quotes = new();
-    private readonly Dictionary<string, Mt5SymbolSpec> _specs = new(StringComparer.Ordinal);
     private (DateTime BarClose, IReadOnlyList<Mt5Position> Positions)? _positionsCache;
-    private Mt5Credentials? _credentials;
+    private string? _suffix;
     private string? _accountId;
     private bool _isDemo = true;
     private string? _lastStatus;
@@ -52,22 +52,27 @@ public sealed class Mt5Broker(
     /// <summary>Account balance; also checks the account (demo only, currency) and reports the result on the Settings page.</summary>
     public async Task<BrokerAccount> GetAccountAsync(CancellationToken cancellationToken)
     {
-        var credentials = await CredentialsAsync(cancellationToken);
+        _suffix ??= await settings.GetSymbolSuffixAsync(cancellationToken);
         Mt5AccountInfo info;
         try
         {
-            info = await api.GetAccountAsync(credentials, cancellationToken);
+            info = await gateway.GetAccountAsync(cancellationToken);
         }
-        catch (MetaApiException ex)
+        catch (Mt5RefusedException ex)
         {
-            var message = ex.IsAuthentication ? "MetaApi rejected the token." : ex.IsNotFound ? "MetaApi does not know this account id." : ex.Message;
-            await ReportAsync(credentials, "Failed", message, null, cancellationToken);
+            var message = ex.NotFound ? "MetaApi does not know this account id." : ex.Message;
+            await ReportAsync("Failed", message, null, cancellationToken);
             throw new BrokerUnavailableException($"MT5: {message}", ex);
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
+        catch (BrokerUnavailableException ex)
         {
-            await ReportAsync(credentials, "Failed", $"MetaApi not reachable: {ex.Message}", null, cancellationToken);
-            throw new BrokerUnavailableException($"MT5: MetaApi not reachable: {ex.Message}", ex);
+            await ReportAsync("Failed", ex.Message, null, cancellationToken);
+            throw;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or TimeoutException && !cancellationToken.IsCancellationRequested)
+        {
+            await ReportAsync("Failed", $"MT5 not reachable: {ex.Message}", null, cancellationToken);
+            throw new BrokerUnavailableException($"MT5 not reachable: {ex.Message}", ex);
         }
 
         // ADR-008: demo accounts only. MetaApi reports the trade mode; older answers without it fall back to the server name.
@@ -76,20 +81,20 @@ public sealed class Mt5Broker(
             : info.Server.Contains("demo", StringComparison.OrdinalIgnoreCase);
         if (!isDemo)
         {
-            await ReportAsync(credentials, "Failed", $"{info.Server} {info.Login} is a real-money account; only demo accounts are allowed.", info, cancellationToken);
+            await ReportAsync("Failed", $"{info.Server} {info.Login} is a real-money account; only demo accounts are allowed.", info, cancellationToken);
             throw new BrokerUnavailableException("MT5: real-money accounts are not allowed; use an MT5 demo account.");
         }
 
         if (!string.Equals(info.Currency, engineOptions.AccountCurrency, StringComparison.OrdinalIgnoreCase))
         {
-            await ReportAsync(credentials, "Failed", $"The account currency {info.Currency} does not match the app's {engineOptions.AccountCurrency}.", info,
+            await ReportAsync("Failed", $"The account currency {info.Currency} does not match the app's {engineOptions.AccountCurrency}.", info,
                 cancellationToken);
             throw new BrokerUnavailableException($"MT5: account currency {info.Currency} does not match {engineOptions.AccountCurrency}.");
         }
 
         _isDemo = true;
         _accountId = $"MT5-{info.Login}";
-        await ReportAsync(credentials, "Connected", null, info, cancellationToken);
+        await ReportAsync("Connected", null, info, cancellationToken);
 
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var row = await db.BrokerAccounts.SingleOrDefaultAsync(a => a.AccountKey == _accountId, cancellationToken);
@@ -119,7 +124,7 @@ public sealed class Mt5Broker(
         var tracked = local.Select(p => p.BrokerContractId).ToHashSet();
         foreach (var position in await LivePositionsAsync(null, cancellationToken))
         {
-            if (!tracked.Contains(position.Id) && Mt5Symbols.ToInstrument(position.Symbol, _credentials!.SymbolSuffix) is { } instrument)
+            if (!tracked.Contains(position.Id) && Mt5Symbols.ToInstrument(position.Symbol, _suffix ?? "") is { } instrument)
             {
                 result.Add(new OpenPosition(Guid.Empty, $"external-{position.Id}", instrument, position.IsBuy ? Direction.Long : Direction.Short, 0, 0, 0,
                     0, 0, position.OpenedAtUtc, "External", 0, 0, 0));
@@ -144,7 +149,6 @@ public sealed class Mt5Broker(
 
     public async Task<OrderResult> PlaceOrderAsync(TradeOrder order, CancellationToken cancellationToken)
     {
-        var credentials = await CredentialsAsync(cancellationToken);
         var accountId = await AccountIdAsync(cancellationToken);
 
         // 1. Idempotency: the unique index on client_order_id admits exactly one submission per signal.
@@ -154,48 +158,31 @@ public sealed class Mt5Broker(
             return duplicate;
         }
 
-        if (Mt5Symbols.For(order.Instrument, credentials.SymbolSuffix) is not { } symbol)
+        if (Mt5Symbols.For(order.Instrument, _suffix ?? "") is not { } symbol)
         {
             return await RejectAsync(entity, $"{order.Instrument.DisplayName} is not Forex: MT5 trades Forex here. Turn MT5 off to trade other markets on Deriv.",
                 cancellationToken);
         }
 
-        // 2. Units to lots, rounded down to the broker's step (never more risk than the engine sized).
-        Mt5SymbolSpec spec;
-        try
-        {
-            spec = await SpecAsync(credentials, symbol, cancellationToken);
-        }
-        catch (Exception ex) when (ex is MetaApiException or HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
-        {
-            return await RejectAsync(entity, $"Symbol {symbol} is not available on the MT5 account: {ex.Message}", cancellationToken);
-        }
-
-        var lots = Math.Floor(order.Units / spec.ContractSize / spec.VolumeStep) * spec.VolumeStep;
-        lots = Math.Min(lots, spec.MaxVolume);
-        if (lots < spec.MinVolume)
-        {
-            return await RejectAsync(entity,
-                $"{order.Units:N0} units is below the broker minimum of {spec.MinVolume} lot ({spec.MinVolume * spec.ContractSize:N0} units); raise the risk per trade or the trading capital.",
-                cancellationToken);
-        }
-
-        var stop = Math.Round(order.StopLoss, spec.Digits);
-        var target = Math.Round(order.TakeProfit, spec.Digits);
+        // 2. Send (the gateway turns units into lots, rounding down). A clear refusal means "not traded"; a lost answer
+        //    means "unknown".
         var clientId = ClientId(order.ClientOrderId);
-
-        // 3. Send. A clear refusal means "not traded"; a timeout or server error means "unknown".
-        Mt5TradeResult result;
+        Mt5OpenResult result;
         var submittedAt = clock.UtcNow;
         try
         {
-            result = await api.OpenAsync(credentials, symbol, order.Direction == Direction.Long, lots, stop, target, clientId, cancellationToken);
+            result = await gateway.OpenAsync(new Mt5OpenRequest(symbol, order.Direction == Direction.Long, order.Units, order.StopLoss, order.TakeProfit,
+                clientId), cancellationToken);
         }
-        catch (MetaApiException ex)
+        catch (Mt5RefusedException ex)
         {
             return await RejectAsync(entity, $"MT5 refused the order: {ex.Message}", cancellationToken);
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
+        catch (BrokerUnavailableException ex)
+        {
+            return await RejectAsync(entity, ex.Message, cancellationToken);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or TimeoutException && !cancellationToken.IsCancellationRequested)
         {
             logger.LogError(ex, "Execution state unknown for {ClientOrderId}; reconciling with MT5 positions", order.ClientOrderId);
             await OrderLedger.UpdateAsync(dbFactory, entity.Id, o => { o.Status = nameof(OrderStatus.Unknown); o.RejectReason = ex.Message; }, cancellationToken);
@@ -207,16 +194,16 @@ public sealed class Mt5Broker(
 
         if (!result.Done || result.PositionId is null)
         {
-            return await RejectAsync(entity, $"MT5 refused the order: {result.Code} {result.Message}".Trim(), cancellationToken);
+            var reason = result.Code is "VOLUME" or "SYMBOL" ? result.Message : $"MT5 refused the order: {result.Code} {result.Message}".Trim();
+            return await RejectAsync(entity, reason, cancellationToken);
         }
 
         _positionsCache = null;
-        var opened = (await LivePositionsAsync(null, cancellationToken)).FirstOrDefault(p => p.Id == result.PositionId);
-        var entry = opened?.OpenPrice ?? (_quotes.TryGetValue(order.Instrument, out var q) ? (order.Direction == Direction.Long ? q.Ask : q.Bid) : order.RequestedPrice);
-        var position = await RecordFillAsync(entity.Id, order, accountId, result.PositionId, entry, opened?.StopLoss ?? stop, opened?.TakeProfit ?? target,
-            lots * spec.ContractSize, opened?.Commission, submittedAt, cancellationToken);
-        logger.LogInformation("MT5 position {PositionId} opened: {Symbol} {Side} {Lots} lots at {Entry} SL {StopLoss} TP {TakeProfit}",
-            result.PositionId, symbol, order.Direction, lots, entry, stop, target);
+        var entry = result.Price ?? (_quotes.TryGetValue(order.Instrument, out var q) ? (order.Direction == Direction.Long ? q.Ask : q.Bid) : order.RequestedPrice);
+        var position = await RecordFillAsync(entity.Id, order, accountId, result.PositionId, entry, order.StopLoss, order.TakeProfit, result.Units,
+            result.Commission, submittedAt, cancellationToken);
+        logger.LogInformation("MT5 position {PositionId} opened: {Symbol} {Side} {Units} units at {Entry} SL {StopLoss} TP {TakeProfit}",
+            result.PositionId, symbol, order.Direction, result.Units, entry, order.StopLoss, order.TakeProfit);
         return new OrderResult(order.ClientOrderId, OrderStatus.Filled, entity.Id, position.Id, entry, null);
     }
 
@@ -237,23 +224,26 @@ public sealed class Mt5Broker(
             return OrderResult.Rejected(positionId, "Unknown MT5 position.");
         }
 
-        var credentials = await CredentialsAsync(cancellationToken);
         try
         {
-            var result = await api.CloseAsync(credentials, mt5Id, cancellationToken);
+            var result = await gateway.CloseAsync(mt5Id, cancellationToken);
             if (!result.Done && !result.Code.Contains("POSITION_CLOSED", StringComparison.Ordinal))
             {
                 return OrderResult.Rejected(position.ClientOrderId, $"MT5 refused the close: {result.Code} {result.Message}".Trim());
             }
         }
-        catch (MetaApiException ex) when (ex.IsNotFound)
+        catch (Mt5RefusedException ex) when (ex.NotFound)
         {
             // Already closed (stop, target, or closed elsewhere): reconciliation reads the result from the deal history.
             logger.LogInformation("MT5 position {PositionId} is no longer open: {Message}", mt5Id, ex.Message);
         }
-        catch (MetaApiException ex)
+        catch (Mt5RefusedException ex)
         {
             return OrderResult.Rejected(position.ClientOrderId, $"MT5 refused the close: {ex.Message}");
+        }
+        catch (BrokerUnavailableException ex)
+        {
+            return OrderResult.Rejected(position.ClientOrderId, ex.Message);
         }
 
         _positionsCache = null; // the next reconciliation must see the close
@@ -277,8 +267,19 @@ public sealed class Mt5Broker(
             return [];
         }
 
-        var live = (await LivePositionsAsync(bar.CloseTimeUtc, cancellationToken)).Select(p => p.Id).ToHashSet();
-        var credentials = await CredentialsAsync(cancellationToken);
+        HashSet<string> live;
+        try
+        {
+            live = (await LivePositionsAsync(bar.CloseTimeUtc, cancellationToken)).Select(p => p.Id).ToHashSet();
+        }
+        catch (BrokerUnavailableException ex)
+        {
+            // Without a current view of MT5 nothing may be treated as closed: keep tracking until it is reachable again.
+            logger.LogWarning("MT5 positions not available; reconciliation skipped: {Message}", ex.Message);
+            await db.SaveChangesAsync(cancellationToken);
+            return [];
+        }
+
         var closed = new List<ClosedPosition>();
         foreach (var entity in open)
         {
@@ -290,7 +291,7 @@ public sealed class Mt5Broker(
                 continue;
             }
 
-            var deals = await api.GetDealsAsync(credentials, mt5Id, cancellationToken);
+            var deals = await gateway.GetDealsAsync(mt5Id, cancellationToken);
             var exit = deals.LastOrDefault(d => d.EntryType is "DEAL_ENTRY_OUT" or "DEAL_ENTRY_OUT_BY" or "DEAL_ENTRY_INOUT");
             if (exit is null)
             {
@@ -335,18 +336,6 @@ public sealed class Mt5Broker(
     public static string ClientId(string clientOrderId) =>
         "HV" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(clientOrderId)))[..12];
 
-    /// <summary>Read again until the account connects, so corrected settings are picked up while waiting.</summary>
-    private async Task<Mt5Credentials> CredentialsAsync(CancellationToken cancellationToken)
-    {
-        if (_credentials is null || _accountId is null)
-        {
-            _credentials = await settings.GetActiveAsync(cancellationToken)
-                           ?? throw new BrokerUnavailableException("MT5 is not set up: enter the MetaApi token and account id in Settings › Broker account.");
-        }
-
-        return _credentials;
-    }
-
     private async Task<string> AccountIdAsync(CancellationToken cancellationToken)
     {
         if (_accountId is null)
@@ -357,17 +346,6 @@ public sealed class Mt5Broker(
         return _accountId!;
     }
 
-    private async Task<Mt5SymbolSpec> SpecAsync(Mt5Credentials credentials, string symbol, CancellationToken cancellationToken)
-    {
-        if (!_specs.TryGetValue(symbol, out var spec))
-        {
-            spec = await api.GetSpecificationAsync(credentials, symbol, cancellationToken);
-            _specs[symbol] = spec;
-        }
-
-        return spec;
-    }
-
     /// <summary>Open positions on the MT5 account, cached per bar so one cycle makes one call.</summary>
     private async Task<IReadOnlyList<Mt5Position>> LivePositionsAsync(DateTime? barClose, CancellationToken cancellationToken)
     {
@@ -376,7 +354,7 @@ public sealed class Mt5Broker(
             return cache.Positions;
         }
 
-        var positions = await api.GetPositionsAsync(await CredentialsAsync(cancellationToken), cancellationToken);
+        var positions = await gateway.GetPositionsAsync(cancellationToken);
         if (barClose is not null)
         {
             _positionsCache = (barClose.Value, positions);
@@ -412,7 +390,8 @@ public sealed class Mt5Broker(
         {
             positions = await LivePositionsAsync(null, cancellationToken);
         }
-        catch (Exception ex) when (ex is MetaApiException or HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
+        catch (Exception ex) when (ex is Mt5RefusedException or BrokerUnavailableException or HttpRequestException or TaskCanceledException
+                                       && !cancellationToken.IsCancellationRequested)
         {
             return null;
         }
@@ -430,9 +409,8 @@ public sealed class Mt5Broker(
         var direction = Enum.Parse<Direction>(order.Direction);
         var tradeOrder = new TradeOrder(order.ClientOrderId, instrument, direction, order.Units, order.RequestedPrice, order.StopLoss, order.TakeProfit,
             0, "Recovered", 0, order.DecisionId, order.CorrelationId);
-        var spec = _specs.GetValueOrDefault(match.Symbol);
         var position = await RecordFillAsync(order.Id, tradeOrder, order.BrokerAccountId ?? _accountId!, match.Id, match.OpenPrice,
-            match.StopLoss ?? order.StopLoss, match.TakeProfit ?? order.TakeProfit, match.Volume * (spec?.ContractSize ?? 100_000m), match.Commission,
+            match.StopLoss ?? order.StopLoss, match.TakeProfit ?? order.TakeProfit, match.Volume * match.ContractSize, match.Commission,
             match.OpenedAtUtc, cancellationToken);
         return new OrderResult(order.ClientOrderId, OrderStatus.Filled, order.Id, position.Id, match.OpenPrice, null);
     }
@@ -482,7 +460,7 @@ public sealed class Mt5Broker(
     }
 
     /// <summary>Writes the connection result for the Settings page when it changes.</summary>
-    private async Task ReportAsync(Mt5Credentials credentials, string state, string? message, Mt5AccountInfo? info, CancellationToken cancellationToken)
+    private async Task ReportAsync(string state, string? message, Mt5AccountInfo? info, CancellationToken cancellationToken)
     {
         var key = $"{state}|{message}|{info?.Balance}";
         if (key == _lastStatus)
@@ -493,7 +471,7 @@ public sealed class Mt5Broker(
         _lastStatus = key;
         try
         {
-            await settings.WriteStatusAsync(new Mt5Status(state, message, credentials.Version, info?.Login, info?.Server, info?.Broker,
+            await settings.WriteStatusAsync(new Mt5Status(state, message, await settings.GetVersionAsync(cancellationToken), info?.Login, info?.Server, info?.Broker,
                 info is null ? null : state == "Connected", info?.Balance, info?.Currency, clock.UtcNow), cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

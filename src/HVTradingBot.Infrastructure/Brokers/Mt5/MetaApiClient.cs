@@ -10,7 +10,7 @@ namespace HVTradingBot.Infrastructure.Brokers.Mt5;
 public sealed record Mt5AccountInfo(string Login, string Server, string Broker, string Currency, decimal Balance, decimal Equity, string? TradeMode);
 
 public sealed record Mt5Position(string Id, string Symbol, bool IsBuy, decimal Volume, decimal OpenPrice, decimal? StopLoss, decimal? TakeProfit,
-    decimal Profit, decimal Commission, decimal Swap, DateTime OpenedAtUtc, string? ClientId);
+    decimal Profit, decimal Commission, decimal Swap, DateTime OpenedAtUtc, string? ClientId, decimal ContractSize = 100_000m);
 
 public sealed record Mt5Deal(string Id, string? EntryType, decimal Price, decimal Profit, decimal Commission, decimal Swap, DateTime TimeUtc,
     string? Reason);

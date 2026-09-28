@@ -388,8 +388,10 @@ public sealed record Mt5StatusDto(string State, string? Message, bool IsCurrent,
     decimal? Balance, string? Currency, DateTime CheckedAtUtc);
 
 /// <summary>
-/// MetaTrader 5 through MetaApi. When enabled, Forex trades on this MT5 demo account instead of Deriv multipliers (prices
-/// still come from Deriv). The token is never returned, only whether one is stored and its last 4 characters.
+/// MetaTrader 5 through MetaApi's cloud or the free Expert Advisor bridge (<see cref="Connection"/> "MetaApi" or "Bridge").
+/// When enabled, Forex trades on this MT5 demo account instead of Deriv multipliers (prices still come from Deriv). The
+/// MetaApi token is never returned, only whether one is stored and its last 4 characters. <see cref="BridgeKey"/> is the
+/// key to paste into the Expert Advisor (bridge mode only).
 /// </summary>
 public sealed record Mt5SettingsDto(
     bool Enabled,
@@ -404,7 +406,12 @@ public sealed record Mt5SettingsDto(
     string? UpdatedBy,
     bool Active,
     Mt5StatusDto? Status,
-    IReadOnlyList<string> Regions);
+    IReadOnlyList<string> Regions,
+    string Connection = "MetaApi",
+    string? BridgeKey = null,
+    DateTime? BridgeLastSeenUtc = null,
+    string? BridgeVersion = null);
 
-/// <summary>A null or empty <see cref="Token"/> keeps the stored token.</summary>
-public sealed record Mt5SettingsRequest(bool Enabled, string? Token, string? AccountId, string? Region, string? SymbolSuffix, decimal? CommissionPercent);
+/// <summary>A null or empty <see cref="Token"/> keeps the stored token. A null <see cref="Connection"/> keeps the stored one.</summary>
+public sealed record Mt5SettingsRequest(bool Enabled, string? Token, string? AccountId, string? Region, string? SymbolSuffix, decimal? CommissionPercent,
+    string? Connection = null, bool NewBridgeKey = false);

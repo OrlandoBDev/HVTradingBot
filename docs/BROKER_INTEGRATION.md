@@ -61,6 +61,36 @@ Unknown and the kill switch stays on. Closes are read from the deal history (pro
 or target from the deal reason). Real-money accounts are refused (MetaApi's trade mode, or the server name).
 Position sizing uses the MT5 commission while MT5 is on. MetaApi is a paid service beyond its free allowance.
 
+### MetaTrader 5 on the same computer: the Expert Advisor bridge (free, Mac or Windows)
+
+The free alternative to MetaApi when the bot runs on a computer that also runs MetaTrader 5 (the Mac Docker stack, or
+`run.sh local`). Not available in the Android app, which has no MetaTrader next to it.
+
+**Set up:** Settings › Broker account › MetaTrader 5: Connection **MT5 on this computer**, tick **Trade Forex on MT5**
+and save. The card then shows a **bridge key** and the steps:
+
+1. Download `HVTradingBotBridge.mq5` from the card (served at `/mt5/HVTradingBotBridge.mq5`) into MetaTrader's
+   `MQL5/Experts` folder (File › Open Data Folder) and compile it in MetaEditor.
+2. Tools › Options › Expert Advisors: tick **Allow WebRequest for listed URL** and add `http://127.0.0.1:5080`.
+3. Attach the Expert Advisor to one chart, paste the bridge key in its inputs, and switch **Algo Trading** on.
+
+**How it works** (`Mt5BridgeStore`, `BridgeGateway`, `POST /api/bridge/mt5`): every second the Expert Advisor posts
+the account, open positions (with our magic number 770077), recent deals of those positions and the results of earlier
+commands, and gets back new commands as text lines (`OPEN|id|symbol|BUY|units|sl|tp|clientId`, `CLOSE|id|ticket`).
+The endpoint skips the dashboard login and accepts only the bridge key (`X-HV-Bridge-Key`, compared in constant time,
+stored encrypted) while MT5 is switched on in bridge mode; **New key** replaces it. The same `Mt5Broker` rules apply
+(lots rounded down in the Expert Advisor, idempotent client id in the position comment, deal-based closes). Failure
+handling:
+
+| Situation | Outcome |
+|---|---|
+| No report for 20 s (MetaTrader closed, Algo Trading off) | Broker unavailable: new orders refused before anything is queued |
+| Order not picked up within 30 s | Withdrawn (`Expired`), never delivered later: a plain rejection |
+| Order picked up, no result within 30 s | Unknown: reconciled by the client id in the position comment, kill switch until then |
+| Real-money account | The Expert Advisor refuses to start, and the broker refuses the account |
+
+Commands are delivered at most once, so a restart of either side never repeats an order.
+
 ### OANDA
 
 Former initial candidate; superseded by Deriv (ADR-008). Keep any OANDA-specific models in Infrastructure.
