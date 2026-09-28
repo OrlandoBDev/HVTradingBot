@@ -188,6 +188,35 @@ public sealed class BrokerSettingsEntity
     public string? UpdatedBy { get; set; }
 }
 
+/// <summary>
+/// MetaTrader 5 through MetaApi (metaapi.cloud): when enabled, Forex orders go to this MT5 account instead of Deriv
+/// multipliers. The MetaApi token is encrypted like the Deriv token. The Status* columns are the worker's latest check.
+/// </summary>
+public sealed class Mt5SettingsEntity
+{
+    public int Id { get; set; }
+    public bool Enabled { get; set; }
+    public string? TokenProtected { get; set; }
+    public string? TokenHint { get; set; }
+    public string? AccountId { get; set; }
+    public string Region { get; set; } = "new-york";
+    public string SymbolSuffix { get; set; } = "";
+    public decimal CommissionPercent { get; set; }
+    public int Version { get; set; }
+    public DateTime UpdatedAtUtc { get; set; }
+    public string? UpdatedBy { get; set; }
+    public string? StatusState { get; set; }
+    public string? StatusMessage { get; set; }
+    public int StatusVersion { get; set; }
+    public string? StatusLogin { get; set; }
+    public string? StatusServer { get; set; }
+    public string? StatusBroker { get; set; }
+    public bool? StatusIsDemo { get; set; }
+    public decimal? StatusBalance { get; set; }
+    public string? StatusCurrency { get; set; }
+    public DateTime? StatusCheckedAtUtc { get; set; }
+}
+
 /// <summary>Result of the worker's latest attempt to connect with the stored settings.</summary>
 public sealed class BrokerConnectionStatusEntity
 {

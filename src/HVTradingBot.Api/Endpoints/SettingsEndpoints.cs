@@ -22,6 +22,12 @@ public static class SettingsEndpoints
             return Results.NoContent();
         });
 
+        var mt5 = app.MapGroup("/api/settings/mt5");
+        mt5.MapGet("", (Mt5SettingsActions actions, CancellationToken ct) => actions.GetAsync(ct));
+        mt5.MapPut("", async (Mt5SettingsRequest request, Mt5SettingsActions actions, HttpContext http, CancellationToken ct) =>
+            (await actions.SaveAsync(request, http.Caller(), ct)).ToHttp());
+        mt5.MapDelete("", (Mt5SettingsActions actions, HttpContext http, CancellationToken ct) => actions.ClearAsync(http.Caller(), ct));
+
         var risk = app.MapGroup("/api/settings/risk");
         risk.MapGet("", (DashboardActions actions, CancellationToken ct) => actions.GetRiskSettingsAsync(ct));
         risk.MapPut("", async (RiskLimitsDto request, DashboardActions actions, HttpContext http, CancellationToken ct) =>

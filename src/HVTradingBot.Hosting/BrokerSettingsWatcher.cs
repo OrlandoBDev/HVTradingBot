@@ -29,6 +29,7 @@ public sealed class BrokerSettingsWatcher(
     ITradeDecisionNotifier notifier,
     TradingEngineOptions engineOptions,
     IWorkerInstanceLock instanceLock,
+    Mt5SettingsStore mt5Settings,
     IHostApplicationLifetime lifetime,
     ILogger<BrokerSettingsWatcher> logger) : BackgroundService
 {
@@ -37,6 +38,7 @@ public sealed class BrokerSettingsWatcher(
 
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(5);
     private DateTime _lastCatalogRefresh = DateTime.UtcNow;
+    private int? _mt5Version;
     private bool? _killSwitchActive;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -55,6 +57,12 @@ public sealed class BrokerSettingsWatcher(
                 // Without the lock a second worker could start trading the same account: restart and wait for the lock.
                 Environment.ExitCode = RestartExitCode;
                 lifetime.StopApplication();
+                return;
+            }
+
+            // Checked also while waiting for a broker: saving MT5 settings must switch brokers even when none connects yet.
+            if (await Mt5SettingsChangedAsync(stoppingToken))
+            {
                 return;
             }
 
@@ -154,6 +162,39 @@ public sealed class BrokerSettingsWatcher(
         }
 
         _killSwitchActive = state.KillSwitchActive;
+    }
+
+    /// <summary>
+    /// MT5 switched on or off, or its account changed: the broker is chosen when the worker starts, so restart. Open
+    /// positions keep their broker-side stop loss and take profit meanwhile.
+    /// </summary>
+    private async Task<bool> Mt5SettingsChangedAsync(CancellationToken cancellationToken)
+    {
+        if (broker.Descriptor.Name is "Paper" or "Backtest")
+        {
+            return false;
+        }
+
+        try
+        {
+            var version = await mt5Settings.GetVersionAsync(cancellationToken);
+            if (_mt5Version is null || _mt5Version == version)
+            {
+                _mt5Version = version;
+                return false;
+            }
+
+            logger.LogWarning("MT5 settings changed (version {Version}); restarting the worker to apply them", version);
+            await journal.RecordAuditAsync(TradingEngine.SystemActor, "WorkerRestart", $"Applying MT5 settings version {version}.", null, cancellationToken);
+            Environment.ExitCode = RestartExitCode;
+            lifetime.StopApplication();
+            return true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "MT5 settings check failed");
+            return false;
+        }
     }
 
     /// <summary>

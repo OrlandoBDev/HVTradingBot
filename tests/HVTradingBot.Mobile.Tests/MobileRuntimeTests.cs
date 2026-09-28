@@ -53,7 +53,7 @@ public sealed class MobileRuntimeTests : IAsyncLifetime
             "/api/positions/open", "/api/trades", "/api/risk", "/api/performance", "/api/profit", "/api/audit", "/api/learning", "/api/test-trades",
             "/api/backtests?limit=20", "/api/settings/deriv", "/api/settings/risk", "/api/settings/notifications", "/api/settings/markets",
             "/api/app/engine", "/api/app/logs?count=50", "/api/candles?instrument=EUR%2FUSD&timeframe=M5&limit=50", "/api/candles?instrument=EUR/USD&timeframe=H1",
-            "/api/signals", "/api/signals?active=true&page=1&pageSize=10", "/api/signals/stats", "/api/settings/signals"
+            "/api/signals", "/api/signals?active=true&page=1&pageSize=10", "/api/signals/stats", "/api/settings/signals", "/api/settings/mt5", "/api/evaluation"
         ];
         foreach (var path in reads)
         {

@@ -382,3 +382,29 @@ public sealed record SignalSettingsDto(
     DateTime? UpdatedAtUtc = null,
     string? UpdatedBy = null,
     int MaxNotificationsPerHour = 3);
+
+/// <summary>The worker's latest check of the MT5 account. <see cref="IsCurrent"/>: made with the saved settings.</summary>
+public sealed record Mt5StatusDto(string State, string? Message, bool IsCurrent, string? Login, string? Server, string? Broker, bool? IsDemo,
+    decimal? Balance, string? Currency, DateTime CheckedAtUtc);
+
+/// <summary>
+/// MetaTrader 5 through MetaApi. When enabled, Forex trades on this MT5 demo account instead of Deriv multipliers (prices
+/// still come from Deriv). The token is never returned, only whether one is stored and its last 4 characters.
+/// </summary>
+public sealed record Mt5SettingsDto(
+    bool Enabled,
+    bool TokenConfigured,
+    string? TokenHint,
+    string? AccountId,
+    string Region,
+    string SymbolSuffix,
+    decimal CommissionPercent,
+    int Version,
+    DateTime? UpdatedAtUtc,
+    string? UpdatedBy,
+    bool Active,
+    Mt5StatusDto? Status,
+    IReadOnlyList<string> Regions);
+
+/// <summary>A null or empty <see cref="Token"/> keeps the stored token.</summary>
+public sealed record Mt5SettingsRequest(bool Enabled, string? Token, string? AccountId, string? Region, string? SymbolSuffix, decimal? CommissionPercent);

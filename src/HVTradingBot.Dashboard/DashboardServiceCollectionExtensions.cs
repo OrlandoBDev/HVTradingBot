@@ -11,6 +11,7 @@ public static class DashboardServiceCollectionExtensions
         services.AddSingleton<DashboardActions>();
         services.AddSingleton<SignalDashboard>();
         services.AddSingleton<EvaluationService>();
+        services.AddSingleton<Mt5SettingsActions>();
         services.AddSingleton<NewsQueries>();
         services.AddSingleton<BacktestService>();
         return services;

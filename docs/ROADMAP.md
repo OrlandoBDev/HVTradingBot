@@ -42,6 +42,9 @@ Ideas agreed for later, not yet scheduled into a phase.
 
 ### MetaTrader 5 as a second broker (Forex through Deriv MT5)
 
+**Status: built** (MetaApi option, Forex only; see docs/BROKER_INTEGRATION.md for set-up). Still open: route Forex to
+MT5 and Derived to Deriv at the same time (today MT5 replaces Deriv while it is on).
+
 **Why:** Deriv multiplier contracts charge a commission of about 0.05% of the position value. At small-account
 risk (≈1% per trade) that is 31–36% of the amount at risk on Forex, above the 30% fee cap, so every Forex
 candidate is currently rejected. Deriv MT5 accounts are typically priced through the spread instead of a

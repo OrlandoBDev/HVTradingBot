@@ -29,7 +29,7 @@ public sealed partial class LocalApi
 
     public LocalApi(DashboardQueries queries, DashboardActions actions, BacktestService backtests, CandleQueryService candles,
         EngineSupervisor engine, AppLog log, ILogger<LocalApi> logger, NewsQueries news, SignalDashboard signals, DataBackup backup,
-        EvaluationService evaluation)
+        EvaluationService evaluation, Mt5SettingsActions mt5)
     {
         _logger = logger;
 
@@ -99,6 +99,9 @@ public sealed partial class LocalApi
             await actions.ClearDerivSettingsAsync(r.Caller, r.Ct);
             return DashboardResult.NoContent;
         });
+        Get("/api/settings/mt5", r => Ok(mt5.GetAsync(r.Ct)));
+        Put("/api/settings/mt5", r => mt5.SaveAsync(r.Body<Mt5SettingsRequest>(), r.Caller, r.Ct));
+        Delete("/api/settings/mt5", r => Ok(mt5.ClearAsync(r.Caller, r.Ct)));
         Get("/api/settings/risk", r => Ok(actions.GetRiskSettingsAsync(r.Ct)));
         Put("/api/settings/risk", r => actions.SaveRiskSettingsAsync(r.Body<RiskLimitsDto>(), r.Caller, r.Ct));
         Delete("/api/settings/risk", r => Ok(actions.ResetRiskSettingsAsync(r.Caller, r.Ct)));
