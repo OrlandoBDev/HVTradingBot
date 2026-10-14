@@ -1,4 +1,4 @@
-export type PageId = "overview" | "markets" | "trades" | "decisions" | "learning" | "performance" | "backtest" | "risk" | "audit" | "settings";
+export type PageId = "overview" | "markets" | "trades" | "signals" | "decisions" | "learning" | "news" | "performance" | "backtest" | "risk" | "audit" | "settings";
 
 export interface PageInfo {
   id: PageId;
@@ -51,6 +51,19 @@ export const PAGES: PageInfo[] = [
     ],
   },
   {
+    id: "signals",
+    label: "Signals",
+    icon: "☍",
+    group: "Trading",
+    summary: "Setups the bot sends you to decide on — trade them or skip them. They never use the bot's own slots or loss budget.",
+    details: [
+      "Signals come from markets set to “Signals only” (Settings › Signals) and, if you turn it on, near misses that score just below the automatic threshold.",
+      "Trading a signal re-prices it at the live quote and runs the same risk rules as the bot. A signal expires after a few minutes, or when the price has already moved too far.",
+      "If a rule fails you see why and can accept the risk — except safety rules (kill switch, stale data, closed market, sizing), which always block. Loss limits need a typed ACCEPT and are off by default.",
+      "Signal trades have their own slots, risk per trade and daily loss budget, and are reported separately (overridden ones on their own). Skipped signals are followed as virtual trades so you can see what you missed.",
+    ],
+  },
+  {
     id: "decisions",
     label: "Decisions",
     icon: "✓",
@@ -71,7 +84,21 @@ export const PAGES: PageInfo[] = [
     details: [
       "Every setup — traded or not — is followed as a virtual trade until its stop, target or expiry.",
       "Good results raise future scores (up to +8), poor ones lower them (down to −15); persistent losers are switched off.",
+      "It also learns which news and cross-market trend conditions help or hurt each strategy (−6 … +3).",
       "Learning never changes position size or risk limits, and needs many samples before it has much effect.",
+    ],
+  },
+  {
+    id: "news",
+    label: "News",
+    icon: "✉",
+    group: "Analysis",
+    summary: "The economic calendar, market headlines and what they mean for each of your markets.",
+    details: [
+      "No new trades on a market from 30 minutes before to 30 minutes after a high-impact release for its currencies.",
+      "Other medium- or high-impact releases within two hours halve the position size; headlines clearly against a trade reduce it too.",
+      "Headline sentiment and the cross-market currency trend nudge scores a little (at most +3 each); news can only make trading more careful, never loosen a risk limit.",
+      "Derived (synthetic) markets are not moved by real-world news, so news does not affect them.",
     ],
   },
   {
@@ -79,8 +106,9 @@ export const PAGES: PageInfo[] = [
     label: "Performance",
     icon: "↗",
     group: "Analysis",
-    summary: "Results of closed trades: win rate, profit factor, drawdown — overall, per strategy and per market.",
+    summary: "Whether the demo results support real money, and the results of closed trades — overall, per strategy and per market.",
     details: [
+      "Ready for real money? The bot's own Forex trades, judged over 200 trades on the average trade (and whether it is more than luck) and the largest drop — not on win rate or a good week.",
       "Profit factor = gross profit ÷ gross loss; expectancy = average result per trade.",
       "Max drawdown is the largest fall from a previous equity peak.",
       "Small samples are unreliable — judge results over many trades.",
@@ -132,6 +160,7 @@ export const PAGES: PageInfo[] = [
       "Markets: what the engine analyses and trades. Saving restarts the worker.",
       "Risk limits: applied within seconds, within safe ranges.",
       "Notifications: your SMTP (e.g. Gmail) settings and recipients; an email for every trade opened and closed.",
+      "Signals: which markets send signals instead of trading, near misses, signal limits, expiry and quiet hours.",
     ],
   },
 ];

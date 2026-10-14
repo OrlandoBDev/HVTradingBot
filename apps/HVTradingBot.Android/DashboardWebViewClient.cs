@@ -9,8 +9,11 @@ namespace HVTradingBot.Android;
 /// requests (same origin, /api/...) are answered in-process by the engine. Links to other sites open in the browser.
 /// Android calls ShouldInterceptRequest on a background thread, so waiting for the answer here is allowed.
 /// </summary>
-public sealed class DashboardWebViewClient(Context context) : WebViewClient
+public sealed class DashboardWebViewClient(MainActivity activity) : WebViewClient
 {
+    /// <summary>Pages the dashboard opens to ask for something only the app can do (e.g. a file picker).</summary>
+    public const string ActionPrefix = "/app-action/";
+
     public override WebResourceResponse? ShouldInterceptRequest(WebView? view, IWebResourceRequest? request)
     {
         if (request?.Url?.ToString() is not { } raw || !Uri.TryCreate(raw, UriKind.Absolute, out var url) || !WebBridge.IsOwnOrigin(url))
@@ -23,18 +26,29 @@ public sealed class DashboardWebViewClient(Context context) : WebViewClient
 
     public override bool ShouldOverrideUrlLoading(WebView? view, IWebResourceRequest? request)
     {
-        if (request?.Url is not { } uri || (Uri.TryCreate(uri.ToString(), UriKind.Absolute, out var url) && WebBridge.IsOwnOrigin(url)))
+        if (request?.Url is not { } uri)
         {
             return false;
         }
 
-        context.StartActivity(new Intent(Intent.ActionView, uri).AddFlags(ActivityFlags.NewTask));
+        if (Uri.TryCreate(uri.ToString(), UriKind.Absolute, out var url) && WebBridge.IsOwnOrigin(url))
+        {
+            if (!url.AbsolutePath.StartsWith(ActionPrefix, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            activity.RunAppAction(url.AbsolutePath[ActionPrefix.Length..]);
+            return true;
+        }
+
+        activity.StartActivity(new Intent(Intent.ActionView, uri).AddFlags(ActivityFlags.NewTask));
         return true;
     }
 
     private WebResourceResponse Api(string method, Uri url)
     {
-        if (!EngineSwitch.IsOn(context))
+        if (!EngineSwitch.IsOn(activity))
         {
             // Stopped from the notification: do not start it again behind the user's back (reopening the app does).
             return Json(new LocalApiResponse(503, """{"title":"Trading is stopped. Reopen the app to start it again.","status":503}"""));
@@ -42,8 +56,8 @@ public sealed class DashboardWebViewClient(Context context) : WebViewClient
 
         try
         {
-            AppRuntime.EnsureStartedAsync(context).GetAwaiter().GetResult();
-            var response = AppRuntime.Get(context).Bridge.HandleApiAsync(method, url, CancellationToken.None).GetAwaiter().GetResult();
+            AppRuntime.EnsureStartedAsync(activity).GetAwaiter().GetResult();
+            var response = AppRuntime.Get(activity).Bridge.HandleApiAsync(method, url, CancellationToken.None).GetAwaiter().GetResult();
             return Json(response);
         }
         catch (Exception ex)
@@ -60,7 +74,7 @@ public sealed class DashboardWebViewClient(Context context) : WebViewClient
         {
             try
             {
-                var stream = context.Assets!.Open("wwwroot/" + path);
+                var stream = activity.Assets!.Open("wwwroot/" + path);
                 return new WebResourceResponse(WebBridge.ContentType(path), "utf-8", 200, "OK",
                     new Dictionary<string, string> { ["Cache-Control"] = "no-cache" }, stream);
             }

@@ -266,4 +266,16 @@ public sealed class TradeDecisionNotificationTests
             return Task.CompletedTask;
         }
     }
+
+    [Fact]
+    public void Email_times_are_local_with_their_utc_offset()
+    {
+        var time = new DateTimeOffset(2026, 9, 26, 18, 5, 0, TimeSpan.Zero);
+        var newYork = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
+        var kolkata = TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+
+        Assert.Equal("2026-09-26 14:05 (UTC-04:00)", TradeEmailTemplate.LocalTime(time, "yyyy-MM-dd HH:mm", newYork));
+        Assert.Equal("2026-09-26 23:35 (UTC+05:30)", TradeEmailTemplate.LocalTime(time, "yyyy-MM-dd HH:mm", kolkata));
+        Assert.Equal("2026-09-26 18:05 (UTC)", TradeEmailTemplate.LocalTime(time, "yyyy-MM-dd HH:mm", TimeZoneInfo.Utc));
+    }
 }

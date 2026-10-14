@@ -12,8 +12,17 @@ export const price = (value: number | null | undefined, instrument?: string, dec
   return value.toLocaleString(undefined, { maximumFractionDigits: 5 });
 };
 
-export const time = (iso: string | null | undefined) =>
-  iso ? new Date(iso).toISOString().replace("T", " ").slice(0, 16) + "Z" : "—";
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** A timestamp in the phone's / computer's local time, e.g. "2026-09-26 14:05". The API sends UTC. */
+export const time = (iso: string | null | undefined) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+/** The local time zone, e.g. "America/New_York"; the API uses it for Today / This week / This month. */
+export const localTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
 export const ago = (iso: string | null | undefined, now: string) => {
   if (!iso) return "never";

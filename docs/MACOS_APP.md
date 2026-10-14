@@ -108,6 +108,14 @@ Two workers on the same database and Deriv account would place duplicate orders.
 
 `./run.sh local` (native, real database, Deriv) stays for when the app is not running.
 
+## Forex on MetaTrader 5 for Mac (free)
+
+MetaTrader 5 for Mac runs Expert Advisors, so Forex can go to an MT5 demo account without MetaApi: in Settings ›
+Broker account › MetaTrader 5 choose **MT5 on this computer**, save, and follow the steps on the card (download
+`HVTradingBotBridge.mq5`, allow WebRequest for `http://127.0.0.1:5080`, attach it to one chart with the bridge key).
+MetaTrader 5 must stay open while the bot trades; when it is closed, new Forex orders are refused and open positions
+keep their broker-side stop loss and take profit. Details: [BROKER_INTEGRATION.md](BROKER_INTEGRATION.md).
+
 ## Project layout
 
 ```

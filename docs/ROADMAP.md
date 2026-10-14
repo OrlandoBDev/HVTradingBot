@@ -42,6 +42,9 @@ Ideas agreed for later, not yet scheduled into a phase.
 
 ### MetaTrader 5 as a second broker (Forex through Deriv MT5)
 
+**Status: built** (MetaApi option, Forex only; see docs/BROKER_INTEGRATION.md for set-up). Still open: route Forex to
+MT5 and Derived to Deriv at the same time (today MT5 replaces Deriv while it is on).
+
 **Why:** Deriv multiplier contracts charge a commission of about 0.05% of the position value. At small-account
 risk (≈1% per trade) that is 31–36% of the amount at risk on Forex, above the 30% fee cap, so every Forex
 candidate is currently rejected. Deriv MT5 accounts are typically priced through the spread instead of a
@@ -173,3 +176,26 @@ Deriv multipliers. Risk engine, learning, dashboard and emails stay unchanged. K
 - automated research pipelines
 
 Production strategies remain gated by deterministic validation and risk controls.
+
+### Guarded demo / real account switch
+
+**Why:** the app is locked to Deriv demo accounts (ADR-008): the startup validator refuses `Deriv:AccountType Real`,
+account selection only picks demo accounts, and the Settings page says so. The plumbing for real accounts already
+exists (account type, demo/real WebSocket check, red REAL badge), so unlocking is small; switching safely is the work.
+
+**When:** only once every check in Performance › "Ready for real money?" passes (200 closed Forex trades by the bot, an
+average trade above 0R with 95% confidence after the Monte Carlo reshuffle, profitable in at least three of four
+periods, largest drop under 10%, on the evaluation setup: Forex only, no high-score extras), and only in a country
+where Deriv offers real multiplier accounts. The switch should refuse to turn on while those checks fail.
+
+**Design:**
+1. **Separate records per account first** (worth doing before the switch): history, performance, App P/L, learning
+   views and loss limits keyed by broker account, so demo and real results never mix.
+2. **Toggle** under Settings → Broker account: Demo / Real; switching restarts the engine on the other account;
+   back to Demo is instant.
+3. **Typed confirmation** ("REAL MONEY") and a summary (balance, risk per trade in money, loss limits) before Real
+   is activated.
+4. **Conservative real defaults** until raised by the user: 0.5% per trade, 1–2 positions, 2% daily loss.
+5. **Always visible:** red REAL badge in the header, the account bar and the engine notification.
+6. **Signals:** risk-rule overrides demo-only at first, or typed confirmation for every override on real.
+7. Learning carries over from demo (same markets and prices); shown as such.

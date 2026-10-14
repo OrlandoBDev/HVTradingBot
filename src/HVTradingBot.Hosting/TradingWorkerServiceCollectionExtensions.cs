@@ -16,6 +16,7 @@ public static class TradingWorkerServiceCollectionExtensions
         services.AddHostedService<TestTradeService>();
         services.AddHostedService<ClosePositionService>();
         services.AddHostedService<BrokerAccountSyncService>();
+        services.AddHostedService<SignalService>();
         return services;
     }
 }

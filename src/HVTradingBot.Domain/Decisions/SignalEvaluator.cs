@@ -2,6 +2,7 @@ using HVTradingBot.Domain.Analysis;
 using HVTradingBot.Domain.Common;
 using HVTradingBot.Domain.Learning;
 using HVTradingBot.Domain.MarketData;
+using HVTradingBot.Domain.News;
 using HVTradingBot.Domain.Scoring;
 using HVTradingBot.Domain.Strategies;
 
@@ -74,6 +75,14 @@ public sealed class SignalEvaluator(
             notes.Add($"15m timing against the setup (-{best.Score.TimingPenalty:0}); re-checked every 5 minutes.");
         }
 
+        if (best.Score.NewsSentiment != 0 || best.Score.MarketTrend != 0 || best.Score.ContextLearned != 0)
+        {
+            notes.Add($"News {best.Score.NewsSentiment:+0.#;-0.#;0}, cross-market trend {best.Score.MarketTrend:+0.#;-0.#;0}, " +
+                      $"learned news/trend {best.Score.ContextLearned:+0.#;-0.#;0}.");
+        }
+
+        notes.AddRange(best.News.Notes);
+
         return new SignalEvaluation(context, state, best, results, allScored, notes);
     }
 
@@ -81,12 +90,18 @@ public sealed class SignalEvaluator(
     {
         var score = TradeScorer.Score(context, result, all);
         var perf = performance?.Get(new SetupKey(result.Strategy, context.Regime, context.Instrument.AssetClass));
+        var news = context.Intelligence is { } inputs
+            ? MarketIntelligence.Assess(context.Instrument, result.Setup!.Direction, context.AsOfUtc, inputs)
+            : NewsAssessment.None;
         score = score with
         {
             Learned = perf?.ScoreAdjustment ?? 0,
-            TimingPenalty = TimingAgainst(context, result.Setup!.Direction) ? AdverseTimingPenalty : 0
+            TimingPenalty = TimingAgainst(context, result.Setup!.Direction) ? AdverseTimingPenalty : 0,
+            NewsSentiment = news.SentimentScore,
+            MarketTrend = news.TrendScore,
+            ContextLearned = performance?.GetContextAdjustment(result.Strategy, news.Condition, news.Trend) ?? 0
         };
-        return new ScoredCandidate(result, score, perf);
+        return new ScoredCandidate(result, score, perf) { News = news };
     }
 
     /// <summary>True when the latest closed 15-minute bar shows trend and momentum pointing the other way.</summary>

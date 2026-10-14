@@ -17,9 +17,22 @@ public sealed record TradeProposal(
     /// (it is closed after a minute); every other rule applies as usual.
     /// </summary>
     public bool IsTestTrade { get; init; }
+
+    /// <summary>
+    /// Position size multiplier from news (a release is near, or headlines oppose the trade). Values above 1 are ignored:
+    /// news can only shrink a position.
+    /// </summary>
+    public decimal NewsRiskMultiplier { get; init; } = 1m;
+
+    /// <summary>Why news blocks this trade (a high-impact release is imminent or just happened); null when it does not.</summary>
+    public string? NewsBlackout { get; init; }
+
+    /// <summary>Set for a signal trade the user accepted: it is checked against the signal limits instead of the bot's.</summary>
+    public SignalLimits? Signal { get; init; }
 }
 
-public sealed record RiskCheck(string Rule, bool Passed, string Detail);
+/// <param name="Overridden">True when the rule failed and the user accepted the risk (signal trades only).</param>
+public sealed record RiskCheck(string Rule, bool Passed, string Detail, bool Overridden = false);
 
 public sealed record RiskDecision(bool IsApproved, decimal Units, decimal RiskAmount, IReadOnlyList<RiskCheck> Checks)
 {

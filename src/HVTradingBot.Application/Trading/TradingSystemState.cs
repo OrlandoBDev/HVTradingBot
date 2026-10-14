@@ -15,6 +15,15 @@ public sealed record TradingSystemState
     public DateOnly? PnlDay { get; init; }
     public decimal DailyRealizedPnl { get; init; }
     public decimal DerivedDailyRealizedPnl { get; init; }
+
+    /// <summary>Signal trades' realized P&amp;L today: their own budget, apart from the bot's daily and weekly figures.</summary>
+    public decimal SignalDailyRealizedPnl { get; init; }
+    /// <summary>The trading capital in use (see <see cref="RiskOptions.TradingCapital"/>); null: the whole balance.</summary>
+    public decimal? CapitalBase { get; init; }
+
+    /// <summary>Realized P&amp;L of every app trade since <see cref="CapitalBase"/> was set.</summary>
+    public decimal CapitalPnl { get; init; }
+
     public DateOnly? PnlWeekStart { get; init; }
     public decimal WeeklyRealizedPnl { get; init; }
     public DateTime? LastBarTimeUtc { get; init; }
@@ -35,6 +44,7 @@ public sealed record TradingSystemState
             PnlDay = day,
             DailyRealizedPnl = PnlDay == day ? DailyRealizedPnl : 0,
             DerivedDailyRealizedPnl = PnlDay == day ? DerivedDailyRealizedPnl : 0,
+            SignalDailyRealizedPnl = PnlDay == day ? SignalDailyRealizedPnl : 0,
             PnlWeekStart = weekStart,
             WeeklyRealizedPnl = PnlWeekStart == weekStart ? WeeklyRealizedPnl : 0
         };
@@ -57,10 +67,37 @@ public sealed record TradingSystemState
             DailyRealizedPnl = rolled.DailyRealizedPnl + realizedPnl,
             DerivedDailyRealizedPnl = rolled.DerivedDailyRealizedPnl + (isDerived ? realizedPnl : 0),
             WeeklyRealizedPnl = rolled.WeeklyRealizedPnl + realizedPnl,
+            CapitalPnl = rolled.CapitalPnl + realizedPnl,
             ConsecutiveLosses = losses,
             CooldownUntilUtc = cooldown
         };
     }
+
+    /// <summary>A closed signal trade counts only against the signal budget: the bot's limits, streak and cooldown are untouched.</summary>
+    public TradingSystemState WithClosedSignalTrade(decimal realizedPnl, DateTime marketTimeUtc)
+    {
+        var rolled = RollPeriods(marketTimeUtc);
+        return rolled with
+        {
+            SignalDailyRealizedPnl = rolled.SignalDailyRealizedPnl + realizedPnl,
+            CapitalPnl = rolled.CapitalPnl + realizedPnl
+        };
+    }
+
+    /// <summary>A new trading capital starts fresh: results before it no longer count.</summary>
+    public TradingSystemState WithCapital(decimal? capital) => this with { CapitalBase = capital, CapitalPnl = 0 };
+
+    /// <summary>
+    /// The balance the app sizes trades and loss limits on: the trading capital plus the app's results since it was set,
+    /// never more than the real balance; the whole balance without one. <paramref name="configured"/> is the setting
+    /// (it applies at once, also before the engine has started the new capital).
+    /// </summary>
+    public decimal SizingBalance(decimal accountBalance, decimal? configured) => configured switch
+    {
+        null => accountBalance,
+        { } capital when capital != CapitalBase => Math.Clamp(capital, 0, accountBalance),
+        { } capital => Math.Clamp(capital + CapitalPnl, 0, accountBalance)
+    };
 
     public TradingSystemState WithKillSwitch(bool active, string reason, DateTime nowUtc) =>
         this with { KillSwitchActive = active, KillSwitchReason = reason, KillSwitchChangedUtc = nowUtc };

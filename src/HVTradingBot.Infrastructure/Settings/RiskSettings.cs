@@ -24,12 +24,13 @@ public sealed record RiskLimits(
     decimal? MaxDerivedDailyLossPercent = null,
     decimal? AssumedCommissionPercent = null,
     int? MaxExtraDerivedPositions = null,
-    int? HighScoreOverrideMinScore = null)
+    int? HighScoreOverrideMinScore = null,
+    decimal? TradingCapital = null)
 {
     public static RiskLimits From(RiskOptions o) => new(o.MaxRiskPerTradePercent, o.MaxDailyLossPercent, o.MaxWeeklyLossPercent,
         o.MaxOpenPositions, o.MinRewardToRisk, o.MaxConsecutiveLosses, o.CooldownMinutes, o.MaxCurrencyExposure, o.MaxCommissionShareOfRisk,
         o.MaxDerivedOpenPositions, o.DerivedRiskPerTradePercent, o.MaxDerivedDailyLossPercent, o.AssumedCommissionPercent,
-        o.MaxExtraDerivedPositions, o.HighScoreOverrideMinScore);
+        o.MaxExtraDerivedPositions, o.HighScoreOverrideMinScore, o.TradingCapital);
 
     /// <summary>Limits saved before the Derived limits existed take the configured Derived defaults.</summary>
     public RiskLimits WithDefaultsFrom(RiskOptions defaults) => this with
@@ -60,6 +61,7 @@ public sealed record RiskLimits(
         o.AssumedCommissionPercent = AssumedCommissionPercent ?? defaults.AssumedCommissionPercent;
         o.MaxExtraDerivedPositions = MaxExtraDerivedPositions ?? defaults.MaxExtraDerivedPositions;
         o.HighScoreOverrideMinScore = HighScoreOverrideMinScore ?? defaults.HighScoreOverrideMinScore;
+        o.TradingCapital = TradingCapital; // null: the whole balance
         return o;
     }
 
@@ -97,9 +99,14 @@ public sealed record RiskLimits(
                 "Derived risk per trade must be between 0.1% and the risk per trade.");
         }
 
+        if (TradingCapital is { } capital)
+        {
+            Check(capital is >= 10m and <= 100_000_000m, nameof(TradingCapital), "Trading capital must be at least 10 (or empty to use the whole balance).");
+        }
+
         if (MaxExtraDerivedPositions is { } extra)
         {
-            Check(extra >= 0 && extra <= 5, nameof(MaxExtraDerivedPositions), "Extra Derived positions must be between 0 (off) and 5.");
+            Check(extra >= 0 && extra <= 5, nameof(MaxExtraDerivedPositions), "High-score extra positions must be between 0 (off) and 5.");
         }
 
         if (HighScoreOverrideMinScore is { } minScore)
@@ -157,12 +164,16 @@ public sealed class RiskSettingsStore(IDbContextFactory<TradingDbContext> dbFact
 
 /// <summary>
 /// Risk limits in force: configured defaults overridden by the Settings page. <see cref="RefreshAsync"/> swaps in a
-/// new immutable snapshot when the stored version changes; invalid stored values are ignored (defaults stay).
+/// new immutable snapshot when the stored version changes; invalid stored values are ignored (defaults stay). While
+/// Forex trades on MT5, sizing assumes MT5's commission (Settings › Broker account) instead of Deriv's.
 /// </summary>
-public sealed class RiskOptionsSource(RiskOptions configured, RiskSettingsStore store, ILogger<RiskOptionsSource> logger) : IRiskOptionsSource
+public sealed class RiskOptionsSource(RiskOptions configured, RiskSettingsStore store, ILogger<RiskOptionsSource> logger,
+    Mt5SettingsStore? mt5 = null) : IRiskOptionsSource
 {
     private volatile RiskOptions _current = configured.Clone();
     private int _version = -1;
+    private decimal? _mt5Commission;
+    private RiskOptions _stored = configured.Clone();
 
     public RiskOptions Current => _current;
 
@@ -171,6 +182,13 @@ public sealed class RiskOptionsSource(RiskOptions configured, RiskSettingsStore 
     public async Task<RiskSettingsView> RefreshAsync(CancellationToken cancellationToken)
     {
         var (limits, version, updatedAt, updatedBy) = await store.GetAsync(cancellationToken);
+        var mt5Commission = mt5 is null ? null : await mt5.GetActiveCommissionAsync(cancellationToken);
+        if (version == _version && mt5Commission != _mt5Commission)
+        {
+            _mt5Commission = mt5Commission;
+            _current = WithBrokerCommission(_stored);
+        }
+
         if (version != _version)
         {
             limits = limits?.WithDefaultsFrom(configured);
@@ -180,7 +198,9 @@ public sealed class RiskOptionsSource(RiskOptions configured, RiskSettingsStore 
                 limits = null;
             }
 
-            _current = limits?.ApplyTo(configured) ?? configured.Clone();
+            _stored = limits?.ApplyTo(configured) ?? configured.Clone();
+            _mt5Commission = mt5Commission;
+            _current = WithBrokerCommission(_stored);
             if (_version != -1)
             {
                 logger.LogWarning("Risk limits changed (version {Version}): {Limits}", version, RiskLimits.From(_current));
@@ -189,6 +209,18 @@ public sealed class RiskOptionsSource(RiskOptions configured, RiskSettingsStore 
             _version = version;
         }
 
-        return new RiskSettingsView(RiskLimits.From(_current), RiskLimits.From(configured), limits is not null, version, updatedAt, updatedBy);
+        return new RiskSettingsView(RiskLimits.From(_stored), RiskLimits.From(configured), limits is not null, version, updatedAt, updatedBy);
+    }
+
+    private RiskOptions WithBrokerCommission(RiskOptions stored)
+    {
+        if (_mt5Commission is not { } commission)
+        {
+            return stored;
+        }
+
+        var options = stored.Clone();
+        options.AssumedCommissionPercent = commission;
+        return options;
     }
 }

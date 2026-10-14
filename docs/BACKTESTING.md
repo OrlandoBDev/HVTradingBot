@@ -50,6 +50,21 @@ Approval Mode
 Small-Capital Live
 ```
 
+## Is It More Than Luck?
+
+Every backtest result includes a robustness check (`RobustnessAnalysis`), shown on the Backtest page:
+
+- **Walk forward, period by period.** The run is split into four consecutive periods. The engine learns only from trades
+  already closed, so each period is traded with what was learned before it. A real edge shows up in most periods, not
+  in one lucky stretch.
+- **Monte Carlo.** The trades' R results are drawn at random with replacement 2,000 times (fixed seed, reproducible):
+  the typical and bad-case (5th percentile) total, the drawdown to expect, the chance of ending with a loss, and the
+  average trade's 95% lower bound.
+- **Verdict.** Fewer than 30 trades: too few to judge. Average R at or below 0: no edge. Otherwise the edge "holds" only
+  when the lower bound is above 0 and at least three of four periods made money; anything else is "not proven".
+
+Simulated prices have no real patterns; only runs on stored Deriv candles say something about real markets.
+
 ## Metrics
 
 - net return

@@ -28,7 +28,8 @@ public sealed partial class LocalApi
     private readonly ILogger<LocalApi> _logger;
 
     public LocalApi(DashboardQueries queries, DashboardActions actions, BacktestService backtests, CandleQueryService candles,
-        EngineSupervisor engine, AppLog log, ILogger<LocalApi> logger)
+        EngineSupervisor engine, AppLog log, ILogger<LocalApi> logger, NewsQueries news, SignalDashboard signals, DataBackup backup,
+        EvaluationService evaluation, Mt5SettingsActions mt5)
     {
         _logger = logger;
 
@@ -66,12 +67,21 @@ public sealed partial class LocalApi
             await queries.GetDecisionAsync(r.Guid("id"), r.Ct) is { } d ? DashboardResult.Ok(d) : DashboardResult.NotFound);
         Get("/api/positions/open", r => Ok(queries.GetOpenPositionsAsync(r.Ct)));
         Post("/api/positions/{id}/close", r => actions.RequestCloseAsync(r.Guid("id"), r.Caller, r.Ct));
+        // "stats" before "{id}": the first route whose path matches answers.
+        Get("/api/signals/stats", r => Ok(signals.GetStatsAsync(r.Ct)));
+        Get("/api/signals", r => Ok(signals.ListAsync(r.Query("active") is "true" or "1", r.Int("page"), r.Int("pageSize"), r.Ct)));
+        Get("/api/signals/{id}", async r => await signals.GetAsync(r.Guid("id"), r.Ct) is { } s ? DashboardResult.Ok(s) : DashboardResult.NotFound);
+        Post("/api/signals/{id}/accept", r => signals.AcceptAsync(r.Guid("id"), r.Body<AcceptSignalRequest>(), r.Caller, r.Ct));
+        Post("/api/signals/{id}/skip", r => signals.SkipAsync(r.Guid("id"), r.Caller, r.Ct));
         Get("/api/trades", r => Ok(queries.GetTradeHistoryAsync(r.Int("limit") ?? 200, r.Ct)));
         Get("/api/risk", r => Ok(queries.GetRiskStatusAsync(r.Ct)));
         Get("/api/performance", r => Ok(queries.GetPerformanceAsync(r.Ct)));
-        Get("/api/profit", r => Ok(queries.GetProfitSummaryAsync(r.Ct)));
+        Get("/api/evaluation", r => Ok(evaluation.GetAsync(r.Ct)));
+        Post("/api/evaluation/setup", r => evaluation.ApplySetupAsync(r.Caller, r.Ct));
+        Get("/api/profit", r => Ok(queries.GetProfitSummaryAsync(r.Query("tz"), r.Ct)));
         Get("/api/audit", r => Ok(queries.GetAuditAsync(r.Int("limit") ?? 100, r.Ct)));
         Get("/api/learning", r => Ok(actions.GetLearningAsync(r.Ct)));
+        Get("/api/news", r => Ok(news.GetNewsAsync(r.Ct)));
         Get("/api/test-trades", r => Ok(actions.GetTestTradesAsync(r.Ct)));
         Post("/api/test-trades", r => actions.RequestTestTradeAsync(r.Body<TestTradeRequest>(), r.Caller, r.Ct));
         Post("/api/kill-switch", r => actions.SetKillSwitchAsync(r.Body<KillSwitchRequest>(), r.Caller, r.Ct));
@@ -89,17 +99,23 @@ public sealed partial class LocalApi
             await actions.ClearDerivSettingsAsync(r.Caller, r.Ct);
             return DashboardResult.NoContent;
         });
+        Get("/api/settings/mt5", r => Ok(mt5.GetAsync(r.Ct)));
+        Put("/api/settings/mt5", r => mt5.SaveAsync(r.Body<Mt5SettingsRequest>(), r.Caller, r.Ct));
+        Delete("/api/settings/mt5", r => Ok(mt5.ClearAsync(r.Caller, r.Ct)));
         Get("/api/settings/risk", r => Ok(actions.GetRiskSettingsAsync(r.Ct)));
         Put("/api/settings/risk", r => actions.SaveRiskSettingsAsync(r.Body<RiskLimitsDto>(), r.Caller, r.Ct));
         Delete("/api/settings/risk", r => Ok(actions.ResetRiskSettingsAsync(r.Caller, r.Ct)));
         Get("/api/settings/notifications", r => Ok(actions.GetNotificationSettingsAsync(r.Ct)));
         Put("/api/settings/notifications", r => actions.SaveNotificationSettingsAsync(r.Body<NotificationSettingsRequest>(), r.Caller, r.Ct));
         Post("/api/settings/notifications/test", r => Ok(actions.SendTestEmailAsync(r.Caller, r.Ct)));
+        Get("/api/settings/signals", r => Ok(signals.GetSettingsAsync(r.Ct)));
+        Put("/api/settings/signals", r => signals.SaveSettingsAsync(r.Body<SignalSettingsDto>(), r.Caller, r.Ct));
         Get("/api/settings/markets", r => Ok(actions.GetMarketSettingsAsync(r.Ct)));
         Put("/api/settings/markets", r => actions.SaveMarketSelectionAsync(r.Body<MarketSelectionRequest>(), r.Caller, r.Ct));
 
         // App only: the engine's state (the web dashboard's equivalent is the Docker/Mac app status) and recent log lines.
         Get("/api/app/engine", _ => Ok(new { State = engine.State.ToString(), engine.LastError, engine.Restarts }));
+        Get("/api/app/backup", _ => Ok(backup.GetStatus()));
         Get("/api/app/logs", r => Ok(log.Recent(r.Int("count") ?? 200)));
     }
 

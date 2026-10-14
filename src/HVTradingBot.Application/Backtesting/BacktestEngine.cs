@@ -1,6 +1,8 @@
 using HVTradingBot.Application.Abstractions;
 using HVTradingBot.Application.Learning;
 using HVTradingBot.Domain.Learning;
+using HVTradingBot.Application.News;
+using HVTradingBot.Domain.News;
 using HVTradingBot.Application.Performance;
 using HVTradingBot.Application.Trading;
 using HVTradingBot.Domain.Analysis;
@@ -37,7 +39,8 @@ public sealed class BacktestEngine(
     ScoringOptions scoringOptions,
     RegimeOptions regimeOptions,
     ExecutionCostOptions costs,
-    LearningOptions learningOptions)
+    LearningOptions learningOptions,
+    NewsOptions? newsOptions = null)
 {
     public async Task<BacktestResult> RunAsync(
         IReadOnlyDictionary<Instrument, IReadOnlyList<Candle>> bars,
@@ -66,6 +69,11 @@ public sealed class BacktestEngine(
         var riskManager = new RiskManager(replayRisk, costs);
         // Learning runs inside the replay from a blank slate, so results stay reproducible and free of look-ahead.
         var learning = new LearningService(new InMemoryVirtualTradeStore(), learningOptions, costs, NullLogger<LearningService>.Instance);
+        // Past headlines and calendars are not stored, so a replay has no news; the cross-market trend comes from the
+        // replayed bars and applies exactly as it does live.
+        var replayNews = (newsOptions ?? new NewsOptions()).Clone();
+        replayNews.Provider = NewsProvider.None;
+        var news = new NewsService(new NoNewsSource(), replayNews, NullLogger<NewsService>.Instance);
         var engine = new TradingEngine(
             new SignalEvaluator(StrategyCatalog.CreateDefault(), scoringOptions, learning),
             riskManager,
@@ -80,7 +88,8 @@ public sealed class BacktestEngine(
             options,
             new FixedRiskOptions(replayRisk),
             regimeOptions,
-            NullLogger<TradingEngine>.Instance);
+            NullLogger<TradingEngine>.Instance,
+            news: news);
 
         await engine.InitializeAsync(new Dictionary<Instrument, IReadOnlyList<Candle>>(), cancellationToken);
 

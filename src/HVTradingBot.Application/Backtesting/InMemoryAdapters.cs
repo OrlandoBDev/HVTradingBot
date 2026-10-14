@@ -136,6 +136,9 @@ public sealed class InMemoryJournal : IDecisionJournal, IMarketSnapshotSink
 
     public List<DecisionRecord> Decisions { get; } = [];
 
+    /// <summary>Audit entries (actor, action, details), kept like <see cref="Decisions"/> only with <see cref="KeepDecisions"/>.</summary>
+    public List<(string Actor, string Action, string Details)> Audit { get; } = [];
+
     public bool KeepDecisions { get; init; }
 
     public Task RecordDecisionAsync(DecisionRecord decision, CancellationToken cancellationToken)
@@ -149,8 +152,18 @@ public sealed class InMemoryJournal : IDecisionJournal, IMarketSnapshotSink
         return Task.CompletedTask;
     }
 
-    public Task RecordAuditAsync(string actor, string action, string details, string? correlationId, CancellationToken cancellationToken) =>
-        Task.CompletedTask;
+    public Task RecordAuditAsync(string actor, string action, string details, string? correlationId, CancellationToken cancellationToken)
+    {
+        if (KeepDecisions)
+        {
+            lock (Audit)
+            {
+                Audit.Add((actor, action, details));
+            }
+        }
+
+        return Task.CompletedTask;
+    }
 
     public Task PublishAsync(MarketSnapshot snapshot, CancellationToken cancellationToken) => Task.CompletedTask;
 

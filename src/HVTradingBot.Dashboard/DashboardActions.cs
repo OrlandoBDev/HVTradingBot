@@ -98,6 +98,7 @@ public sealed partial class DashboardActions(
         var now = clock.UtcNow;
         var outcomes = await virtualTrades.GetOutcomesAsync(now.AddDays(-learningOptions.LookbackDays), ct);
         var model = StrategyPerformanceModel.Compute(outcomes, now, learningOptions);
+        var context = StrategyPerformanceModel.ComputeContext(outcomes, now, learningOptions);
         return new
         {
             learningOptions.Enabled,
@@ -121,6 +122,25 @@ public sealed partial class DashboardActions(
                     p.ShrunkR,
                     p.ScoreAdjustment,
                     p.Disabled
+                }),
+            learningOptions.ContextMaxBoost,
+            learningOptions.ContextMaxPenalty,
+            // What news and cross-market trend conditions have been worth to each strategy.
+            Conditions = context.Values
+                .OrderBy(c => c.Key.Factor, StringComparer.Ordinal)
+                .ThenBy(c => c.Key.Strategy, StringComparer.Ordinal)
+                .ThenBy(c => c.Key.Value, StringComparer.Ordinal)
+                .Select(c => new
+                {
+                    c.Key.Strategy,
+                    c.Key.Factor,
+                    Condition = c.Key.Value,
+                    c.Samples,
+                    c.WinRate,
+                    c.AverageR,
+                    c.BaselineR,
+                    c.ShrunkExcessR,
+                    c.ScoreAdjustment
                 })
         };
     }
@@ -231,7 +251,7 @@ public sealed partial class DashboardActions(
         var view = await riskSource.RefreshAsync(ct);
         var status = await queries.GetStatusAsync(ct);
         return new RiskSettingsDto(ToDto(view.Effective), ToDto(view.Defaults), view.IsCustomized, view.Version, view.UpdatedAtUtc, view.UpdatedBy,
-            status.Account.Balance, status.Account.Currency);
+            status.TradingCapital ?? status.Account.Balance, status.Account.Currency);
     }
 
     public async Task<DashboardResult> SaveRiskSettingsAsync(RiskLimitsDto request, DashboardCaller caller, CancellationToken ct)
@@ -240,7 +260,7 @@ public sealed partial class DashboardActions(
             request.MaxOpenPositions, request.MinRewardToRisk, request.MaxConsecutiveLosses, request.CooldownMinutes,
             request.MaxCurrencyExposure, request.MaxCommissionShareOfRisk, request.MaxDerivedOpenPositions, request.DerivedRiskPerTradePercent,
             request.MaxDerivedDailyLossPercent, request.AssumedCommissionPercent, request.MaxExtraDerivedPositions,
-            request.HighScoreOverrideMinScore);
+            request.HighScoreOverrideMinScore, request.TradingCapital);
         limits = limits.WithDefaultsFrom(riskSource.Defaults);
         var errors = limits.Validate();
         if (errors.Count > 0)
@@ -362,7 +382,7 @@ public sealed partial class DashboardActions(
     private static RiskLimitsDto ToDto(RiskLimits l) => new(l.MaxRiskPerTradePercent, l.MaxDailyLossPercent, l.MaxWeeklyLossPercent,
         l.MaxOpenPositions, l.MinRewardToRisk, l.MaxConsecutiveLosses, l.CooldownMinutes, l.MaxCurrencyExposure, l.MaxCommissionShareOfRisk,
         l.MaxDerivedOpenPositions, l.DerivedRiskPerTradePercent, l.MaxDerivedDailyLossPercent, l.AssumedCommissionPercent,
-        l.MaxExtraDerivedPositions, l.HighScoreOverrideMinScore);
+        l.MaxExtraDerivedPositions, l.HighScoreOverrideMinScore, l.TradingCapital);
 
     private async Task<DerivSettingsDto> ToDtoAsync(DerivSettingsView view, CancellationToken ct)
     {

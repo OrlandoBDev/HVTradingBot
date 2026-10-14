@@ -683,6 +683,210 @@ namespace HVTradingBot.Infrastructure.Sqlite.Migrations
                     b.ToTable("market_snapshots", (string)null);
                 });
 
+            modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.Mt5BridgeCommandEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTime?>("DoneAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("done_at_utc");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("payload");
+
+                    b.Property<string>("ResultJson")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("result_json");
+
+                    b.Property<DateTime?>("SentAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("sent_at_utc");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_mt5_bridge_commands");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_mt5_bridge_commands_status");
+
+                    b.ToTable("mt5_bridge_commands", (string)null);
+                });
+
+            modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.Mt5BridgeStateEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AccountJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("account_json");
+
+                    b.Property<string>("DealsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("deals_json");
+
+                    b.Property<string>("EaVersion")
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ea_version");
+
+                    b.Property<DateTime>("LastSeenUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("last_seen_utc");
+
+                    b.Property<string>("PositionsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("positions_json");
+
+                    b.HasKey("Id")
+                        .HasName("pk_mt5_bridge_state");
+
+                    b.ToTable("mt5_bridge_state", (string)null);
+                });
+
+            modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.Mt5SettingsEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AccountId")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("BridgeKeyProtected")
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("bridge_key_protected");
+
+                    b.Property<double>("CommissionPercent")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("REAL")
+                        .HasColumnName("commission_percent");
+
+                    b.Property<string>("Connection")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("connection");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("enabled");
+
+                    b.Property<string>("Region")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("region");
+
+                    b.Property<double?>("StatusBalance")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("REAL")
+                        .HasColumnName("status_balance");
+
+                    b.Property<string>("StatusBroker")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("status_broker");
+
+                    b.Property<DateTime?>("StatusCheckedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("status_checked_at_utc");
+
+                    b.Property<string>("StatusCurrency")
+                        .HasMaxLength(8)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("status_currency");
+
+                    b.Property<bool?>("StatusIsDemo")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("status_is_demo");
+
+                    b.Property<string>("StatusLogin")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("status_login");
+
+                    b.Property<string>("StatusMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("status_message");
+
+                    b.Property<string>("StatusServer")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("status_server");
+
+                    b.Property<string>("StatusState")
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("status_state");
+
+                    b.Property<int>("StatusVersion")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("status_version");
+
+                    b.Property<string>("SymbolSuffix")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("symbol_suffix");
+
+                    b.Property<string>("TokenHint")
+                        .HasMaxLength(8)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("token_hint");
+
+                    b.Property<string>("TokenProtected")
+                        .HasMaxLength(8000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("token_protected");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_by");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_mt5_settings");
+
+                    b.ToTable("mt5_settings", (string)null);
+                });
+
             modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.NotificationSettingsEntity", b =>
                 {
                     b.Property<int>("Id")
@@ -1144,6 +1348,11 @@ namespace HVTradingBot.Infrastructure.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("instrument");
 
+                    b.Property<string>("NewsCondition")
+                        .HasMaxLength(24)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("news_condition");
+
                     b.Property<DateTime>("OpenedAtUtc")
                         .HasColumnType("TEXT")
                         .HasColumnName("opened_at_utc");
@@ -1187,6 +1396,11 @@ namespace HVTradingBot.Infrastructure.Sqlite.Migrations
                         .HasColumnType("REAL")
                         .HasColumnName("take_profit");
 
+                    b.Property<string>("TrendAlignment")
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trend_alignment");
+
                     b.HasKey("Id")
                         .HasName("pk_setup_outcomes");
 
@@ -1201,6 +1415,173 @@ namespace HVTradingBot.Infrastructure.Sqlite.Migrations
                         .HasDatabaseName("ix_setup_outcomes_instrument_status");
 
                     b.ToTable("setup_outcomes", (string)null);
+                });
+
+            modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.SignalEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AcceptedRules")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("accepted_rules");
+
+                    b.Property<string>("Checks")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("checks");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTime?>("DecidedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("decided_at_utc");
+
+                    b.Property<string>("DecidedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("decided_by");
+
+                    b.Property<Guid>("DecisionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("decision_id");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("direction");
+
+                    b.Property<double>("Entry")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("REAL")
+                        .HasColumnName("entry");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<double?>("FillPrice")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("REAL")
+                        .HasColumnName("fill_price");
+
+                    b.Property<string>("Instrument")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("instrument");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("message");
+
+                    b.Property<bool>("Notified")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("notified");
+
+                    b.Property<Guid?>("PositionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("position_id");
+
+                    b.Property<string>("Regime")
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("regime");
+
+                    b.Property<double?>("RiskAmount")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("REAL")
+                        .HasColumnName("risk_amount");
+
+                    b.Property<int>("Score")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("score");
+
+                    b.Property<string>("SetupId")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("setup_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("status");
+
+                    b.Property<double>("StopLoss")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("REAL")
+                        .HasColumnName("stop_loss");
+
+                    b.Property<string>("Strategy")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("strategy");
+
+                    b.Property<double>("TakeProfit")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("REAL")
+                        .HasColumnName("take_profit");
+
+                    b.HasKey("Id")
+                        .HasName("pk_signals");
+
+                    b.HasIndex("CreatedAtUtc")
+                        .HasDatabaseName("ix_signals_created_at_utc");
+
+                    b.HasIndex("SetupId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_signals_setup_id");
+
+                    b.HasIndex("Status", "ExpiresAtUtc")
+                        .HasDatabaseName("ix_signals_status_expires_at_utc");
+
+                    b.ToTable("signals", (string)null);
+                });
+
+            modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.SignalSettingsEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Settings")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("settings");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_by");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_signal_settings");
+
+                    b.ToTable("signal_settings", (string)null);
                 });
 
             modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.SystemStateEntity", b =>
@@ -1220,6 +1601,16 @@ namespace HVTradingBot.Infrastructure.Sqlite.Migrations
                     b.Property<string>("BrokerName")
                         .HasColumnType("TEXT")
                         .HasColumnName("broker_name");
+
+                    b.Property<double?>("CapitalBase")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("REAL")
+                        .HasColumnName("capital_base");
+
+                    b.Property<double>("CapitalPnl")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("REAL")
+                        .HasColumnName("capital_pnl");
 
                     b.Property<int>("ConsecutiveLosses")
                         .HasColumnType("INTEGER")
@@ -1276,6 +1667,11 @@ namespace HVTradingBot.Infrastructure.Sqlite.Migrations
                     b.Property<DateOnly?>("PnlWeekStart")
                         .HasColumnType("TEXT")
                         .HasColumnName("pnl_week_start");
+
+                    b.Property<double>("SignalDailyRealizedPnl")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("REAL")
+                        .HasColumnName("signal_daily_realized_pnl");
 
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()

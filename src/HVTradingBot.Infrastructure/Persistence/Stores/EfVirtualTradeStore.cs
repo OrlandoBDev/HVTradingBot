@@ -3,6 +3,7 @@ using HVTradingBot.Domain.Analysis;
 using HVTradingBot.Domain.Common;
 using HVTradingBot.Domain.Learning;
 using HVTradingBot.Domain.MarketData;
+using HVTradingBot.Domain.News;
 using HVTradingBot.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -40,7 +41,9 @@ public sealed class EfVirtualTradeStore(IDbContextFactory<TradingDbContext> dbFa
                 StopLoss = s.StopLoss,
                 TakeProfit = s.TakeProfit,
                 OpenedAtUtc = s.OpenedAtUtc,
-                Status = Open
+                Status = Open,
+                NewsCondition = s.News?.ToString(),
+                TrendAlignment = s.Trend?.ToString()
             });
         }
 
@@ -59,7 +62,11 @@ public sealed class EfVirtualTradeStore(IDbContextFactory<TradingDbContext> dbFa
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var rows = await db.SetupOutcomes.AsNoTracking().Where(o => o.Instrument == instrument && o.Status == Open).ToListAsync(cancellationToken);
         return rows.Select(o => new VirtualSetup(o.Id, o.SetupId, o.DecisionId, Key(o), o.Instrument, Enum.Parse<Direction>(o.Direction), o.Score,
-            o.Entry, o.StopLoss, o.TakeProfit, DateTime.SpecifyKind(o.OpenedAtUtc, DateTimeKind.Utc), Enum.Parse<DecisionState>(o.DecisionState))).ToList();
+            o.Entry, o.StopLoss, o.TakeProfit, DateTime.SpecifyKind(o.OpenedAtUtc, DateTimeKind.Utc), Enum.Parse<DecisionState>(o.DecisionState))
+        {
+            News = Parse<NewsCondition>(o.NewsCondition),
+            Trend = Parse<TrendAlignment>(o.TrendAlignment)
+        }).ToList();
     }
 
     public async Task ResolveAsync(Guid id, VirtualOutcome outcome, decimal rMultiple, decimal exitPrice, DateTime closedAtUtc, CancellationToken cancellationToken)
@@ -77,13 +84,20 @@ public sealed class EfVirtualTradeStore(IDbContextFactory<TradingDbContext> dbFa
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var rows = await db.SetupOutcomes.AsNoTracking()
             .Where(o => o.Status != Open && o.ClosedAtUtc >= sinceUtc)
-            .Select(o => new { o.Strategy, o.Regime, o.AssetClass, o.RMultiple, o.ClosedAtUtc })
+            .Select(o => new { o.Strategy, o.Regime, o.AssetClass, o.RMultiple, o.ClosedAtUtc, o.NewsCondition, o.TrendAlignment })
             .ToListAsync(cancellationToken);
         return rows.Select(o => new SetupOutcome(
             new SetupKey(o.Strategy, Enum.Parse<MarketRegime>(o.Regime), Enum.Parse<AssetClass>(o.AssetClass)),
             o.RMultiple ?? 0,
-            DateTime.SpecifyKind(o.ClosedAtUtc!.Value, DateTimeKind.Utc))).ToList();
+            DateTime.SpecifyKind(o.ClosedAtUtc!.Value, DateTimeKind.Utc))
+        {
+            News = Parse<NewsCondition>(o.NewsCondition),
+            Trend = Parse<TrendAlignment>(o.TrendAlignment)
+        }).ToList();
     }
+
+    private static T? Parse<T>(string? value) where T : struct, Enum =>
+        Enum.TryParse<T>(value, out var parsed) ? parsed : null;
 
     private static SetupKey Key(SetupOutcomeEntity o) =>
         new(o.Strategy, Enum.Parse<MarketRegime>(o.Regime), Enum.Parse<AssetClass>(o.AssetClass));

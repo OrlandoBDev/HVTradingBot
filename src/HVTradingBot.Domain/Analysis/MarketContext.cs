@@ -1,4 +1,5 @@
 using HVTradingBot.Domain.MarketData;
+using HVTradingBot.Domain.News;
 
 namespace HVTradingBot.Domain.Analysis;
 
@@ -18,6 +19,9 @@ public sealed record MarketContext(
     decimal AverageSpread,
     bool IsDataStale)
 {
+    /// <summary>News, economic calendar and cross-market trend at <see cref="AsOfUtc"/>; null when not in use.</summary>
+    public MarketIntelligenceInputs? Intelligence { get; init; }
+
     /// <summary>Primary setup timeframe (1H).</summary>
     public IndicatorSnapshot Primary => Indicators[TimeFrame.H1];
 

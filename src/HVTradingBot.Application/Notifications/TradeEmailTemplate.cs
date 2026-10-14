@@ -133,7 +133,7 @@ Choose which emails you receive under <b>Settings › Notifications</b> in the H
 </div>
 </td></tr>
 </table>
-<div style="font-family:{{Font}};font-size:11px;color:#94a3b8;padding-top:12px;">HVTradingBot · {{E(n.DecidedAtUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture))}}</div>
+<div style="font-family:{{Font}};font-size:11px;color:#94a3b8;padding-top:12px;">HVTradingBot · {{E(LocalTime(n.DecidedAtUtc, "yyyy-MM-dd HH:mm"))}}</div>
 </td></tr>
 </table>
 </body>
@@ -257,7 +257,7 @@ Choose which emails you receive under <b>Settings › Notifications</b> in the H
         }
 
         if (!string.IsNullOrWhiteSpace(n.Broker)) rows.Add(("Account", n.Broker));
-        rows.Add(("Time", n.DecidedAtUtc.UtcDateTime.ToString("ddd d MMM yyyy, HH:mm:ss 'UTC'", CultureInfo.InvariantCulture)));
+        rows.Add(("Time", LocalTime(n.DecidedAtUtc, "ddd d MMM yyyy, HH:mm:ss")));
         if (!string.IsNullOrWhiteSpace(n.BrokerOrderId)) rows.Add(("Order reference", n.BrokerOrderId));
         return rows;
     }
@@ -285,6 +285,19 @@ Choose which emails you receive under <b>Settings › Notifications</b> in the H
     private static bool IsNumeric(string value) => value.Length > 0 && (char.IsDigit(value[0]) || value[0] is '+' or '-' or '−');
 
     /// <summary>Readable market name, e.g. "Volatility 75 (1s) Index" for 1HZ75V.</summary>
+    /// <summary>
+    /// A time in this device's time zone (the phone's in the Android app, the server's otherwise) with its UTC offset,
+    /// e.g. "2026-09-26 14:05 (UTC-04:00)", so it is unambiguous wherever the email is read.
+    /// </summary>
+    public static string LocalTime(DateTimeOffset time, string format, TimeZoneInfo? zone = null)
+    {
+        var local = TimeZoneInfo.ConvertTime(time, zone ?? TimeZoneInfo.Local);
+        var offset = local.Offset == TimeSpan.Zero
+            ? "UTC"
+            : $"UTC{(local.Offset < TimeSpan.Zero ? "-" : "+")}{local.Offset.Duration():hh\\:mm}";
+        return $"{local.ToString(format, CultureInfo.InvariantCulture)} ({offset})";
+    }
+
     public static string Market(string symbol) => Instruments.DisplayNameOf(symbol);
 
     /// <summary>Market name with its symbol when they differ, e.g. "Volatility 75 (1s) Index (1HZ75V)".</summary>

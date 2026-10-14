@@ -41,6 +41,20 @@ Track:
 - correlated positions
 - same-direction concentration
 
+### Position Slots and High-Score Extras
+
+- **Normal slots** (`MaxOpenPositions`, default 3) are shared by all markets. While Forex trades, Derived markets
+  take at most `MaxDerivedOpenPositions` (1) of them so they cannot crowd Forex out; while Forex is closed
+  (weekends, the daily break) Derived may use every slot. Derived trades already open when Forex reopens run to
+  their stop or target; Forex takes slots as they free up.
+- **High-score extras** (`MaxExtraDerivedPositions`, default 2, shared by every market type): a candidate scoring at
+  least `HighScoreOverrideMinScore` (90) may open when the slots are full, on a market with no open position (a
+  Derived market may also add to one it already trades; Forex never does). At most normal + extras (5) are open at
+  once. An extra only opens if every open trade and the new one could hit their stops without going over today's
+  remaining daily loss limit (Derived: the Derived daily limit too). Every other rule still applies.
+- **Derived risk budget:** every Derived trade after the first must fit in today's remaining Derived loss budget
+  if all open Derived trades and the new one hit their stops.
+
 ### Daily / Weekly Loss
 
 Block new trades once thresholds are breached.
@@ -72,6 +86,45 @@ If data is stale:
 - block new trades
 - raise health alert
 - optionally trigger kill switch
+
+### News Events
+
+No new trade on a market from 30 minutes before to 30 minutes after a high-impact release for its currencies; other
+medium- or high-impact releases within two hours, and headlines clearly against the trade, shrink the position. News
+can only tighten risk. See [NEWS_AND_TRENDS.md](NEWS_AND_TRENDS.md).
+
+### Trading Capital
+
+Settings › Risk limits › Trading capital (`RiskOptions.TradingCapital`, stored with the risk limits): trade a set amount
+instead of the whole balance, e.g. $100 on a $10,000 demo to trade as a small real account would. Sizing and every loss
+limit (daily, weekly, Derived, signals) then use the capital plus the realized results of every app trade since it was
+set (`TradingSystemState.CapitalBase`/`CapitalPnl`), never more than the real balance. Changing the amount starts it
+fresh; empty uses the whole balance. The account bar shows the capital next to the account balance. Small capitals
+make the broker's minimum stake and commission matter: such trades are refused, not enlarged.
+
+### Evaluation Before Real Money
+
+Performance › "Ready for real money?" (`EvaluationService`) judges the bot's own closed Forex trades on the demo
+account; signal trades, test trades and other markets are reported apart. It passes only when all hold: 200 trades,
+an average trade above 0R with 95% confidence (Monte Carlo), profitable in at least three of four periods, largest
+drop under 10%, high-score extras off and only Forex markets selected. "Use the evaluation setup" applies the last two
+through the normal, audited settings paths. High-score extras are off by default (`MaxExtraDerivedPositions` 0).
+
+### Signal Trades
+
+Signals are setups the engine sends to the user instead of trading them (markets set to "Signals", and optional near
+misses scoring just below the automatic threshold). A signal is traded only when the user accepts it, and it never
+touches the bot's own limits:
+
+- Its own slots (default 2), risk per trade (default 0.5%) and daily loss budget (default 2%); trades are tagged by the
+  `SIG-` client order id. The bot's slot and loss rules ignore signal trades; currency exposure counts every position.
+- Accepting re-prices the entry at the live quote and refuses the signal once the price has covered a set share
+  (default 1/3) of the way to its stop or target, or after it expires (default 10 minutes).
+- The same rules run again at placement. A failed rule can be accepted by the user, except hard rules, which always
+  block: trading mode, kill switch, stale data, market not tradable, sizing, already traded. Loss limits can be accepted
+  only when "Allow trading past a loss limit" is on, with a typed `ACCEPT`.
+- Accepted rules are recorded on the risk check ("Accepted by you: ..."), the decision journal and the audit log
+  (`SignalTradedWithOverrides`); results of overridden trades are reported separately on the Signals page.
 
 ### Kill Switch
 

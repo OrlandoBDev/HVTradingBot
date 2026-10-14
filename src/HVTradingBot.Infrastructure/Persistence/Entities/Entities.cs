@@ -125,6 +125,9 @@ public sealed class SystemStateEntity
     public DateOnly? PnlDay { get; set; }
     public decimal DailyRealizedPnl { get; set; }
     public decimal DerivedDailyRealizedPnl { get; set; }
+    public decimal SignalDailyRealizedPnl { get; set; }
+    public decimal? CapitalBase { get; set; }
+    public decimal CapitalPnl { get; set; }
     public DateOnly? PnlWeekStart { get; set; }
     public decimal WeeklyRealizedPnl { get; set; }
     public DateTime? LastBarTimeUtc { get; set; }
@@ -183,6 +186,65 @@ public sealed class BrokerSettingsEntity
     public int Version { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
     public string? UpdatedBy { get; set; }
+}
+
+/// <summary>
+/// MetaTrader 5 through MetaApi (metaapi.cloud): when enabled, Forex orders go to this MT5 account instead of Deriv
+/// multipliers. The MetaApi token is encrypted like the Deriv token. The Status* columns are the worker's latest check.
+/// </summary>
+public sealed class Mt5SettingsEntity
+{
+    public int Id { get; set; }
+    public bool Enabled { get; set; }
+    public string? TokenProtected { get; set; }
+    public string? TokenHint { get; set; }
+    public string? AccountId { get; set; }
+    public string Region { get; set; } = "new-york";
+    public string SymbolSuffix { get; set; } = "";
+    public decimal CommissionPercent { get; set; }
+
+    /// <summary>"MetaApi" (cloud) or "Bridge" (the HVTradingBot Expert Advisor in MT5 on this computer).</summary>
+    public string Connection { get; set; } = "MetaApi";
+
+    /// <summary>The key the Expert Advisor sends with every request (encrypted).</summary>
+    public string? BridgeKeyProtected { get; set; }
+    public int Version { get; set; }
+    public DateTime UpdatedAtUtc { get; set; }
+    public string? UpdatedBy { get; set; }
+    public string? StatusState { get; set; }
+    public string? StatusMessage { get; set; }
+    public int StatusVersion { get; set; }
+    public string? StatusLogin { get; set; }
+    public string? StatusServer { get; set; }
+    public string? StatusBroker { get; set; }
+    public bool? StatusIsDemo { get; set; }
+    public decimal? StatusBalance { get; set; }
+    public string? StatusCurrency { get; set; }
+    public DateTime? StatusCheckedAtUtc { get; set; }
+}
+
+/// <summary>What the MT5 Expert Advisor last reported (bridge connection): account, open positions and recent deals.</summary>
+public sealed class Mt5BridgeStateEntity
+{
+    public int Id { get; set; }
+    public DateTime LastSeenUtc { get; set; }
+    public string? EaVersion { get; set; }
+    public required string AccountJson { get; set; }
+    public required string PositionsJson { get; set; }
+    public required string DealsJson { get; set; }
+}
+
+/// <summary>An order or close for the Expert Advisor. Status: Pending → Sent (delivered) → Done; Expired if never delivered.</summary>
+public sealed class Mt5BridgeCommandEntity
+{
+    public long Id { get; set; }
+    public required string Type { get; set; }
+    public required string Payload { get; set; }
+    public required string Status { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
+    public DateTime? SentAtUtc { get; set; }
+    public DateTime? DoneAtUtc { get; set; }
+    public string? ResultJson { get; set; }
 }
 
 /// <summary>Result of the worker's latest attempt to connect with the stored settings.</summary>
@@ -249,6 +311,12 @@ public sealed class SetupOutcomeEntity
     public decimal? RMultiple { get; set; }
     public decimal? ExitPrice { get; set; }
     public DateTime? ClosedAtUtc { get; set; }
+
+    /// <summary>News condition when the setup was found (<c>NewsCondition</c>); null before news was recorded.</summary>
+    public string? NewsCondition { get; set; }
+
+    /// <summary>Relation to the cross-market currency trend (<c>TrendAlignment</c>).</summary>
+    public string? TrendAlignment { get; set; }
 }
 
 /// <summary>Risk limits changed on the Settings page (JSON of <c>RiskLimits</c>), applied over the configured defaults.</summary>
@@ -368,4 +436,49 @@ public sealed class BrokerContractEntity
     public decimal? ExitSpot { get; set; }
     public string? Description { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
+}
+
+/// <summary>A setup sent to the user as a signal, and what became of it (traded, skipped, expired).</summary>
+public sealed class SignalEntity
+{
+    public Guid Id { get; set; }
+    /// <summary>The setup's key (unique per setup and hour); the order's client id is "SIG-" + this.</summary>
+    public required string SetupId { get; set; }
+    public required string Kind { get; set; }
+    public required string Instrument { get; set; }
+    public required string Direction { get; set; }
+    public required string Strategy { get; set; }
+    public int Score { get; set; }
+    public string? Regime { get; set; }
+    public decimal Entry { get; set; }
+    public decimal StopLoss { get; set; }
+    public decimal TakeProfit { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
+    public DateTime ExpiresAtUtc { get; set; }
+    public Guid DecisionId { get; set; }
+    /// <summary>Pending, Accepted, Placing, NeedsReview, Placed, Skipped, Expired, Failed.</summary>
+    public required string Status { get; set; }
+    public string? Message { get; set; }
+    /// <summary>The latest risk check (JSON list of rule, passed, detail, overridden, kind).</summary>
+    public required string Checks { get; set; }
+    /// <summary>Money at risk if traded now (from the latest check).</summary>
+    public decimal? RiskAmount { get; set; }
+    /// <summary>Failed rules the user accepted (JSON list).</summary>
+    public required string AcceptedRules { get; set; }
+    public DateTime? DecidedAtUtc { get; set; }
+    public string? DecidedBy { get; set; }
+    public Guid? PositionId { get; set; }
+    public decimal? FillPrice { get; set; }
+    /// <summary>True once the phone has been notified (so each signal is announced once).</summary>
+    public bool Notified { get; set; }
+}
+
+/// <summary>Signal settings from the Settings page (single row, JSON).</summary>
+public sealed class SignalSettingsEntity
+{
+    public int Id { get; set; }
+    public required string Settings { get; set; }
+    public int Version { get; set; }
+    public DateTime UpdatedAtUtc { get; set; }
+    public string? UpdatedBy { get; set; }
 }

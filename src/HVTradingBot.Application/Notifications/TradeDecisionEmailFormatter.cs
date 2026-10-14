@@ -25,7 +25,7 @@ public static class TradeDecisionEmailFormatter
         }
 
         if (!string.IsNullOrWhiteSpace(notification.Regime)) AppendLine(body, "Regime", notification.Regime);
-        AppendLine(body, "Time (UTC)", notification.DecidedAtUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
+        AppendLine(body, "Time", TradeEmailTemplate.LocalTime(notification.DecidedAtUtc, "yyyy-MM-dd HH:mm:ss"));
 
         if (notification.Kind == NotificationKind.TradeClosed)
         {

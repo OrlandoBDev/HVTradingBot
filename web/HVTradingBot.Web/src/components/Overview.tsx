@@ -1,20 +1,22 @@
 import type { PnlPeriods, ProfitSummary, SystemStatus } from "../types";
 import type { PageId } from "../pages";
-import { ago, money, signClass, time } from "../format";
+import { ago, localTimeZone, money, signClass, time } from "../format";
 import { Badge, Card, Stat } from "./Ui";
 import { useData } from "../useData";
 import { Markets } from "./Markets";
 import { OpenPositions } from "./Positions";
+import { inApp } from "../platform";
 
 type Navigate = (page: PageId, section?: string) => void;
 
 export function Overview({ status, refreshKey, navigate }: { status: SystemStatus; refreshKey: unknown; navigate: Navigate }) {
   const a = status.account;
-  const { data: profit } = useData<ProfitSummary>("/api/profit", refreshKey);
+  const { data: profit } = useData<ProfitSummary>(`/api/profit?tz=${encodeURIComponent(localTimeZone())}`, refreshKey);
   const account = profit?.account;
   const scope = profit?.accountFromBroker ? "whole account" : "all trades";
   return (
     <div className="stack">
+      {inApp && <BackupReminder navigate={navigate} />}
       {/* The whole broker account: every contract, including ones opened outside this app. */}
       <div className="grid-stats">
         <Stat label="Equity" value={money(a.equity, a.currency)} sub={`balance ${money(a.balance, a.currency)}`} />
@@ -25,6 +27,7 @@ export function Overview({ status, refreshKey, navigate }: { status: SystemStatu
       </div>
 
       {profit && <AppPnl app={profit.app} currency={profit.currency} fromBroker={profit.accountFromBroker} />}
+      {profit?.signals && <SignalPnl signals={profit.signals} currency={profit.currency} />}
 
       <div className="status-strip">
         <span>
@@ -57,7 +60,7 @@ function AppPnl({ app, currency, fromBroker }: { app: PnlPeriods; currency: stri
   return (
     <Card title="App P/L">
       <p className="hint">
-        Only trades placed by this app{fromBroker ? "; the figures above cover every trade on the broker account" : ""}. Days and weeks in UTC.
+        Only trades the bot placed (signal trades are shown separately){fromBroker ? "; the figures above cover every trade on the broker account" : ""}. Days and weeks in your local time.
       </p>
       <div className="grid-stats">
         <Stat label="Today" value={money(app.today, currency)} tone={signClass(app.today)} sub="realized" />
@@ -68,5 +71,34 @@ function AppPnl({ app, currency, fromBroker }: { app: PnlPeriods; currency: stri
         <Stat label="Open" value={money(app.open, currency)} tone={signClass(app.open)} sub={`${app.openTrades} open position(s)`} />
       </div>
     </Card>
+  );
+}
+
+/** Trades you took from signals: kept apart from the bot's own results. */
+function SignalPnl({ signals, currency }: { signals: PnlPeriods; currency: string }) {
+  const winRate = signals.closedTrades === 0 ? null : (signals.wins / signals.closedTrades) * 100;
+  return (
+    <Card title="Signal trades P/L">
+      <p className="hint">Trades you chose from signals. They have their own slots and loss budget and are not part of App P/L.</p>
+      <div className="grid-stats">
+        <Stat label="Today" value={money(signals.today, currency)} tone={signClass(signals.today)} sub="realized" />
+        <Stat label="This week" value={money(signals.week, currency)} tone={signClass(signals.week)} sub="realized since Monday" />
+        <Stat label="All time" value={money(signals.allTime, currency)} tone={signClass(signals.allTime)}
+          sub={`${signals.closedTrades} trade(s)${winRate == null ? "" : `, ${winRate.toFixed(0)}% won`}`} />
+        <Stat label="Open" value={money(signals.open, currency)} tone={signClass(signals.open)} sub={`${signals.openTrades} open position(s)`} />
+      </div>
+    </Card>
+  );
+}
+
+/** Android app: everything is on the phone, so remind to save a backup when there is none from the last week. */
+function BackupReminder({ navigate }: { navigate: Navigate }) {
+  const { data } = useData<{ lastExportUtc: string | null }>("/api/app/backup", null);
+  if (!data || (data.lastExportUtc && Date.now() - Date.parse(data.lastExportUtc) < 7 * 86_400_000)) return null;
+  return (
+    <div className="banner">
+      <b>{data.lastExportUtc ? "No backup this week." : "Your data is not backed up."}</b> Trades and learning live only on this phone.{" "}
+      <a href="#/settings/engine" onClick={(e) => { e.preventDefault(); navigate("settings", "engine"); }}>Save a backup</a>
+    </div>
   );
 }

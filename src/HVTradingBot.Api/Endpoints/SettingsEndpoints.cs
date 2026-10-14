@@ -22,6 +22,12 @@ public static class SettingsEndpoints
             return Results.NoContent();
         });
 
+        var mt5 = app.MapGroup("/api/settings/mt5");
+        mt5.MapGet("", (Mt5SettingsActions actions, CancellationToken ct) => actions.GetAsync(ct));
+        mt5.MapPut("", async (Mt5SettingsRequest request, Mt5SettingsActions actions, HttpContext http, CancellationToken ct) =>
+            (await actions.SaveAsync(request, http.Caller(), ct)).ToHttp());
+        mt5.MapDelete("", (Mt5SettingsActions actions, HttpContext http, CancellationToken ct) => actions.ClearAsync(http.Caller(), ct));
+
         var risk = app.MapGroup("/api/settings/risk");
         risk.MapGet("", (DashboardActions actions, CancellationToken ct) => actions.GetRiskSettingsAsync(ct));
         risk.MapPut("", async (RiskLimitsDto request, DashboardActions actions, HttpContext http, CancellationToken ct) =>
@@ -33,6 +39,11 @@ public static class SettingsEndpoints
         notifications.MapPut("", async (NotificationSettingsRequest request, DashboardActions actions, HttpContext http, CancellationToken ct) =>
             (await actions.SaveNotificationSettingsAsync(request, http.Caller(), ct)).ToHttp());
         notifications.MapPost("/test", (DashboardActions actions, HttpContext http, CancellationToken ct) => actions.SendTestEmailAsync(http.Caller(), ct));
+
+        var signals = app.MapGroup("/api/settings/signals");
+        signals.MapGet("", (SignalDashboard dashboard, CancellationToken ct) => dashboard.GetSettingsAsync(ct));
+        signals.MapPut("", async (SignalSettingsDto request, SignalDashboard dashboard, HttpContext http, CancellationToken ct) =>
+            (await dashboard.SaveSettingsAsync(request, http.Caller(), ct)).ToHttp());
 
         var markets = app.MapGroup("/api/settings/markets");
         markets.MapGet("", (DashboardActions actions, CancellationToken ct) => actions.GetMarketSettingsAsync(ct));

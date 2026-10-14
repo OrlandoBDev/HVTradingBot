@@ -3,6 +3,7 @@ using HVTradingBot.Domain.Decisions;
 using HVTradingBot.Domain.Execution;
 using HVTradingBot.Domain.Learning;
 using HVTradingBot.Domain.MarketData;
+using HVTradingBot.Domain.News;
 using Microsoft.Extensions.Logging;
 
 namespace HVTradingBot.Application.Learning;
@@ -20,7 +21,14 @@ public sealed record VirtualSetup(
     decimal StopLoss,
     decimal TakeProfit,
     DateTime OpenedAtUtc,
-    DecisionState DecisionState);
+    DecisionState DecisionState)
+{
+    /// <summary>The news around the setup when it was found; learning uses it to tell which news conditions pay.</summary>
+    public NewsCondition? News { get; init; }
+
+    /// <summary>The setup's relation to the cross-market currency trend.</summary>
+    public TrendAlignment? Trend { get; init; }
+}
 
 public enum VirtualOutcome
 {
@@ -53,10 +61,17 @@ public sealed class LearningService(
     ILogger<LearningService> logger) : IStrategyPerformanceProvider
 {
     private volatile IReadOnlyDictionary<SetupKey, StrategyPerformance> _model = new Dictionary<SetupKey, StrategyPerformance>();
+    private volatile IReadOnlyDictionary<ContextKey, ContextPerformance> _contextModel = new Dictionary<ContextKey, ContextPerformance>();
 
     public IReadOnlyDictionary<SetupKey, StrategyPerformance> Model => _model;
 
+    /// <summary>What has been learned about news and trend conditions, per strategy.</summary>
+    public IReadOnlyDictionary<ContextKey, ContextPerformance> ContextModel => _contextModel;
+
     public StrategyPerformance? Get(SetupKey key) => options.Enabled ? _model.GetValueOrDefault(key) : null;
+
+    public decimal GetContextAdjustment(string strategy, NewsCondition? news, TrendAlignment? trend) =>
+        options.Enabled ? StrategyPerformanceModel.ContextAdjustment(_contextModel, strategy, news, trend, options) : 0;
 
     public async Task RefreshAsync(DateTime marketTimeUtc, CancellationToken cancellationToken)
     {
@@ -67,9 +82,10 @@ public sealed class LearningService(
 
         var outcomes = await store.GetOutcomesAsync(marketTimeUtc.AddDays(-options.LookbackDays), cancellationToken);
         _model = StrategyPerformanceModel.Compute(outcomes, marketTimeUtc, options);
+        _contextModel = StrategyPerformanceModel.ComputeContext(outcomes, marketTimeUtc, options);
         var disabled = _model.Values.Where(p => p.Disabled).Select(p => p.Key.ToString()).ToList();
-        logger.LogInformation("Learning model refreshed: {Outcomes} outcomes, {Keys} combinations, disabled: {Disabled}",
-            outcomes.Count, _model.Count, disabled.Count == 0 ? "none" : string.Join(", ", disabled));
+        logger.LogInformation("Learning model refreshed: {Outcomes} outcomes, {Keys} combinations, {Conditions} news/trend conditions, disabled: {Disabled}",
+            outcomes.Count, _model.Count, _contextModel.Count, disabled.Count == 0 ? "none" : string.Join(", ", disabled));
     }
 
     /// <summary>Records every scored setup of an evaluation (one per strategy, direction and signal bar).</summary>
@@ -93,7 +109,11 @@ public sealed class LearningService(
             c.Setup.StopLoss,
             c.Setup.TakeProfit,
             context.AsOfUtc,
-            c == evaluation.Best ? state : DecisionState.NoTrade)).ToList();
+            c == evaluation.Best ? state : DecisionState.NoTrade)
+        {
+            News = c.News.Condition,
+            Trend = c.News.Trend
+        }).ToList();
         return store.AddAsync(setups, cancellationToken);
     }
 
@@ -174,7 +194,7 @@ public sealed class InMemoryVirtualTradeStore : IVirtualTradeStore
         {
             if (open.Remove(id, out var setup))
             {
-                _outcomes.Add(new SetupOutcome(setup.Key, rMultiple, closedAtUtc));
+                _outcomes.Add(new SetupOutcome(setup.Key, rMultiple, closedAtUtc) { News = setup.News, Trend = setup.Trend });
                 break;
             }
         }

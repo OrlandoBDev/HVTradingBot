@@ -6,6 +6,7 @@ import { useData } from "../useData";
 import { useMarketNames } from "../useMarketNames";
 import { Card, Empty, ErrorNote } from "./Ui";
 import { MetricsByGroup, MetricsSummary } from "./MetricsTable";
+import { RobustnessCard } from "./RobustnessCard";
 
 export function Backtest() {
   const marketName = useMarketNames();
@@ -78,6 +79,7 @@ export function Backtest() {
           </Card>
         </div>
       )}
+      {shown?.summary.robustness && <RobustnessCard r={shown.summary.robustness} source={shown.parameters.source} />}
       {shown && <Card title="By strategy"><MetricsByGroup groups={shown.summary.byStrategy} label="Strategy" /></Card>}
 
       <Card title="Previous runs">

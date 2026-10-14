@@ -1,7 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
 using HVTradingBot.Api.Auth;
+using HVTradingBot.Api.Endpoints;
 using HVTradingBot.Contracts;
+using HVTradingBot.Infrastructure.Bridge;
+using HVTradingBot.Infrastructure.Settings;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -141,5 +144,36 @@ public sealed class DashboardAuthTests(PostgresFixture fixture) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Unauthorized, (await second.GetAsync("/api/markets/names")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized,
             (await Client().PostAsJsonAsync("/api/auth/login", new LoginRequest("owner", Password))).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_mt5_bridge_signs_in_with_its_key_only_while_switched_on()
+    {
+        var settings = _app.Services.GetRequiredService<Mt5SettingsStore>();
+        var client = Client();
+        const string report = """{"version":"1.00","account":{"login":5550001,"server":"Demo","company":"Broker","currency":"USD","balance":100,"equity":100,"tradeMode":"ACCOUNT_TRADE_MODE_DEMO"},"positions":[],"deals":[],"results":[]}""";
+        async Task<HttpResponseMessage> PostAsync(string key, string body = report)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, "/api/bridge/mt5") { Content = new StringContent(body + "\0") };
+            request.Headers.Add(BridgeEndpoints.KeyHeader, key);
+            return await client.SendAsync(request);
+        }
+
+        await settings.ClearAsync("test", CancellationToken.None);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await PostAsync("0123456789abcdef0123456789abcdef")).StatusCode);
+
+        await settings.SaveAsync(true, null, null, "london", "", 0.007m, "test", CancellationToken.None, Mt5SettingsStore.BridgeConnection, newBridgeKey: true);
+        var key = (await settings.GetViewAsync(CancellationToken.None)).BridgeKey!;
+
+        var wrong = await PostAsync("0123456789abcdef0123456789abcdef");
+        var ok = await PostAsync(key);
+        var junk = await PostAsync(key, "{not json");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, wrong.StatusCode);
+        Assert.StartsWith("ERR|", await wrong.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.OK, ok.StatusCode);
+        Assert.Equal("OK\n", await ok.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.BadRequest, junk.StatusCode);
+        Assert.Equal(100m, (await _app.Services.GetRequiredService<Mt5BridgeStore>().GetStateAsync(CancellationToken.None))!.Account.Balance);
     }
 }
