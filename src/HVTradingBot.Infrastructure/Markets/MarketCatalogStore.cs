@@ -13,7 +13,8 @@ public sealed record MarketSelection(
     int AppliedVersion,
     DateTime? UpdatedAtUtc,
     string? UpdatedBy,
-    bool DerivedOnlyWhenForexClosed = true);
+    bool DerivedOnlyWhenForexClosed = true,
+    bool SessionMarketsEnabled = false);
 
 /// <summary>
 /// The broker's market catalog and the user's market selection, both in PostgreSQL. Every process calls
@@ -80,11 +81,11 @@ public sealed class MarketCatalogStore(IDbContextFactory<TradingDbContext> dbFac
         return row is null
             ? new MarketSelection(null, 0, 0, null, null)
             : new MarketSelection(JsonSerializer.Deserialize<List<string>>(row.Instruments), row.Version, row.AppliedVersion, row.UpdatedAtUtc,
-                row.UpdatedBy, row.DerivedOnlyWhenForexClosed);
+                row.UpdatedBy, row.DerivedOnlyWhenForexClosed, row.SessionMarketsEnabled);
     }
 
     public async Task<MarketSelection> SaveSelectionAsync(IReadOnlyList<string> symbols, string actor, CancellationToken cancellationToken,
-        bool derivedOnlyWhenForexClosed = true)
+        bool derivedOnlyWhenForexClosed = true, bool sessionMarketsEnabled = false)
     {
         var distinct = symbols.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (distinct.Count == 0 || distinct.Count > MaxSelectedInstruments)
@@ -109,6 +110,7 @@ public sealed class MarketCatalogStore(IDbContextFactory<TradingDbContext> dbFac
 
         row.Instruments = JsonSerializer.Serialize(canonical);
         row.DerivedOnlyWhenForexClosed = derivedOnlyWhenForexClosed;
+        row.SessionMarketsEnabled = sessionMarketsEnabled;
         row.Version++;
         row.UpdatedAtUtc = clock.UtcNow;
         row.UpdatedBy = actor;
@@ -125,6 +127,18 @@ public sealed class MarketCatalogStore(IDbContextFactory<TradingDbContext> dbFac
             row.AppliedVersion = version;
             await db.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// Tradable Forex pairs outside <paramref name="selected"/>: the markets session trading may add. The worker follows
+    /// all of them (a pair closed at startup, e.g. on a weekend, trades once it reopens); <paramref name="openOnly"/> for
+    /// what is tradable right now.
+    /// </summary>
+    public static IReadOnlyList<Instrument> SessionCandidates(IEnumerable<MarketEntity> catalog, IEnumerable<string> selected, bool openOnly = false)
+    {
+        var chosen = selected.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return catalog.Where(m => m.AssetClass == nameof(AssetClass.Forex) && m.IsTradable && (m.IsOpen || !openOnly) && !chosen.Contains(m.Symbol))
+            .Select(ToInstrument).ToList();
     }
 
     public static Instrument ToInstrument(MarketEntity m)

@@ -100,10 +100,16 @@ public sealed class DashboardQueries(
         // Only the markets currently selected on the Settings page (deselected ones keep old snapshot rows).
         var selection = await catalog.GetSelectionAsync(cancellationToken);
         var selected = selection.Instruments ?? engineOptions.Instruments;
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var rows = await db.MarketSnapshots.AsNoTracking().Where(s => selected.Contains(s.Instrument)).ToListAsync(cancellationToken);
-        var order = selected.Select((symbol, index) => (symbol, index)).ToDictionary(x => x.symbol, x => x.index);
         var now = clock.UtcNow;
+        // Plus the session markets the worker evaluates right now (Settings › Markets).
+        var session = selection.SessionMarketsEnabled
+            ? TradingSessions.Pick(MarketCatalogStore.SessionCandidates(await catalog.GetCatalogAsync(cancellationToken), selected, openOnly: true), now)
+                .Select(i => i.Symbol).ToHashSet()
+            : [];
+        var shown = selected.Concat(session).ToList();
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var rows = await db.MarketSnapshots.AsNoTracking().Where(s => shown.Contains(s.Instrument)).ToListAsync(cancellationToken);
+        var order = shown.Select((symbol, index) => (symbol, index)).ToDictionary(x => x.symbol, x => x.index);
 
         var markets = rows.OrderBy(r => order.GetValueOrDefault(r.Instrument, int.MaxValue)).Select(s =>
         {
@@ -120,7 +126,8 @@ public sealed class DashboardQueries(
             var paused = selection.DerivedOnlyWhenForexClosed && forexOpen && i?.AssetClass == AssetClass.SyntheticIndex;
             return new MarketDto(s.Instrument, i?.DisplayName ?? s.Instrument, i?.AssetClass.ToString() ?? "Forex", i?.IsTradable ?? true,
                 i?.PriceDecimals ?? 5, m.IsOpen, paused, false, s.MarketTimeUtc, s.Bid, s.Ask, s.SpreadPips, s.Regime, s.LastDecision,
-                s.LastDecisionTimeUtc, s.Indicators is null ? null : JsonDocument.Parse(s.Indicators).RootElement.Clone());
+                s.LastDecisionTimeUtc, s.Indicators is null ? null : JsonDocument.Parse(s.Indicators).RootElement.Clone(),
+                session.Contains(s.Instrument));
         }).ToList();
 
         // Newly selected markets have no data until the worker has loaded their history: show them as loading.
@@ -510,12 +517,12 @@ public sealed class DashboardQueries(
         p.RMultiple, p.MaePips, p.MfePips, Commission: p.Commission, ContractId: p.BrokerContractId,
         Source: SignalOrders.IsSignal(p.ClientOrderId) ? SignalSource : AppSource);
 
-    /// <summary>A contract opened outside this app, as the broker reports it.</summary>
+    /// <summary>A contract opened outside this app, as the broker reports it. MT5 positions have no stake; their size in lots is the contract type.</summary>
     private static PositionDto ToDto(BrokerContractEntity c) => new(
-        Guid.Empty, $"deriv-{c.ContractId}", c.Symbol, c.Direction ?? c.ContractType, 0, c.EntrySpot, c.StopLoss, c.TakeProfit, 0,
+        Guid.Empty, $"{c.Broker.ToLowerInvariant()}-{c.ContractId}", c.Symbol, c.Direction ?? c.ContractType, 0, c.EntrySpot, c.StopLoss, c.TakeProfit, 0,
         c.PurchaseTimeUtc, ExternalSource, 0, c.IsOpen ? c.CurrentSpot : null, c.IsOpen ? c.Profit : null, c.SellTimeUtc, c.ExitSpot,
         c.IsOpen ? null : "Closed", c.IsOpen ? null : c.Profit, null, null, null, Commission: c.Commission, Source: ExternalSource,
-        ContractId: c.ContractId, Stake: c.BuyPrice, ContractType: c.ContractType);
+        ContractId: c.ContractId, Stake: c.BuyPrice > 0 ? c.BuyPrice : null, ContractType: c.ContractType);
 
     private static DecisionDto ToDto(TradeDecisionEntity d) => new(
         d.Id, d.MarketTimeUtc, d.Instrument, d.State, d.Regime, d.Strategy, d.Direction, d.Score, d.Entry, d.StopLoss,

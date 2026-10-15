@@ -1,16 +1,16 @@
 using HVTradingBot.Application.Abstractions;
-using HVTradingBot.Infrastructure.Brokers.Deriv;
+using HVTradingBot.Infrastructure.Brokers;
 
 namespace HVTradingBot.Hosting;
 
 /// <summary>
 /// Keeps the dashboard's view of the whole broker account current: open contracts every 15 seconds, closed ones every
-/// two minutes and right after a contract closes. Includes contracts opened outside this app. Deriv only; the paper
+/// two minutes and right after a contract closes. Includes contracts opened outside this app. Deriv and MT5; the paper
 /// broker's trades are all the app's own.
 /// </summary>
 public sealed class BrokerAccountSyncService(
     IExecutionBroker broker,
-    DerivAccountSync sync,
+    IEnumerable<IBrokerAccountSync> syncs,
     ILogger<BrokerAccountSyncService> logger) : BackgroundService
 {
     private static readonly TimeSpan OpenInterval = TimeSpan.FromSeconds(15);
@@ -18,7 +18,7 @@ public sealed class BrokerAccountSyncService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (broker.Descriptor.Name != DerivBroker.BrokerName)
+        if (syncs.FirstOrDefault(s => s.BrokerName == broker.Descriptor.Name) is not { } sync)
         {
             return;
         }

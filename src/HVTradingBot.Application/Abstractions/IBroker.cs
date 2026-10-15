@@ -58,6 +58,12 @@ public interface IExecutionBroker : IBroker
         Candle bar,
         CurrencyConverter converter,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Records why the app closed a position itself (an early exit): the broker only reports a manual close. Brokers
+    /// without a stored journal (backtests) ignore it.
+    /// </summary>
+    Task SetExitReasonAsync(Guid positionId, ExitReason reason, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
 /// <summary>

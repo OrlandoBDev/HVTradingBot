@@ -25,12 +25,13 @@ public sealed record RiskLimits(
     decimal? AssumedCommissionPercent = null,
     int? MaxExtraDerivedPositions = null,
     int? HighScoreOverrideMinScore = null,
-    decimal? TradingCapital = null)
+    decimal? TradingCapital = null,
+    bool? EarlyExitEnabled = null)
 {
     public static RiskLimits From(RiskOptions o) => new(o.MaxRiskPerTradePercent, o.MaxDailyLossPercent, o.MaxWeeklyLossPercent,
         o.MaxOpenPositions, o.MinRewardToRisk, o.MaxConsecutiveLosses, o.CooldownMinutes, o.MaxCurrencyExposure, o.MaxCommissionShareOfRisk,
         o.MaxDerivedOpenPositions, o.DerivedRiskPerTradePercent, o.MaxDerivedDailyLossPercent, o.AssumedCommissionPercent,
-        o.MaxExtraDerivedPositions, o.HighScoreOverrideMinScore, o.TradingCapital);
+        o.MaxExtraDerivedPositions, o.HighScoreOverrideMinScore, o.TradingCapital, o.EarlyExitEnabled);
 
     /// <summary>Limits saved before the Derived limits existed take the configured Derived defaults.</summary>
     public RiskLimits WithDefaultsFrom(RiskOptions defaults) => this with
@@ -40,7 +41,8 @@ public sealed record RiskLimits(
         MaxDerivedDailyLossPercent = MaxDerivedDailyLossPercent ?? defaults.MaxDerivedDailyLossPercent,
         AssumedCommissionPercent = AssumedCommissionPercent ?? defaults.AssumedCommissionPercent,
         MaxExtraDerivedPositions = MaxExtraDerivedPositions ?? defaults.MaxExtraDerivedPositions,
-        HighScoreOverrideMinScore = HighScoreOverrideMinScore ?? defaults.HighScoreOverrideMinScore
+        HighScoreOverrideMinScore = HighScoreOverrideMinScore ?? defaults.HighScoreOverrideMinScore,
+        EarlyExitEnabled = EarlyExitEnabled ?? defaults.EarlyExitEnabled
     };
 
     public RiskOptions ApplyTo(RiskOptions defaults)
@@ -62,6 +64,7 @@ public sealed record RiskLimits(
         o.MaxExtraDerivedPositions = MaxExtraDerivedPositions ?? defaults.MaxExtraDerivedPositions;
         o.HighScoreOverrideMinScore = HighScoreOverrideMinScore ?? defaults.HighScoreOverrideMinScore;
         o.TradingCapital = TradingCapital; // null: the whole balance
+        o.EarlyExitEnabled = EarlyExitEnabled ?? defaults.EarlyExitEnabled;
         return o;
     }
 

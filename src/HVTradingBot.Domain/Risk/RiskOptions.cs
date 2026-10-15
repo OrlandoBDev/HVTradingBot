@@ -63,6 +63,9 @@ public sealed class RiskOptions
     /// </summary>
     [Range(10, 100_000_000)] public decimal? TradingCapital { get; set; }
 
+    /// <summary>Close losing trades before their stop when the trend or momentum turns against them (see EarlyExitRules).</summary>
+    public bool EarlyExitEnabled { get; set; }
+
     /// <summary>Minimum score for the high-score override.</summary>
     [Range(75, 100)] public int HighScoreOverrideMinScore { get; set; } = 90;
 

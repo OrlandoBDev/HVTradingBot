@@ -75,8 +75,8 @@ and save. The card then shows a **bridge key** and the steps:
 3. Attach the Expert Advisor to one chart, paste the bridge key in its inputs, and switch **Algo Trading** on.
 
 **How it works** (`Mt5BridgeStore`, `BridgeGateway`, `POST /api/bridge/mt5`): every second the Expert Advisor posts
-the account, open positions (with our magic number 770077), recent deals of those positions and the results of earlier
-commands, and gets back new commands as text lines (`OPEN|id|symbol|BUY|units|sl|tp|clientId`, `CLOSE|id|ticket`).
+the account, all open positions (ours carry magic number 770077), the buy and sell deals of the last `HistoryDays`
+days (Expert Advisor 1.1; 1.0 sent only our own) and the results of earlier commands, and gets back new commands as text lines (`OPEN|id|symbol|BUY|units|sl|tp|clientId`, `CLOSE|id|ticket`).
 The endpoint skips the dashboard login and accepts only the bridge key (`X-HV-Bridge-Key`, compared in constant time,
 stored encrypted) while MT5 is switched on in bridge mode; **New key** replaces it. The same `Mt5Broker` rules apply
 (lots rounded down in the Expert Advisor, idempotent client id in the position comment, deal-based closes). Failure
@@ -90,6 +90,12 @@ handling:
 | Real-money account | The Expert Advisor refuses to start, and the broker refuses the account |
 
 Commands are delivered at most once, so a restart of either side never repeats an order.
+
+**Trades placed outside the app** (by hand in MetaTrader, the phone app, another Expert Advisor): `Mt5AccountSync`
+copies every position on the account into `broker_contracts` (open ones every 15 s, closed ones from the deals every
+two minutes; the first sync reaches back 35 days, or the Expert Advisor's `HistoryDays`), the same way
+`DerivAccountSync` does for Deriv. The dashboard lists them as **External**, with the size in lots, and keeps them
+out of the app's own profit. Works through MetaApi too; the bridge needs Expert Advisor 1.1 for closed ones.
 
 ### OANDA
 

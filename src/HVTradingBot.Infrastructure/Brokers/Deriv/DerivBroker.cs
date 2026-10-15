@@ -247,6 +247,9 @@ public sealed class DerivBroker(
         return new OrderResult(order.ClientOrderId, OrderStatus.Filled, entity.Id, position.Id, spot, null);
     }
 
+    public Task SetExitReasonAsync(Guid positionId, ExitReason reason, CancellationToken cancellationToken) =>
+        PositionExitReasons.SetAsync(dbFactory, positionId, reason, cancellationToken);
+
     public Task<OrderResult> CancelOrderAsync(string orderId, CancellationToken cancellationToken) =>
         Task.FromResult(OrderResult.Rejected(orderId, "Multiplier contracts open immediately; there is nothing pending to cancel."));
 

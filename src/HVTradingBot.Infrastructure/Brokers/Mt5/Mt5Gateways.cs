@@ -37,6 +37,9 @@ public interface IMt5Gateway
     /// <summary>Deals of one position (opening and closing); empty until MT5 has recorded them.</summary>
     Task<IReadOnlyList<Mt5Deal>> GetDealsAsync(string positionId, CancellationToken cancellationToken);
 
+    /// <summary>Buy and sell deals on the whole account from <paramref name="fromUtc"/> on, including trades placed outside this app.</summary>
+    Task<IReadOnlyList<Mt5AccountDeal>> GetAccountDealsAsync(DateTime fromUtc, CancellationToken cancellationToken);
+
     Task<Mt5OpenResult> OpenAsync(Mt5OpenRequest request, CancellationToken cancellationToken);
 
     Task<Mt5TradeResult> CloseAsync(string positionId, CancellationToken cancellationToken);
@@ -69,6 +72,9 @@ public sealed class MetaApiGateway(MetaApiClient api, Mt5SettingsStore settings)
 
     public async Task<IReadOnlyList<Mt5Deal>> GetDealsAsync(string positionId, CancellationToken cancellationToken) =>
         await Call(c => api.GetDealsAsync(c, positionId, cancellationToken), cancellationToken);
+
+    public async Task<IReadOnlyList<Mt5AccountDeal>> GetAccountDealsAsync(DateTime fromUtc, CancellationToken cancellationToken) =>
+        await Call(c => api.GetDealsSinceAsync(c, fromUtc, cancellationToken), cancellationToken);
 
     public async Task<Mt5OpenResult> OpenAsync(Mt5OpenRequest request, CancellationToken cancellationToken)
     {
@@ -171,7 +177,7 @@ public sealed class BridgeGateway(Mt5BridgeStore bridge, IClock clock, TimeSpan?
     public async Task<IReadOnlyList<Mt5Position>> GetPositionsAsync(CancellationToken cancellationToken) =>
         (await OnlineStateAsync(cancellationToken)).Positions.Select(p => new Mt5Position(Id(p.Ticket), p.Symbol, p.Type == "BUY", p.Volume, p.PriceOpen,
             p.Sl == 0 ? null : p.Sl, p.Tp == 0 ? null : p.Tp, p.Profit, 0, p.Swap, DateTimeOffset.FromUnixTimeSeconds(p.Time).UtcDateTime, p.Comment,
-            p.ContractSize)).ToList();
+            p.ContractSize, p.PriceCurrent)).ToList();
 
     public async Task<IReadOnlyList<Mt5Deal>> GetDealsAsync(string positionId, CancellationToken cancellationToken) =>
         (await OnlineStateAsync(cancellationToken)).Deals.Where(d => Id(d.PositionId) == positionId)
@@ -179,6 +185,17 @@ public sealed class BridgeGateway(Mt5BridgeStore bridge, IClock clock, TimeSpan?
         .Select(d => new Mt5Deal(Id(d.Ticket), $"DEAL_ENTRY_{d.Entry}", d.Price, d.Profit, d.Commission, d.Swap,
             DateTimeOffset.FromUnixTimeSeconds(d.Time).UtcDateTime, $"DEAL_REASON_{d.Reason}"))
         .ToList();
+
+    /// <summary>The deals the Expert Advisor reports (its HistoryDays input); version 1.0 reports only our own, without symbol or side.</summary>
+    public async Task<IReadOnlyList<Mt5AccountDeal>> GetAccountDealsAsync(DateTime fromUtc, CancellationToken cancellationToken)
+    {
+        var from = new DateTimeOffset(DateTime.SpecifyKind(fromUtc, DateTimeKind.Utc)).ToUnixTimeSeconds();
+        return (await OnlineStateAsync(cancellationToken)).Deals.Where(d => d.Time >= from && d.Type is "BUY" or "SELL")
+            .OrderBy(d => d.Time)
+            .Select(d => new Mt5AccountDeal(Id(d.Ticket), Id(d.PositionId), d.Symbol ?? "", d.Type == "BUY", $"DEAL_ENTRY_{d.Entry}", d.Volume ?? 0,
+                d.Price, d.Profit, d.Commission, d.Swap, DateTimeOffset.FromUnixTimeSeconds(d.Time).UtcDateTime, $"DEAL_REASON_{d.Reason}"))
+            .ToList();
+    }
 
     public async Task<Mt5OpenResult> OpenAsync(Mt5OpenRequest request, CancellationToken cancellationToken)
     {

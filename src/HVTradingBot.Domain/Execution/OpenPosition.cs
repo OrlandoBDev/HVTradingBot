@@ -8,7 +8,9 @@ public enum ExitReason
     StopLoss,
     TakeProfit,
     Manual,
-    KillSwitch
+    KillSwitch,
+    /// <summary>Closed by the app before its stop because the trade stopped going as planned (see EarlyExitRules).</summary>
+    EarlyExit
 }
 
 public sealed record OpenPosition(

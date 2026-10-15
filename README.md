@@ -125,6 +125,10 @@ Design, install and signing: [docs/ANDROID_APP.md](docs/ANDROID_APP.md).
   limits are editable under **Settings → Risk limits** within safe ranges and apply without a restart.
   Setups scoring 90+ may open up to 2 extra positions on new markets (Forex or Derived) when the limits are full,
   within the daily loss budget; while Forex is closed, Derived may use every slot.
+- **Session markets (optional, Settings → Markets):** besides the selected markets, evaluate up to 4 more Forex pairs
+  whose trading session is open (Sydney, Tokyo, London, New York in their local time; pairs with both sessions open
+  first, then the most liquid). They rotate as sessions open and close, show a "session" badge on the dashboard, and
+  the same risk limits apply (`TradingSessions`).
 - **Execution:** Deriv demo account (multiplier contracts with broker-side stop loss / take profit, idempotent
   submission, unknown-state reconciliation) or local paper broker.
 - **Journal:** every decision incl. NO_TRADE, orders, positions (R, MAE, MFE), audit log.

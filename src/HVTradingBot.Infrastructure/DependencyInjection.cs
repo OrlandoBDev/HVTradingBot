@@ -126,6 +126,7 @@ public static class DependencyInjection
         services.AddSingleton<DerivSession>();
         services.AddSingleton<DerivMarketDiscovery>();
         services.AddSingleton<DerivAccountSync>();
+        services.AddSingleton<Brokers.IBrokerAccountSync>(sp => sp.GetRequiredService<DerivAccountSync>());
 
         if (marketData.Provider == MarketDataProvider.Deriv)
         {
@@ -150,6 +151,8 @@ public static class DependencyInjection
                     ? sp.GetRequiredService<Brokers.Mt5.BridgeGateway>()
                     : sp.GetRequiredService<Brokers.Mt5.MetaApiGateway>());
             services.AddSingleton<Brokers.Mt5.Mt5Broker>();
+            services.AddSingleton<Brokers.Mt5.Mt5AccountSync>();
+            services.AddSingleton<Brokers.IBrokerAccountSync>(sp => sp.GetRequiredService<Brokers.Mt5.Mt5AccountSync>());
             services.AddSingleton<IExecutionBroker>(sp =>
                 sp.GetRequiredService<Mt5SettingsStore>().IsActiveAsync(CancellationToken.None).GetAwaiter().GetResult()
                     ? sp.GetRequiredService<Brokers.Mt5.Mt5Broker>()

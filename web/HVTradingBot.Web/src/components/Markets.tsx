@@ -72,6 +72,9 @@ export function Markets({ refreshKey, navigate, compact = false }: { refreshKey:
                     <span className="strong">{m.displayName}</span>
                     {m.displayName !== m.instrument && <span className="muted small"> {m.instrument}</span>}
                     {!m.isTradable && <> <Badge tone="neutral">analysis only</Badge></>}
+                    {m.isSessionMarket && (
+                      <> <span title="Added while its trading session is active (Settings › Markets)"><Badge tone="neutral">session</Badge></span></>
+                    )}
                   </td>
                   <td className="num mono">{m.isLoading ? "—" : price(m.bid, m.instrument, m.priceDecimals)}</td>
                   {!compact && <td className="num mono">{m.isLoading ? "—" : price(m.ask, m.instrument, m.priceDecimals)}</td>}

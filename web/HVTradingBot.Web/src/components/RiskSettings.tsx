@@ -21,6 +21,8 @@ interface RiskLimits {
   highScoreOverrideMinScore: number;
   /** The money the app trades with; null: the whole balance. */
   tradingCapital: number | null;
+  /** Close losing trades before their stop when the trend or momentum turns against them. */
+  earlyExitEnabled: boolean;
 }
 
 interface RiskSettingsData {
@@ -38,7 +40,7 @@ type Ctx = { v: number; f: RiskLimits; b: number; c: string };
 const pct = (b: number, p: number, c: string) => money((b * p) / 100, c);
 
 type Field = {
-  key: Exclude<keyof RiskLimits, "tradingCapital">;
+  key: Exclude<keyof RiskLimits, "tradingCapital" | "earlyExitEnabled">;
   label: string;
   step: number;
   min: number;
@@ -193,7 +195,8 @@ export function RiskSettings() {
   };
 
   const dirty = !!data && !!form && (GROUPS.flatMap((g) => g.fields).some((f) => form[f.key] !== data.effective[f.key])
-    || (form.tradingCapital ?? null) !== (data.effective.tradingCapital ?? null));
+    || (form.tradingCapital ?? null) !== (data.effective.tradingCapital ?? null)
+    || form.earlyExitEnabled !== data.effective.earlyExitEnabled);
   const capital = form?.tradingCapital ?? null;
 
   return (
@@ -271,6 +274,24 @@ export function RiskSettings() {
             </div>
           </section>
         ))}
+      {form && data && (
+        <section className="risk-group">
+          <h3>Early exit</h3>
+          <label className="event-option">
+            <input type="checkbox" checked={form.earlyExitEnabled} onChange={(e) => setForm({ ...form, earlyExitEnabled: e.target.checked })} />
+            <span>
+              <span className="strong">Close a losing trade before its stop when it stops going as planned</span>
+              <span className="muted small">
+                {" "}— checked on every closed 1-hour bar, only for the bot's trades that are at a loss (winners keep their stop and target;
+                trades you took from signals are never touched). It closes when the trend turns against the trade, when it is halfway to
+                the stop and 1H momentum (EMA9/EMA20 and MACD) turned against it, or when it is still losing after 24 hours without
+                ever getting 0.5R into profit. The trade history shows these as <span className="strong">EarlyExit</span>. A smaller
+                loss still counts toward the loss limits and the losing streak.
+              </span>
+            </span>
+          </label>
+        </section>
+      )}
       <div className="form-actions">
         <button className="primary" onClick={save} disabled={saving || !dirty}>{saving ? "Saving…" : "Save risk limits"}</button>
         {dirty && data && <button onClick={() => setForm(data.effective)}>Discard changes</button>}

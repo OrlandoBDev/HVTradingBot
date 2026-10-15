@@ -170,11 +170,17 @@ public sealed class TradingWorker(
             selected.AddRange(Instruments.Defaults);
         }
 
-        universe.Configure(selected, engineOptions.AccountCurrency, selection.DerivedOnlyWhenForexClosed);
-        logger.LogInformation("Markets: Derived {DerivedMode}; trading {Traded}; conversion only {Conversion}",
+        // Session markets: the open Forex pairs are followed from the start, and up to four of them are evaluated while
+        // their session is active. Not offline: the simulator covers only a few pairs.
+        var sessionCandidates = selection.SessionMarketsEnabled && marketDataOptions.Provider == MarketDataProvider.Deriv
+            ? MarketCatalogStore.SessionCandidates(await catalog.GetCatalogAsync(cancellationToken), selected.Select(i => i.Symbol))
+            : [];
+        universe.Configure(selected, engineOptions.AccountCurrency, selection.DerivedOnlyWhenForexClosed, sessionCandidates);
+        logger.LogInformation("Markets: Derived {DerivedMode}; trading {Traded}; session candidates {Session}; conversion only {Conversion}",
             selection.DerivedOnlyWhenForexClosed ? "only while Forex is closed" : "always",
             string.Join(", ", universe.Traded.Select(i => i.DisplayName)),
-            string.Join(", ", universe.Data.Except(universe.Traded).Select(i => i.Symbol)));
+            universe.SessionCandidates.Count == 0 ? "off" : string.Join(", ", universe.SessionCandidates.Select(i => i.Symbol)),
+            string.Join(", ", universe.Data.Except(universe.Traded).Except(universe.SessionCandidates).Select(i => i.Symbol)));
         return selection.Version;
     }
 

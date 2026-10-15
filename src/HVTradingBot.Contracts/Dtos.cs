@@ -45,7 +45,8 @@ public sealed record MarketDto(
     string? Regime,
     string? LastDecision,
     DateTime? LastDecisionTimeUtc,
-    JsonElement? Indicators);
+    JsonElement? Indicators,
+    bool IsSessionMarket = false);
 
 public sealed record DecisionDto(
     Guid Id,
@@ -180,9 +181,13 @@ public sealed record MarketSettingsDto(
     DateTime? UpdatedAtUtc,
     string? UpdatedBy,
     int MaxSelected,
-    IReadOnlyList<MarketCatalogItemDto> Catalog);
+    IReadOnlyList<MarketCatalogItemDto> Catalog,
+    bool SessionMarketsEnabled = false,
+    int MaxSessionMarkets = 4,
+    IReadOnlyList<string>? ActiveSessions = null,
+    IReadOnlyList<string>? SessionMarketsNow = null);
 
-public sealed record MarketSelectionRequest(IReadOnlyList<string> Instruments, bool DerivedOnlyWhenForexClosed = true);
+public sealed record MarketSelectionRequest(IReadOnlyList<string> Instruments, bool DerivedOnlyWhenForexClosed = true, bool SessionMarketsEnabled = false);
 
 public sealed record RiskLimitsDto(
     decimal MaxRiskPerTradePercent,
@@ -200,7 +205,8 @@ public sealed record RiskLimitsDto(
     decimal? AssumedCommissionPercent = null,
     int? MaxExtraDerivedPositions = null,
     int? HighScoreOverrideMinScore = null,
-    decimal? TradingCapital = null);
+    decimal? TradingCapital = null,
+    bool? EarlyExitEnabled = null);
 
 public sealed record RiskSettingsDto(
     RiskLimitsDto Effective,

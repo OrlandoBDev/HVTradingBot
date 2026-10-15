@@ -10,10 +10,18 @@ namespace HVTradingBot.Infrastructure.Brokers.Mt5;
 public sealed record Mt5AccountInfo(string Login, string Server, string Broker, string Currency, decimal Balance, decimal Equity, string? TradeMode);
 
 public sealed record Mt5Position(string Id, string Symbol, bool IsBuy, decimal Volume, decimal OpenPrice, decimal? StopLoss, decimal? TakeProfit,
-    decimal Profit, decimal Commission, decimal Swap, DateTime OpenedAtUtc, string? ClientId, decimal ContractSize = 100_000m);
+    decimal Profit, decimal Commission, decimal Swap, DateTime OpenedAtUtc, string? ClientId, decimal ContractSize = 100_000m,
+    decimal? CurrentPrice = null);
 
 public sealed record Mt5Deal(string Id, string? EntryType, decimal Price, decimal Profit, decimal Commission, decimal Swap, DateTime TimeUtc,
     string? Reason);
+
+/// <summary>
+/// A buy or sell deal on the account, whoever placed it. <see cref="IsBuy"/> is the deal's side (a closing deal is the
+/// opposite of the position's); <see cref="Symbol"/> is empty when the source does not report it.
+/// </summary>
+public sealed record Mt5AccountDeal(string Id, string PositionId, string Symbol, bool IsBuy, string? EntryType, decimal Volume, decimal Price,
+    decimal Profit, decimal Commission, decimal Swap, DateTime TimeUtc, string? Reason);
 
 public sealed record Mt5SymbolSpec(string Symbol, decimal ContractSize, decimal MinVolume, decimal MaxVolume, decimal VolumeStep, int Digits);
 
@@ -70,6 +78,19 @@ public sealed class MetaApiClient(HttpClient http)
         .Select(d => new Mt5Deal(Text(d, "id") ?? "", Text(d, "entryType"), Num(d, "price") ?? 0, Num(d, "profit") ?? 0, Num(d, "commission") ?? 0,
             Num(d, "swap") ?? 0, Time(d, "time") ?? DateTime.UtcNow, Text(d, "reason")))
         .ToList();
+
+    /// <summary>Buy and sell deals on the account from <paramref name="fromUtc"/> on (balance operations skipped).</summary>
+    public async Task<IReadOnlyList<Mt5AccountDeal>> GetDealsSinceAsync(Mt5Credentials c, DateTime fromUtc, CancellationToken ct)
+    {
+        static string Iso(DateTime t) => Uri.EscapeDataString(t.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture));
+        var deals = await GetAsync(c, $"history-deals/time/{Iso(fromUtc)}/{Iso(DateTime.UtcNow.AddDays(1))}", ct);
+        return deals.EnumerateArray()
+            .Where(d => Text(d, "type") is "DEAL_TYPE_BUY" or "DEAL_TYPE_SELL")
+            .Select(d => new Mt5AccountDeal(Text(d, "id") ?? "", Text(d, "positionId") ?? "", Text(d, "symbol") ?? "", Text(d, "type") == "DEAL_TYPE_BUY",
+                Text(d, "entryType"), Num(d, "volume") ?? 0, Num(d, "price") ?? 0, Num(d, "profit") ?? 0, Num(d, "commission") ?? 0, Num(d, "swap") ?? 0,
+                Time(d, "time") ?? DateTime.UtcNow, Text(d, "reason")))
+            .ToList();
+    }
 
     /// <summary>A market order with broker-side stop loss and take profit.</summary>
     public Task<Mt5TradeResult> OpenAsync(Mt5Credentials c, string symbol, bool buy, decimal volume, decimal stopLoss, decimal takeProfit,
@@ -146,7 +167,7 @@ public sealed class MetaApiClient(HttpClient http)
     private static Mt5Position Position(JsonElement p) => new(
         Text(p, "id") ?? "", Text(p, "symbol") ?? "", Text(p, "type") == "POSITION_TYPE_BUY", Num(p, "volume") ?? 0, Num(p, "openPrice") ?? 0,
         Num(p, "stopLoss"), Num(p, "takeProfit"), Num(p, "profit") ?? 0, Num(p, "commission") ?? 0, Num(p, "swap") ?? 0,
-        Time(p, "time") ?? DateTime.UtcNow, Text(p, "clientId"));
+        Time(p, "time") ?? DateTime.UtcNow, Text(p, "clientId"), CurrentPrice: Num(p, "currentPrice"));
 
     private static string Truncate(string text) => text.Length > 300 ? text[..300] : text;
 

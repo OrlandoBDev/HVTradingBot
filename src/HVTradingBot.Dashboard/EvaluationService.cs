@@ -125,7 +125,7 @@ public sealed class EvaluationService(
         var changes = new List<string>();
         if (keep.Count != selected.Count)
         {
-            var saved = await actions.SaveMarketSelectionAsync(new MarketSelectionRequest(keep, selection.DerivedOnlyWhenForexClosed), caller, ct);
+            var saved = await actions.SaveMarketSelectionAsync(new MarketSelectionRequest(keep, selection.DerivedOnlyWhenForexClosed, selection.SessionMarketsEnabled), caller, ct);
             if (saved is not DashboardResult.OkResult)
             {
                 return saved;

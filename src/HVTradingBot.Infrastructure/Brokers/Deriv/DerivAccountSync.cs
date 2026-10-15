@@ -17,11 +17,14 @@ namespace HVTradingBot.Infrastructure.Brokers.Deriv;
 /// ones from "profit_table". Read-only: nothing here buys or sells.
 /// </summary>
 public sealed class DerivAccountSync(DerivSession session, IDbContextFactory<TradingDbContext> dbFactory, IClock clock, ILogger<DerivAccountSync> logger)
+    : IBrokerAccountSync
 {
     /// <summary>How far back the first history sync reaches (enough for the week and month on the overview).</summary>
     public static readonly TimeSpan InitialHistory = TimeSpan.FromDays(35);
 
     private const int HistoryLimit = 500;
+
+    public string BrokerName => DerivBroker.BrokerName;
 
     /// <summary>Refreshes the open contracts. Returns true when a contract closed since the last refresh.</summary>
     public async Task<bool> SyncOpenAsync(CancellationToken cancellationToken)

@@ -284,6 +284,8 @@ public sealed class MarketSelectionEntity
     public int Id { get; set; }
     public required string Instruments { get; set; }
     public bool DerivedOnlyWhenForexClosed { get; set; } = true;
+    /// <summary>Also trade up to four open Forex pairs whose trading session is active (see TradingSessions).</summary>
+    public bool SessionMarketsEnabled { get; set; }
     public int Version { get; set; }
     public int AppliedVersion { get; set; }
     public DateTime UpdatedAtUtc { get; set; }

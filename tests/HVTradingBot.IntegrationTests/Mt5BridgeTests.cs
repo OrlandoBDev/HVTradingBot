@@ -6,10 +6,13 @@ using HVTradingBot.Dashboard;
 using HVTradingBot.Domain.Common;
 using HVTradingBot.Domain.Execution;
 using HVTradingBot.Domain.MarketData;
+using HVTradingBot.Domain.Risk;
 using HVTradingBot.Infrastructure.Bridge;
 using HVTradingBot.Infrastructure.Brokers.Mt5;
+using HVTradingBot.Infrastructure.Markets;
 using HVTradingBot.Infrastructure.Persistence.Stores;
 using HVTradingBot.Infrastructure.Settings;
+using HVTradingBot.Infrastructure.Trades;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -108,6 +111,59 @@ public abstract class Mt5BridgeTests(DatabaseFixture fixture) : IAsyncLifetime
         var position = await db.Positions.SingleAsync();
         Assert.Equal(("MT5", "9001", 12_000m, 1.10012m, 0.42m), (position.Broker, position.BrokerContractId, position.Units, position.EntryPrice, position.Commission));
         Assert.Equal("Done", (await db.Mt5BridgeCommands.SingleAsync()).Status);
+    }
+
+    [Fact]
+    public async Task An_order_goes_to_only_one_expert_advisor_when_several_report_at_once()
+    {
+        // The Expert Advisor attached to five charts: every copy reports at the same moment.
+        await _ea.SyncOnceAsync(CancellationToken.None); // connected before the order
+        var id = await Bridge().EnqueueOpenAsync(new BridgeOpen("EURCHF", false, 2_000m, 0.93122m, 0.92759m, "HV1"), CancellationToken.None);
+        var report = _ea.Report();
+
+        var answers = await Task.WhenAll(Enumerable.Range(0, 5).Select(_ => Task.Run(() => Bridge().SyncAsync(report, CancellationToken.None))));
+
+        Assert.Single(answers.SelectMany(a => a.Split('\n')), line => line.StartsWith($"OPEN|{id}|", StringComparison.Ordinal));
+        await using var db = await fixture.DbFactory.CreateDbContextAsync();
+        Assert.Equal("Sent", (await db.Mt5BridgeCommands.SingleAsync()).Status);
+    }
+
+    [Fact]
+    public async Task Trades_placed_outside_the_app_are_synced_for_the_dashboard()
+    {
+        var broker = await BrokerAsync();
+        var epoch = new DateTimeOffset(T0).ToUnixTimeSeconds();
+        // Opened by hand in MetaTrader (no magic number): still open, and one opened and closed an hour earlier.
+        _ea.AddPosition(new BridgePosition(7001, "GBPUSD", "SELL", 0.1m, 1.25m, 0, 0, 3.5m, -0.2m, epoch, "", 0, 100_000m, 1.2465m));
+        _ea.AddDeal(new BridgeDeal(6001, 7001, "IN", 1.25m, 0, -0.35m, 0, epoch, "CLIENT", "GBPUSD", "SELL", 0.1m, 0));
+        _ea.AddDeal(new BridgeDeal(6002, 7002, "IN", 1.1m, 0, -0.7m, 0, epoch - 7200, "CLIENT", "EURUSD", "BUY", 0.2m, 0));
+        _ea.AddDeal(new BridgeDeal(6003, 7002, "OUT", 1.101m, 20m, -0.7m, 0, epoch - 3600, "TP", "EURUSD", "SELL", 0.2m, 0));
+        await _ea.SyncOnceAsync(CancellationToken.None);
+        await new EfTradingStateStore(fixture.DbFactory).UpdateAsync(
+            s => s with { BrokerName = "MT5", BrokerAccountId = "MT5-5550001", BrokerIsDemo = true }, CancellationToken.None);
+        var sync = new Mt5AccountSync(new BridgeGateway(Bridge(), _clock), broker, Store(), fixture.DbFactory, _clock,
+            NullLogger<Mt5AccountSync>.Instance);
+
+        Assert.False(await sync.SyncOpenAsync(CancellationToken.None));
+        await sync.SyncHistoryAsync(CancellationToken.None);
+
+        var open = Assert.Single(await Queries().GetOpenPositionsAsync(CancellationToken.None));
+        Assert.Equal(("External", "GBP/USD", "Short", 1.25m, 1.2465m, 3.3m, "0.10 lot", (decimal?)null),
+            (open.Source, open.Instrument, open.Direction, open.EntryPrice, open.CurrentPrice, open.UnrealizedPnl, open.ContractType, open.Stake));
+        var closed = Assert.Single((await Queries().GetTradeHistoryPageAsync(1, 50, CancellationToken.None)).Items);
+        Assert.Equal(("External", "EUR/USD", "Long", 1.1m, 1.101m, 18.6m, -1.4m),
+            (closed.Source, closed.Instrument, closed.Direction, closed.EntryPrice, closed.ExitPrice, closed.RealizedPnl, closed.Commission));
+
+        // Then closed by hand too.
+        _ea.ClosePosition(7001, new BridgeDeal(6004, 7001, "OUT", 1.2465m, 3.5m, -0.35m, -0.2m, epoch + 600, "CLIENT", "GBPUSD", "BUY", 0.1m, 0));
+        await _ea.SyncOnceAsync(CancellationToken.None);
+        Assert.True(await sync.SyncOpenAsync(CancellationToken.None));
+        await sync.SyncHistoryAsync(CancellationToken.None);
+
+        Assert.Empty(await Queries().GetOpenPositionsAsync(CancellationToken.None));
+        var history = (await Queries().GetTradeHistoryPageAsync(1, 50, CancellationToken.None)).Items;
+        Assert.Equal(2, history.Count);
+        Assert.Equal((2.6m, T0.AddMinutes(10)), (history[0].RealizedPnl, history[0].ClosedAtUtc));
     }
 
     [Fact]
@@ -213,6 +269,10 @@ public abstract class Mt5BridgeTests(DatabaseFixture fixture) : IAsyncLifetime
         Assert.False(await Store().IsValidBridgeKeyAsync(renewed.BridgeKey!, CancellationToken.None)); // switched off: the Expert Advisor is locked out
     }
 
+    private DashboardQueries Queries() => new(fixture.DbFactory, new EfTradingStateStore(fixture.DbFactory), _clock,
+        new RiskOptionsSource(new RiskOptions(), new RiskSettingsStore(fixture.DbFactory, _clock), NullLogger<RiskOptionsSource>.Instance),
+        new TradingEngineOptions(), new MarketCatalogStore(fixture.DbFactory, _clock), new CloseRequestStore(fixture.DbFactory, _clock));
+
     private sealed class Clock : IClock
     {
         public DateTime UtcNow { get; set; }
@@ -230,6 +290,17 @@ public abstract class Mt5BridgeTests(DatabaseFixture fixture) : IAsyncLifetime
         public string TradeMode { get; set; } = "ACCOUNT_TRADE_MODE_DEMO";
         public bool DropResults { get; set; }
         public (int Code, string Message)? Refuse { get; set; }
+
+        /// <summary>A trade placed outside HVTradingBot (by hand in MetaTrader).</summary>
+        public void AddPosition(BridgePosition position) => _positions.Add(position);
+
+        public void AddDeal(BridgeDeal deal) => _deals.Add(deal);
+
+        public void ClosePosition(long ticket, BridgeDeal exit)
+        {
+            _positions.RemoveAll(p => p.Ticket == ticket);
+            _deals.Add(exit);
+        }
 
         public BridgeSync Report() => new("1.00", new BridgeAccount(5550001, "Deriv-Demo", "Deriv.com Limited", "USD", 10_000m, 10_000m, TradeMode),
             [.. _positions], [.. _deals], [.. _results]);

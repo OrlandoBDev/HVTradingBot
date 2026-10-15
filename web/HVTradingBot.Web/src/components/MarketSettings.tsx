@@ -21,6 +21,7 @@ export function MarketSettings() {
   const [filter, setFilter] = useState("");
   const [tradableOnly, setTradableOnly] = useState(false);
   const [derivedOnlyWhenForexClosed, setDerivedOnlyWhenForexClosed] = useState(true);
+  const [sessionMarketsEnabled, setSessionMarketsEnabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -31,6 +32,7 @@ export function MarketSettings() {
       if (resetSelection) {
         setSelected(new Set(d.selected));
         setDerivedOnlyWhenForexClosed(d.derivedOnlyWhenForexClosed);
+        setSessionMarketsEnabled(d.sessionMarketsEnabled);
       }
       setError(null);
     } catch (e) {
@@ -55,9 +57,10 @@ export function MarketSettings() {
     return (
       current.size !== selected.size ||
       [...selected].some((s) => !current.has(s)) ||
-      derivedOnlyWhenForexClosed !== data.derivedOnlyWhenForexClosed
+      derivedOnlyWhenForexClosed !== data.derivedOnlyWhenForexClosed ||
+      sessionMarketsEnabled !== data.sessionMarketsEnabled
     );
-  }, [data, selected, derivedOnlyWhenForexClosed]);
+  }, [data, selected, derivedOnlyWhenForexClosed, sessionMarketsEnabled]);
 
   const toggle = (symbol: string) =>
     setSelected((prev) => {
@@ -71,10 +74,15 @@ export function MarketSettings() {
     setSaving(true);
     setError(null);
     try {
-      const d = await api.put<MarketSettingsData>("/api/settings/markets", { instruments: [...selected], derivedOnlyWhenForexClosed });
+      const d = await api.put<MarketSettingsData>("/api/settings/markets", {
+        instruments: [...selected],
+        derivedOnlyWhenForexClosed,
+        sessionMarketsEnabled,
+      });
       setData(d);
       setSelected(new Set(d.selected));
       setDerivedOnlyWhenForexClosed(d.derivedOnlyWhenForexClosed);
+      setSessionMarketsEnabled(d.sessionMarketsEnabled);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -116,6 +124,22 @@ export function MarketSettings() {
             </span>
           </span>
         </label>
+        <label className="event-option" style={{ marginTop: 8 }}>
+          <input type="checkbox" checked={sessionMarketsEnabled} onChange={(e) => setSessionMarketsEnabled(e.target.checked)} />
+          <span>
+            <span className="strong">Also trade Forex pairs whose session is open (up to {data?.maxSessionMarkets ?? 4} extra)</span>
+            <span className="muted small">
+              {" "}— follows the Sydney, Tokyo, London and New York sessions in their local time and adds the most active pairs, both
+              currencies' sessions open first. They rotate as sessions open and close; the same risk limits apply.
+              {data && (
+                <>
+                  {" "}Open now: {data.activeSessions?.length ? data.activeSessions.join(", ") : "no session"}
+                  {data.sessionMarketsNow?.length ? ` → ${data.sessionMarketsNow.map((s) => byName.get(s)?.name ?? s).join(", ")}` : ""}.
+                </>
+              )}
+            </span>
+          </span>
+        </label>
         <div className="form-actions" style={{ marginTop: 12 }}>
           <button className="primary" onClick={save} disabled={saving || !dirty || selected.size === 0}>
             {saving ? "Saving…" : "Save selection"}
@@ -126,6 +150,7 @@ export function MarketSettings() {
                 if (!data) return;
                 setSelected(new Set(data.selected));
                 setDerivedOnlyWhenForexClosed(data.derivedOnlyWhenForexClosed);
+                setSessionMarketsEnabled(data.sessionMarketsEnabled);
               }}
             >
               Discard changes

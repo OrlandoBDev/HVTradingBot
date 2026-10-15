@@ -63,6 +63,8 @@ export interface Market {
   lastDecision: string | null;
   lastDecisionTimeUtc: string | null;
   indicators: IndicatorSnapshot | null;
+  /** Added for its active trading session (Settings › Markets), not part of the selection. */
+  isSessionMarket: boolean;
 }
 
 export interface Decision {
@@ -267,6 +269,12 @@ export interface MarketSettings {
   updatedBy: string | null;
   maxSelected: number;
   catalog: MarketCatalogItem[];
+  sessionMarketsEnabled: boolean;
+  maxSessionMarkets: number;
+  /** Trading sessions open now (Sydney, Tokyo, London, New York). */
+  activeSessions: string[] | null;
+  /** The Forex pairs session trading would add right now. */
+  sessionMarketsNow: string[] | null;
 }
 
 export interface AuthStatus {

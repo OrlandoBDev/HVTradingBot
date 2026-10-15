@@ -3,17 +3,20 @@
 //|  Connects MetaTrader 5 to HVTradingBot running on this computer. |
 //|                                                                  |
 //|  Every second it reports the account, open positions and recent  |
-//|  deals of HVTradingBot's trades to HVTradingBot, and places or   |
-//|  closes the trades HVTradingBot asks for. Demo accounts only.    |
+//|  deals (HVTradingBot's trades and ones placed by hand or other   |
+//|  Expert Advisors) to HVTradingBot, and places or closes the      |
+//|  trades HVTradingBot asks for. Demo accounts only.               |
 //|                                                                  |
 //|  Set up: Tools > Options > Expert Advisors > tick "Allow         |
 //|  WebRequest for listed URL" and add http://127.0.0.1:5080 .       |
 //|  Then attach this Expert Advisor to any one chart, paste the     |
 //|  bridge key from HVTradingBot (Settings > Broker account) and    |
-//|  make sure "Algo Trading" is on.                                 |
+//|  make sure "Algo Trading" is on. Only one copy runs per          |
+//|  MetaTrader: a copy on a second chart removes itself (each copy  |
+//|  would otherwise place every order).                             |
 //+------------------------------------------------------------------+
 #property copyright   "HVTradingBot"
-#property version     "1.00"
+#property version     "1.20"
 #property description "Bridge between HVTradingBot and this MT5 demo account."
 
 #include <Trade\Trade.mqh>
@@ -24,9 +27,14 @@ input long   MagicNumber = 770077;                                  // Marks HVT
 input int    PollMs      = 1000;                                    // How often to check in (milliseconds)
 input int    HistoryDays = 7;                                       // Days of closed trades to report
 
-#define EA_VERSION "1.0"
+#define EA_VERSION "1.2"
+
+#define LOCK_NAME  "HVTradingBotBridge.owner" // token of the copy that runs
+#define BEAT_NAME  "HVTradingBotBridge.beat"  // when that copy last ran (TimeLocal)
+#define STALE_SECS 30                         // a lock not refreshed for this long is taken over
 
 CTrade   g_trade;
+double   g_token = 0;     // this copy's lock token
 string   g_results[];     // results not yet delivered to HVTradingBot
 long     g_done[];        // command ids already executed: never execute one twice
 datetime g_lastWarning = 0;
@@ -44,6 +52,11 @@ int OnInit()
       Alert("HVTradingBot: this is a real-money account. The bridge only runs on demo accounts.");
       return(INIT_FAILED);
      }
+   if(!AcquireLock())
+     {
+      Alert("HVTradingBot: the bridge already runs on another chart; this copy was removed. Keep it on one chart only.");
+      return(INIT_FAILED);
+     }
    g_trade.SetExpertMagicNumber((ulong)MagicNumber);
    g_trade.SetDeviationInPoints(20);
    EventSetMillisecondTimer(MathMax(250, PollMs));
@@ -55,11 +68,55 @@ int OnInit()
 void OnDeinit(const int reason)
   {
    EventKillTimer();
+   if(g_token != 0)
+      GlobalVariableSetOnCondition(LOCK_NAME, 0, g_token); // release only our own lock
+  }
+
+//+------------------------------------------------------------------+
+//| One copy per terminal: the lock holds the running copy's token.  |
+//| Free (0) or not refreshed for STALE_SECS (its chart crashed): we |
+//| take it. Temporary variables vanish when MetaTrader closes.      |
+//+------------------------------------------------------------------+
+bool AcquireLock()
+  {
+   g_token = (double)(GetMicrosecondCount() % 1000000000000) + 1 + MathRand();
+   if(!GlobalVariableCheck(LOCK_NAME))
+      GlobalVariableTemp(LOCK_NAME);
+   double owner = GlobalVariableGet(LOCK_NAME);
+   bool stale = owner != 0 && (!GlobalVariableCheck(BEAT_NAME) || (double)TimeLocal() - GlobalVariableGet(BEAT_NAME) > STALE_SECS);
+   if(GlobalVariableSetOnCondition(LOCK_NAME, g_token, stale ? owner : 0))
+     {
+      Beat();
+      return(true);
+     }
+   g_token = 0;
+   return(false);
+  }
+
+bool OwnsLock()
+  {
+   return(g_token != 0 && GlobalVariableGet(LOCK_NAME) == g_token);
+  }
+
+void Beat()
+  {
+   if(!GlobalVariableCheck(BEAT_NAME))
+      GlobalVariableTemp(BEAT_NAME);
+   GlobalVariableSet(BEAT_NAME, (double)TimeLocal());
   }
 
 //+------------------------------------------------------------------+
 void OnTimer()
   {
+   if(!OwnsLock())
+     {
+      // Another copy took over (we stalled for STALE_SECS): never run in parallel with it.
+      Alert("HVTradingBot: another copy of the bridge took over; this one stopped.");
+      g_token = 0;
+      ExpertRemove();
+      return;
+     }
+   Beat();
    Sync();
   }
 
@@ -216,7 +273,7 @@ ulong FindPosition(long identifier)
   }
 
 //+------------------------------------------------------------------+
-//| The report: account, all open positions, deals of our positions. |
+//| The report: account, all open positions, recent trade deals.     |
 //| Times are sent as UTC seconds.                                   |
 //+------------------------------------------------------------------+
 string BuildReport()
@@ -247,6 +304,7 @@ string BuildReport()
       s += ",\"type\":" + Str(PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY ? "BUY" : "SELL");
       s += ",\"volume\":" + Num(PositionGetDouble(POSITION_VOLUME));
       s += ",\"priceOpen\":" + Num(PositionGetDouble(POSITION_PRICE_OPEN));
+      s += ",\"priceCurrent\":" + Num(PositionGetDouble(POSITION_PRICE_CURRENT));
       s += ",\"sl\":" + Num(PositionGetDouble(POSITION_SL));
       s += ",\"tp\":" + Num(PositionGetDouble(POSITION_TP));
       s += ",\"profit\":" + Num(PositionGetDouble(POSITION_PROFIT));
@@ -265,39 +323,28 @@ string BuildReport()
    return(s);
   }
 
-//| Deals of positions HVTradingBot opened (by magic number), including stop/target closes.
+//| Buy and sell deals of the last HistoryDays days, whoever placed them (balance operations are skipped), so
+//| HVTradingBot can show trades placed outside it too. HVTradingBot's own carry MagicNumber.
 string Deals(long offset)
   {
    datetime now = TimeCurrent();
    if(!HistorySelect(now - HistoryDays * 86400, now + 86400))
       return("");
 
-   long ours[];
-   int total = HistoryDealsTotal();
-   for(int i = 0; i < total; i++)
-     {
-      ulong deal = HistoryDealGetTicket(i);
-      if(deal > 0 && HistoryDealGetInteger(deal, DEAL_MAGIC) == MagicNumber && HistoryDealGetInteger(deal, DEAL_ENTRY) == DEAL_ENTRY_IN)
-        {
-         int size = ArraySize(ours);
-         ArrayResize(ours, size + 1);
-         ours[size] = HistoryDealGetInteger(deal, DEAL_POSITION_ID);
-        }
-     }
-
    string s = "";
+   int total = HistoryDealsTotal();
    for(int i = 0; i < total; i++)
      {
       ulong deal = HistoryDealGetTicket(i);
       if(deal == 0)
          continue;
-      long position = HistoryDealGetInteger(deal, DEAL_POSITION_ID);
-      if(!Contains(ours, position))
+      long type = HistoryDealGetInteger(deal, DEAL_TYPE);
+      if(type != DEAL_TYPE_BUY && type != DEAL_TYPE_SELL)
          continue;
       if(s != "")
          s += ",";
       s += "{\"ticket\":" + IntegerToString((long)deal);
-      s += ",\"positionId\":" + IntegerToString(position);
+      s += ",\"positionId\":" + IntegerToString(HistoryDealGetInteger(deal, DEAL_POSITION_ID));
       s += ",\"entry\":" + Str(Entry(HistoryDealGetInteger(deal, DEAL_ENTRY)));
       s += ",\"price\":" + Num(HistoryDealGetDouble(deal, DEAL_PRICE));
       s += ",\"profit\":" + Num(HistoryDealGetDouble(deal, DEAL_PROFIT));
@@ -305,6 +352,10 @@ string Deals(long offset)
       s += ",\"swap\":" + Num(HistoryDealGetDouble(deal, DEAL_SWAP));
       s += ",\"time\":" + IntegerToString((long)HistoryDealGetInteger(deal, DEAL_TIME) - offset);
       s += ",\"reason\":" + Str(Reason(HistoryDealGetInteger(deal, DEAL_REASON)));
+      s += ",\"symbol\":" + Str(HistoryDealGetString(deal, DEAL_SYMBOL));
+      s += ",\"type\":" + Str(type == DEAL_TYPE_BUY ? "BUY" : "SELL");
+      s += ",\"volume\":" + Num(HistoryDealGetDouble(deal, DEAL_VOLUME));
+      s += ",\"magic\":" + IntegerToString(HistoryDealGetInteger(deal, DEAL_MAGIC));
       s += "}";
      }
    return(s);

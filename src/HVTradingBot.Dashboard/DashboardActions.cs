@@ -260,7 +260,7 @@ public sealed partial class DashboardActions(
             request.MaxOpenPositions, request.MinRewardToRisk, request.MaxConsecutiveLosses, request.CooldownMinutes,
             request.MaxCurrencyExposure, request.MaxCommissionShareOfRisk, request.MaxDerivedOpenPositions, request.DerivedRiskPerTradePercent,
             request.MaxDerivedDailyLossPercent, request.AssumedCommissionPercent, request.MaxExtraDerivedPositions,
-            request.HighScoreOverrideMinScore, request.TradingCapital);
+            request.HighScoreOverrideMinScore, request.TradingCapital, request.EarlyExitEnabled);
         limits = limits.WithDefaultsFrom(riskSource.Defaults);
         var errors = limits.Validate();
         if (errors.Count > 0)
@@ -339,8 +339,10 @@ public sealed partial class DashboardActions(
     {
         var items = await catalog.GetCatalogAsync(ct);
         var selection = await catalog.GetSelectionAsync(ct);
+        var selected = selection.Instruments ?? engineOptions.Instruments;
+        var now = clock.UtcNow;
         return new MarketSettingsDto(
-            selection.Instruments ?? engineOptions.Instruments,
+            selected,
             selection.DerivedOnlyWhenForexClosed,
             selection.Instruments is null,
             selection.Version,
@@ -349,7 +351,11 @@ public sealed partial class DashboardActions(
             selection.UpdatedBy,
             MarketCatalogStore.MaxSelectedInstruments,
             items.Select(m => new MarketCatalogItemDto(m.Symbol, m.BrokerSymbol, m.Name, m.Market, m.Submarket, m.AssetClass, m.IsTradable, m.IsOpen,
-                JsonSerializer.Deserialize<List<int>>(m.Multipliers) ?? [])).ToList());
+                JsonSerializer.Deserialize<List<int>>(m.Multipliers) ?? [])).ToList(),
+            selection.SessionMarketsEnabled,
+            TradingSessions.MaxSessionMarkets,
+            TradingSessions.OpenAt(now).Select(s => s.Name).ToList(),
+            TradingSessions.Pick(MarketCatalogStore.SessionCandidates(items, selected, openOnly: true), now).Select(i => i.Symbol).ToList());
     }
 
     public async Task<DashboardResult> SaveMarketSelectionAsync(MarketSelectionRequest request, DashboardCaller caller, CancellationToken ct)
@@ -357,10 +363,12 @@ public sealed partial class DashboardActions(
         await catalog.LoadAndRegisterAsync(ct);
         try
         {
-            var saved = await catalog.SaveSelectionAsync(request.Instruments ?? [], caller.Actor, ct, request.DerivedOnlyWhenForexClosed);
+            var saved = await catalog.SaveSelectionAsync(request.Instruments ?? [], caller.Actor, ct, request.DerivedOnlyWhenForexClosed,
+                request.SessionMarketsEnabled);
             await journal.RecordAuditAsync(caller.Actor, "MarketSelectionUpdated",
                 $"Version {saved.Version}: {string.Join(", ", saved.Instruments ?? [])}; Derived " +
-                (saved.DerivedOnlyWhenForexClosed ? "only while Forex is closed" : "always"), caller.CorrelationId, ct);
+                (saved.DerivedOnlyWhenForexClosed ? "only while Forex is closed" : "always") +
+                $"; session markets {(saved.SessionMarketsEnabled ? "on" : "off")}", caller.CorrelationId, ct);
         }
         catch (ArgumentException ex)
         {
@@ -382,7 +390,7 @@ public sealed partial class DashboardActions(
     private static RiskLimitsDto ToDto(RiskLimits l) => new(l.MaxRiskPerTradePercent, l.MaxDailyLossPercent, l.MaxWeeklyLossPercent,
         l.MaxOpenPositions, l.MinRewardToRisk, l.MaxConsecutiveLosses, l.CooldownMinutes, l.MaxCurrencyExposure, l.MaxCommissionShareOfRisk,
         l.MaxDerivedOpenPositions, l.DerivedRiskPerTradePercent, l.MaxDerivedDailyLossPercent, l.AssumedCommissionPercent,
-        l.MaxExtraDerivedPositions, l.HighScoreOverrideMinScore, l.TradingCapital);
+        l.MaxExtraDerivedPositions, l.HighScoreOverrideMinScore, l.TradingCapital, l.EarlyExitEnabled);
 
     private async Task<DerivSettingsDto> ToDtoAsync(DerivSettingsView view, CancellationToken ct)
     {

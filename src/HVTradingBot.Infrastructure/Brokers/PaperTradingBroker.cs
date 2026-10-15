@@ -129,6 +129,9 @@ public sealed class PaperTradingBroker(
         return new OrderResult(order.ClientOrderId, OrderStatus.Filled, orderEntity.Id, position.Id, fill, null);
     }
 
+    public Task SetExitReasonAsync(Guid positionId, ExitReason reason, CancellationToken cancellationToken) =>
+        PositionExitReasons.SetAsync(dbFactory, positionId, reason, cancellationToken);
+
     public Task<OrderResult> CancelOrderAsync(string orderId, CancellationToken cancellationToken) =>
         Task.FromResult(OrderResult.Rejected(orderId, "Paper market orders fill immediately; there is nothing pending to cancel."));
 

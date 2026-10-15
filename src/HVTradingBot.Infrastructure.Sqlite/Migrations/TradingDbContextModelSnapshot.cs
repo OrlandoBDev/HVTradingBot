@@ -15,7 +15,7 @@ namespace HVTradingBot.Infrastructure.Sqlite.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.13");
 
             modelBuilder.Entity("HVTradingBot.Infrastructure.Persistence.Entities.AppUserEntity", b =>
                 {
@@ -613,6 +613,10 @@ namespace HVTradingBot.Infrastructure.Sqlite.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT")
                         .HasColumnName("instruments");
+
+                    b.Property<bool>("SessionMarketsEnabled")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("session_markets_enabled");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("TEXT")

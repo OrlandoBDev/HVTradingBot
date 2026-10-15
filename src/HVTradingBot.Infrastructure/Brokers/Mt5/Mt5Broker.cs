@@ -207,6 +207,9 @@ public sealed class Mt5Broker(
         return new OrderResult(order.ClientOrderId, OrderStatus.Filled, entity.Id, position.Id, entry, null);
     }
 
+    public Task SetExitReasonAsync(Guid positionId, ExitReason reason, CancellationToken cancellationToken) =>
+        PositionExitReasons.SetAsync(dbFactory, positionId, reason, cancellationToken);
+
     public Task<OrderResult> CancelOrderAsync(string orderId, CancellationToken cancellationToken) =>
         Task.FromResult(OrderResult.Rejected(orderId, "Market orders open immediately; there is nothing pending to cancel."));
 

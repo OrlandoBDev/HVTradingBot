@@ -148,3 +148,17 @@ Risk must be checked twice:
 2. immediately before execution
 
 This protects against price movement or account changes between proposal and execution.
+
+## Early exit (optional)
+
+Off by default; **Settings → Risk limits → Early exit**. On each closed 1H bar the engine checks the bot's open trades
+(`EarlyExitRules`) and closes one before its stop when it is **at a loss** and any of these holds:
+
+- the regime turned against it (TrendingBearish for a buy, TrendingBullish for a sell);
+- it is at least 0.5R toward the stop and 1H momentum turned against it (EMA9 crossed EMA20 the wrong way and the MACD
+  histogram points against it);
+- it is still losing after 24 hours and never got 0.5R into profit.
+
+Trades in profit keep their stop and target; trades the user took from signals are never closed. The close is recorded
+with exit reason `EarlyExit` (audit action `EarlyExit` with the reason) and counts toward the loss limits and the losing
+streak like any other loss. Skipped while market data is stale.

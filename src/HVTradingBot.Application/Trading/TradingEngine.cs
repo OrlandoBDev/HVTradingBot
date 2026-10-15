@@ -36,6 +36,10 @@ public sealed class TradingEngine
     private readonly SemaphoreSlim _cycleLock = new(1, 1);
     private readonly Dictionary<Instrument, MultiTimeFrameSeries> _series = new();
     private readonly Dictionary<Instrument, Quote> _quotes = new();
+    private string _sessionMarkets = "";
+
+    /// <summary>Why the app closed these positions itself; applied when the broker reports the close (as manual).</summary>
+    private readonly Dictionary<Guid, ExitReason> _exitReasons = new();
     private readonly Dictionary<Instrument, (MarketRegime Regime, IndicatorSnapshot Primary, DecisionState State, DateTime Time)> _lastEvaluation = new();
 
     private readonly SignalEvaluator _evaluator;
@@ -222,7 +226,10 @@ public sealed class TradingEngine
         using var activity = ActivitySource.StartActivity("TradingCycle");
         activity?.SetTag("correlation.id", correlationId);
 
+        var marketTime = bars.Max(b => b.Bar.CloseTimeUtc);
+        var evaluated = EvaluatedInstruments(marketTime);
         var closedPrimary = new List<Instrument>();
+        var hourClosedFor = new List<Instrument>();
         var hourClosed = false;
         foreach (var (instrument, bar) in bars)
         {
@@ -234,13 +241,17 @@ public sealed class TradingEngine
             var closed = series.Add(bar);
             _quotes[instrument] = QuoteFrom(instrument, bar);
             hourClosed |= closed.Contains(TimeFrame.H1);
-            if (closed.Contains(_options.EvaluationTimeFrame) && _universe.Traded.Contains(instrument))
+            if (closed.Contains(TimeFrame.H1))
+            {
+                hourClosedFor.Add(instrument);
+            }
+
+            if (closed.Contains(_options.EvaluationTimeFrame) && evaluated.Contains(instrument))
             {
                 closedPrimary.Add(instrument);
             }
         }
 
-        var marketTime = bars.Max(b => b.Bar.CloseTimeUtc);
         var converter = Converter();
 
         ForexOpen = IsForexOpen(marketTime);
@@ -272,6 +283,11 @@ public sealed class TradingEngine
         state = await ApplyAutomaticKillSwitchAsync(state, dataStatus, correlationId, cancellationToken);
 
         var isStale = dataStatus.IsStale(_clock.UtcNow, TimeSpan.FromSeconds(_risk.Current.MaxMarketDataAgeSeconds));
+        if (_risk.Current.EarlyExitEnabled && !isStale && hourClosedFor.Count > 0)
+        {
+            await CloseFailingTradesAsync(hourClosedFor, converter, marketTime, correlationId, cancellationToken);
+        }
+
         if (closedPrimary.Count > 0)
         {
             await RefreshIntelligenceAsync(marketTime, cancellationToken);
@@ -288,6 +304,22 @@ public sealed class TradingEngine
         }
     }
 
+    /// <summary>The selected markets plus the session markets active now (logged when they change).</summary>
+    private HashSet<Instrument> EvaluatedInstruments(DateTime marketTime)
+    {
+        var session = _universe.SessionMarkets(marketTime);
+        var names = string.Join(", ", session.Select(i => i.Symbol));
+        if (_universe.SessionCandidates.Count > 0 && names != _sessionMarkets)
+        {
+            var open = string.Join(", ", TradingSessions.OpenAt(marketTime).Select(s => s.Name));
+            _logger.LogInformation("Session markets now: {Markets} (open sessions: {Sessions})",
+                names.Length == 0 ? "none" : names, open.Length == 0 ? "none" : open);
+            _sessionMarkets = names;
+        }
+
+        return _universe.Traded.Concat(session).ToHashSet();
+    }
+
     private async Task<IReadOnlyList<ClosedPosition>> MonitorPositionsAsync(
         IReadOnlyList<InstrumentBar> bars,
         CurrencyConverter converter,
@@ -298,10 +330,16 @@ public sealed class TradingEngine
         var all = new List<ClosedPosition>();
         foreach (var (instrument, bar) in bars)
         {
-            var closedPositions = await _broker.ProcessBarAsync(instrument, bar, converter, cancellationToken);
-            all.AddRange(closedPositions);
-            foreach (var closed in closedPositions)
+            foreach (var reported in await _broker.ProcessBarAsync(instrument, bar, converter, cancellationToken))
             {
+                var closed = reported;
+                if (_exitReasons.Remove(closed.Position.Id, out var ownReason) && closed.Reason == ExitReason.Manual)
+                {
+                    closed = closed with { Reason = ownReason };
+                    await _broker.SetExitReasonAsync(closed.Position.Id, ownReason, cancellationToken);
+                }
+
+                all.Add(closed);
                 ClosedTradeCounter.Add(1, new KeyValuePair<string, object?>("reason", closed.Reason.ToString()));
                 _logger.LogInformation(
                     "Position {ClientOrderId} {Instrument} closed by {Reason} at {ExitPrice}: P&L {Pnl} ({R}R)",
@@ -344,6 +382,50 @@ public sealed class TradingEngine
         }
 
         return all;
+    }
+
+    /// <summary>
+    /// Early exit (Settings › Risk limits): on each closed 1H bar, closes the bot's losing trades whose reason is gone
+    /// (see <see cref="EarlyExitRules"/>) instead of waiting for the stop. Signal trades are the user's and are left alone.
+    /// </summary>
+    private async Task CloseFailingTradesAsync(IReadOnlyList<Instrument> instruments, CurrencyConverter converter, DateTime marketTime,
+        string correlationId, CancellationToken cancellationToken)
+    {
+        var positions = (await _broker.GetPositionsAsync(cancellationToken))
+            .Where(p => p.Id != Guid.Empty && !SignalOrders.IsSignal(p.ClientOrderId) && instruments.Contains(p.Instrument))
+            .ToList();
+        foreach (var position in positions)
+        {
+            var series = _series[position.Instrument];
+            if (series.Closed(TimeFrame.H1).Count < _options.MinPrimaryBars || series.Closed(TimeFrame.H4).Count < _options.MinStructuralBars
+                || !_quotes.TryGetValue(position.Instrument, out var quote) || series.LastBar is not { } lastBar)
+            {
+                continue;
+            }
+
+            var context = MarketContext.Build(series, quote, _regimeOptions, false);
+            var exitPrice = position.Direction == Direction.Long ? quote.Bid : quote.Ask;
+            if (EarlyExitRules.Check(position, exitPrice, context.Regime, context.Primary, marketTime) is not { } why)
+            {
+                continue;
+            }
+
+            _logger.LogInformation("Early exit: closing {ClientOrderId} {Instrument} before its stop. {Reason}",
+                position.ClientOrderId, position.Instrument.Symbol, why);
+            _exitReasons[position.Id] = ExitReason.EarlyExit;
+            var result = await _broker.ClosePositionAsync(position.Id.ToString(), cancellationToken);
+            await _journal.RecordAuditAsync(SystemActor, "EarlyExit",
+                $"{position.ClientOrderId} {position.Instrument.Symbol}: {why} Close {result.Status}{(result.RejectReason is { } r ? $": {r}" : "")}",
+                correlationId, cancellationToken);
+            if (result.Status == OrderStatus.Rejected)
+            {
+                _exitReasons.Remove(position.Id);
+                continue;
+            }
+
+            // Record the result now (loss limits, email) rather than on the next bar.
+            await MonitorPositionsAsync([new InstrumentBar(position.Instrument, lastBar)], converter, marketTime, correlationId, cancellationToken);
+        }
     }
 
     private async Task<TradingSystemState> ApplyAutomaticKillSwitchAsync(

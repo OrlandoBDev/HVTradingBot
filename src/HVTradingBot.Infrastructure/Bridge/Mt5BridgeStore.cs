@@ -10,13 +10,20 @@ namespace HVTradingBot.Infrastructure.Bridge;
 
 public sealed record BridgeAccount(long Login, string Server, string Company, string Currency, decimal Balance, decimal Equity, string TradeMode);
 
-/// <summary>An open MT5 position. <see cref="Ticket"/> is the position identifier; <see cref="Comment"/> carries our client id.</summary>
+/// <summary>
+/// An open MT5 position. <see cref="Ticket"/> is the position identifier; <see cref="Comment"/> carries our client id.
+/// <see cref="PriceCurrent"/> is reported from Expert Advisor 1.1 on.
+/// </summary>
 public sealed record BridgePosition(long Ticket, string Symbol, string Type, decimal Volume, decimal PriceOpen, decimal Sl, decimal Tp, decimal Profit,
-    decimal Swap, long Time, string Comment, long Magic, decimal ContractSize);
+    decimal Swap, long Time, string Comment, long Magic, decimal ContractSize, decimal? PriceCurrent = null);
 
-/// <summary>A deal of one of our positions. Entry: IN, OUT, INOUT, OUT_BY. Reason: SL, TP, SO, CLIENT, EXPERT, OTHER. Times are UTC seconds.</summary>
+/// <summary>
+/// A buy or sell deal. Entry: IN, OUT, INOUT, OUT_BY. Reason: SL, TP, SO, CLIENT, EXPERT, OTHER. Times are UTC seconds.
+/// Expert Advisor 1.0 reports only deals of our positions, without <see cref="Symbol"/>, <see cref="Type"/> (BUY or SELL),
+/// <see cref="Volume"/> (lots) and <see cref="Magic"/>; 1.1 reports every trade deal with them.
+/// </summary>
 public sealed record BridgeDeal(long Ticket, long PositionId, string Entry, decimal Price, decimal Profit, decimal Commission, decimal Swap, long Time,
-    string Reason);
+    string Reason, string? Symbol = null, string? Type = null, decimal? Volume = null, long? Magic = null);
 
 /// <summary>What the Expert Advisor did with a command.</summary>
 public sealed record BridgeResult(long Id, bool Ok, int Retcode, string Message, long? Ticket, decimal? Price, decimal? Volume, decimal? Units,
@@ -77,13 +84,18 @@ public sealed class Mt5BridgeStore(IDbContextFactory<TradingDbContext> dbFactory
             command.ResultJson = JsonSerializer.Serialize(sync.Results!.Last(r => r.Id == command.Id), Json);
         }
 
-        var pending = await db.Mt5BridgeCommands.Where(c => c.Status == Pending).OrderBy(c => c.Id).ToListAsync(cancellationToken);
+        // Claimed one by one with a conditional update, so a command goes to exactly one caller even when several Expert
+        // Advisors (one per chart) report at the same moment: each copy would otherwise place the order.
+        var pending = await db.Mt5BridgeCommands.AsNoTracking().Where(c => c.Status == Pending).OrderBy(c => c.Id).ToListAsync(cancellationToken);
         var lines = new StringBuilder("OK\n");
         foreach (var command in pending)
         {
-            command.Status = Sent;
-            command.SentAtUtc = now;
-            lines.Append(Line(command)).Append('\n');
+            var claimed = await db.Mt5BridgeCommands.Where(c => c.Id == command.Id && c.Status == Pending)
+                .ExecuteUpdateAsync(u => u.SetProperty(c => c.Status, Sent).SetProperty(c => c.SentAtUtc, (DateTime?)now), cancellationToken);
+            if (claimed == 1)
+            {
+                lines.Append(Line(command)).Append('\n');
+            }
         }
 
         await db.SaveChangesAsync(cancellationToken);
