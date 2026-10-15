@@ -113,7 +113,7 @@ public sealed class DashboardViewModel : ObservableObject
 
         settings.QuitExplained = true;
         await navigator.AlertAsync("Trading continues without the app",
-            "Quitting HVTradingBot leaves the Docker containers running, so the bot keeps trading. Use \"Stop trading\" " +
+            "Quitting Ospreya leaves the Docker containers running, so the bot keeps trading. Use \"Stop trading\" " +
             "to stop it, or turn on \"Stop trading when the app quits\" in Settings.");
     }
 

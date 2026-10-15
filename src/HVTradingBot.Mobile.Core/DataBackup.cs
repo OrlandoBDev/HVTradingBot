@@ -163,7 +163,7 @@ public sealed class DataBackup(MobileSettings settings)
                 var databaseEntry = zip.GetEntry(DatabaseEntry);
                 if (manifestEntry is null || databaseEntry is null)
                 {
-                    throw new BackupException("This is not an HVTradingBot backup.");
+                    throw new BackupException("This is not an Ospreya backup.");
                 }
 
                 await using (var reader = manifestEntry.Open())
@@ -186,7 +186,7 @@ public sealed class DataBackup(MobileSettings settings)
 
             if (manifest is not { App: "HVTradingBot" })
             {
-                throw new BackupException("This is not an HVTradingBot backup.");
+                throw new BackupException("This is not an Ospreya backup.");
             }
 
             if (manifest.Format > FormatVersion)
@@ -239,12 +239,12 @@ public sealed class DataBackup(MobileSettings settings)
         }
         catch (SqliteException)
         {
-            throw new BackupException("This backup has no HVTradingBot data.");
+            throw new BackupException("This backup has no Ospreya data.");
         }
 
         if (!applied.Any())
         {
-            throw new BackupException("This backup has no HVTradingBot data.");
+            throw new BackupException("This backup has no Ospreya data.");
         }
 
         if (applied.FirstOrDefault(m => !known.Contains(m)) is { } unknown)

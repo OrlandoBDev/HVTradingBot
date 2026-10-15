@@ -1,6 +1,10 @@
-# HVTradingBot
+# Ospreya
 
-HVTradingBot is a research-driven, risk-first automated trading platform designed to analyze financial markets, identify high-quality trade opportunities, and support paper, approval-based, and eventually guarded automated execution.
+Ospreya (formerly HVTradingBot) is a research-driven, risk-first automated trading platform designed to analyze financial markets, identify high-quality trade opportunities, and support paper, approval-based, and eventually guarded automated execution.
+
+> **Name:** like the osprey, it circles until it is sure, then takes one clean catch. The product is called Ospreya;
+> code, folders, Docker/database names and the MT5 Expert Advisor keep the `HVTradingBot` name so existing installs,
+> saved credentials and backups keep working.
 
 ## Core Principle
 

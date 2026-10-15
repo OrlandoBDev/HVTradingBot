@@ -7,7 +7,7 @@
              x:Class="HVTradingBot.App.Pages.StartupPage"
              x:DataType="vm:StartupViewModel"
              NavigationPage.HasNavigationBar="False"
-             Title="HVTradingBot">
+             Title="Ospreya">
 
     <ContentPage.Resources>
         <pages:StepStateToSymbolConverter x:Key="StateSymbol" />
@@ -17,7 +17,7 @@
     <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" Padding="32,24" RowSpacing="16" MaximumWidthRequest="900">
 
         <VerticalStackLayout Grid.Row="0" Spacing="4">
-            <Label Text="Starting HVTradingBot" FontSize="24" FontAttributes="Bold" />
+            <Label Text="Starting Ospreya" FontSize="24" FontAttributes="Bold" />
             <Label FontSize="13" TextColor="Gray">
                 <Label.FormattedText>
                     <FormattedString>

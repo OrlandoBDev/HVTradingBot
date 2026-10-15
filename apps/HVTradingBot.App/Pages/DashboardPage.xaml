@@ -5,7 +5,7 @@
              x:Class="HVTradingBot.App.Pages.DashboardPage"
              x:DataType="vm:DashboardViewModel"
              NavigationPage.HasNavigationBar="False"
-             Title="HVTradingBot">
+             Title="Ospreya">
 
     <Grid RowDefinitions="*,Auto">
 

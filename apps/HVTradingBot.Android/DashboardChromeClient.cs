@@ -49,7 +49,7 @@ public sealed class DashboardChromeClient(Activity activity) : WebChromeClient
     /// <summary>Not cancelable by tapping outside or Back: the page waits for OK or Cancel.</summary>
     private AlertDialog.Builder Dialog(string? message) =>
         new AlertDialog.Builder(activity)
-            .SetTitle("HVTradingBot")!
+            .SetTitle("Ospreya")!
             .SetMessage(message ?? "")!
             .SetCancelable(false)!;
 }

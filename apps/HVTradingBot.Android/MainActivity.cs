@@ -16,7 +16,7 @@ namespace HVTradingBot.Android;
 /// the trading service, which keeps running after the app is closed until "Stop trading" in its notification.
 /// </summary>
 [Activity(
-    Label = "HVTradingBot",
+    Label = "Ospreya",
     MainLauncher = true,
     Theme = "@style/AppTheme",
     LaunchMode = LaunchMode.SingleTop,
@@ -157,7 +157,7 @@ public sealed class MainActivity : Activity
             case "backup-export":
                 // The user picks where the backup goes (Google Drive, Downloads, ...).
                 StartActivityForResult(new Intent(Intent.ActionCreateDocument).AddCategory(Intent.CategoryOpenable).SetType("application/zip")
-                    .PutExtra(Intent.ExtraTitle, $"HVTradingBot-backup-{DateTime.Now:yyyy-MM-dd-HHmm}.zip"), ExportBackupRequest);
+                    .PutExtra(Intent.ExtraTitle, $"Ospreya-backup-{DateTime.Now:yyyy-MM-dd-HHmm}.zip"), ExportBackupRequest);
                 break;
             case "backup-restore":
                 StartActivityForResult(new Intent(Intent.ActionOpenDocument).AddCategory(Intent.CategoryOpenable).SetType("*/*")

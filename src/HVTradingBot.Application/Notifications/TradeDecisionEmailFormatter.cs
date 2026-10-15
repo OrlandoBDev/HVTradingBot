@@ -62,7 +62,7 @@ public static class TradeDecisionEmailFormatter
         }
 
         body.AppendLine();
-        body.AppendLine("Sent by HVTradingBot. Notifications are informational only and cannot approve or execute trades.");
+        body.AppendLine("Sent by Ospreya. Notifications are informational only and cannot approve or execute trades.");
         var html = TradeEmailTemplate.Render(notification);
         return new EmailMessage(subject, body.ToString(), html);
     }
@@ -89,7 +89,7 @@ public static class TradeDecisionEmailFormatter
         NotificationKind.KillSwitch => n.KillSwitchActive == false
             ? "The kill switch was deactivated; new trades are allowed again."
             : "The kill switch was activated; no new trades will be placed until it is turned off.",
-        NotificationKind.Test => "This is a test email from HVTradingBot. Your email settings work.",
+        NotificationKind.Test => "This is a test email from Ospreya. Your email settings work.",
         _ => "An order was not placed."
     };
 

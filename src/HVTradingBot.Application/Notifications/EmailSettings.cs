@@ -25,10 +25,10 @@ public sealed record EmailSettings(
     bool OnTradeClosed,
     bool OnOrderRejected,
     bool OnKillSwitch,
-    string SubjectPrefix = "[HVTradingBot]",
+    string SubjectPrefix = "[Ospreya]",
     int MaxSendAttempts = 3)
 {
-    public static readonly EmailSettings Disabled = new(false, "smtp.gmail.com", 587, null, null, null, "HVTradingBot", [], true, true, false, true);
+    public static readonly EmailSettings Disabled = new(false, "smtp.gmail.com", 587, null, null, null, "Ospreya", [], true, true, false, true);
 
     public string? EffectiveFromAddress => string.IsNullOrWhiteSpace(FromAddress) ? Username : FromAddress;
 

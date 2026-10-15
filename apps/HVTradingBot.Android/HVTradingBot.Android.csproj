@@ -21,7 +21,7 @@
     <!-- Android toolchain warnings vary with the installed SDK; do not fail the build on them. -->
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
 
-    <ApplicationTitle>HVTradingBot</ApplicationTitle>
+    <ApplicationTitle>Ospreya</ApplicationTitle>
     <ApplicationId>com.hvtradingbot.android</ApplicationId>
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>

@@ -57,7 +57,7 @@ export function AppEngineSettings() {
           </div>
         )}
         <p className="muted">
-          The engine runs in the background while the "HVTradingBot is trading" notification is shown, also with the
+          The engine runs in the background while the "Ospreya is trading" notification is shown, also with the
           screen off. It restarts on its own after errors and when you change the markets. Open positions always keep
           their broker-side stop loss and take profit.
         </p>

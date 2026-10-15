@@ -22,9 +22,9 @@ public sealed class EmailNotificationOptions
     public string? Password { get; init; }
 
     public string? FromAddress { get; init; }
-    public string FromName { get; init; } = "HVTradingBot";
+    public string FromName { get; init; } = "Ospreya";
     public string[] ToAddresses { get; init; } = [];
-    public string SubjectPrefix { get; init; } = "[HVTradingBot]";
+    public string SubjectPrefix { get; init; } = "[Ospreya]";
 
     /// <summary>Decision statuses to notify on (legacy); RejectedByRisk switches on "order rejected" emails.</summary>
     public DecisionState[] NotifyOnStatuses { get; init; } = [];

@@ -82,7 +82,7 @@ public sealed class ConflictDetector(IProcessRunner runner, IPortProbe ports, IL
         if (native.Count > 0)
         {
             logger.LogWarning("Native HVTradingBot processes are running: {Processes}", string.Join("; ", native));
-            return "HVTradingBot is already running outside Docker (./run.sh or dotnet run). Stop it first; two workers " +
+            return "Ospreya is already running outside Docker (./run.sh or dotnet run). Stop it first; two workers " +
                    "would trade the same Deriv account. (./run.sh dev may keep running.)\n" + string.Join('\n', native);
         }
 

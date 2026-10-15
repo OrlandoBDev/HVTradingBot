@@ -238,11 +238,11 @@ public sealed class BridgeGateway(Mt5BridgeStore bridge, IClock clock, TimeSpan?
     private async Task<BridgeState> OnlineStateAsync(CancellationToken cancellationToken)
     {
         var state = await bridge.GetStateAsync(cancellationToken)
-                    ?? throw new BrokerUnavailableException("The MT5 bridge has not connected yet: start MetaTrader 5 with the HVTradingBot Expert Advisor.");
+                    ?? throw new BrokerUnavailableException("The MT5 bridge has not connected yet: start MetaTrader 5 with the Ospreya Expert Advisor (HVTradingBotBridge).");
         if (clock.UtcNow - state.LastSeenUtc > OfflineAfter)
         {
             throw new BrokerUnavailableException(
-                $"The MT5 Expert Advisor last reported {(clock.UtcNow - state.LastSeenUtc).TotalMinutes:0} min ago: is MetaTrader 5 running with the HVTradingBot Expert Advisor?");
+                $"The MT5 Expert Advisor last reported {(clock.UtcNow - state.LastSeenUtc).TotalMinutes:0} min ago: is MetaTrader 5 running with the Ospreya Expert Advisor (HVTradingBotBridge)?");
         }
 
         return state;

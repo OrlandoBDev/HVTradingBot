@@ -20,7 +20,7 @@
     <!-- Warnings from the MAUI/Xcode toolchain vary with the installed Xcode; do not fail the build on them. -->
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
 
-    <ApplicationTitle>HVTradingBot</ApplicationTitle>
+    <ApplicationTitle>Ospreya</ApplicationTitle>
     <ApplicationId>com.hvtradingbot.app</ApplicationId>
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>

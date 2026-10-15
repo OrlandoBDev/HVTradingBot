@@ -47,7 +47,7 @@ public sealed class TradingService : Service
     {
         PhoneNotifications.CreateChannels(this);
         // Android requires the notification within seconds of starting a foreground service, also when stopping.
-        StartInForeground(EngineNotification("HVTradingBot is starting", "Opening the database…"));
+        StartInForeground(EngineNotification("Ospreya is starting", "Opening the database…"));
 
         if (intent?.Action == ActionStop)
         {
@@ -89,7 +89,7 @@ public sealed class TradingService : Service
         catch (Exception ex)
         {
             global::Android.Util.Log.Error("HVTradingBot", $"Engine failed to start: {ex}");
-            Show(EngineNotification("HVTradingBot could not start", ex.Message));
+            Show(EngineNotification("Ospreya could not start", ex.Message));
         }
     }
 

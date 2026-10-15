@@ -102,7 +102,7 @@ public sealed class EmailSettingsStore(
         var row = await db.NotificationSettings.SingleOrDefaultAsync(s => s.Id == RowId, cancellationToken);
         if (row is null)
         {
-            row = new NotificationSettingsEntity { Id = RowId, SmtpHost = input.SmtpHost, FromName = "HVTradingBot", ToAddresses = "[]" };
+            row = new NotificationSettingsEntity { Id = RowId, SmtpHost = input.SmtpHost, FromName = "Ospreya", ToAddresses = "[]" };
             db.NotificationSettings.Add(row);
         }
 
@@ -117,7 +117,7 @@ public sealed class EmailSettingsStore(
         }
 
         row.FromAddress = Clean(input.FromAddress);
-        row.FromName = Clean(input.FromName) ?? "HVTradingBot";
+        row.FromName = Clean(input.FromName) ?? "Ospreya";
         row.ToAddresses = JsonSerializer.Serialize(input.ToAddresses.Select(a => a.Trim()).Where(a => a.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList());
         row.OnTradeOpened = input.OnTradeOpened;
         row.OnTradeClosed = input.OnTradeClosed;

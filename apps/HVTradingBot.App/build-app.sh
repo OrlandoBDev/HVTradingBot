@@ -56,4 +56,4 @@ fi
 info "Installing to ${DEST}"
 rm -rf "$DEST"
 ditto "$app" "$DEST"
-info "Done. Open HVTradingBot from Launchpad or /Applications."
+info "Done. Open Ospreya (HVTradingBot.app) from Launchpad or /Applications."

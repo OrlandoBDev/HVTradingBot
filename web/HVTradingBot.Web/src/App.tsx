@@ -74,7 +74,7 @@ function Dashboard({ username, onSignOut }: { username: string; onSignOut: () =>
         </button>
         <div className="brand">
           <span className="logo">HV</span>
-          <span className="brand-name">HVTradingBot</span>
+          <span className="brand-name">Ospreya</span>
         </div>
         {status && (
           <div className="topbar-status">

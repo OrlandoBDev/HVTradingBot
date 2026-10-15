@@ -25,7 +25,7 @@ public partial class App : Application
 
         var window = new Window(new NavigationPage(startupPage))
         {
-            Title = "HVTradingBot",
+            Title = "Ospreya",
             Width = width > 0 ? width : 1360,
             Height = height > 0 ? height : 900,
             // Small enough that the dashboard can switch to its compact layout (sidebar behind the menu button).

@@ -92,7 +92,7 @@ public sealed class DataBackupTests : IAsyncLifetime
         var before = Decisions(settings.DatabasePath);
 
         await AssertRefused(backup, "not a zip"u8.ToArray(), "not a backup");
-        await AssertRefused(backup, Zip(("hello.txt", "hi"u8.ToArray())), "not an HVTradingBot backup");
+        await AssertRefused(backup, Zip(("hello.txt", "hi"u8.ToArray())), "not an Ospreya backup");
         await AssertRefused(backup, WithFutureMigration(), "newer version");
 
         Assert.Equal(before, Decisions(settings.DatabasePath));

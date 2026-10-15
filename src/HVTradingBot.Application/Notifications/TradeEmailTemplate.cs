@@ -52,7 +52,7 @@ public static class TradeEmailTemplate
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
 <td style="font-family:{{Font}};">
 <span style="display:inline-block;width:30px;height:30px;line-height:30px;text-align:center;border-radius:8px;background:#5b9dff;color:#ffffff;font-weight:700;font-size:12px;vertical-align:middle;">HV</span>
-<span style="color:#ffffff;font-size:16px;font-weight:600;vertical-align:middle;padding-left:10px;">HVTradingBot</span>
+<span style="color:#ffffff;font-size:16px;font-weight:600;vertical-align:middle;padding-left:10px;">Ospreya</span>
 </td>
 <td align="right" style="font-family:{{Font}};">{{ModeBadge(n)}}</td>
 </tr></table>
@@ -129,11 +129,11 @@ public static class TradeEmailTemplate
 <div style="font-size:12px;line-height:1.55;color:{{Muted}};border-top:1px solid {{Line}};padding-top:14px;">
 Informational only — notifications cannot approve, change or execute trades.
 {{(n.Broker?.Contains("demo", StringComparison.OrdinalIgnoreCase) == true ? "Trades are placed on a <b>demo</b> account with virtual funds. " : "")}}Results are not evidence of a future edge and are not financial advice.<br>
-Choose which emails you receive under <b>Settings › Notifications</b> in the HVTradingBot dashboard.
+Choose which emails you receive under <b>Settings › Notifications</b> in the Ospreya dashboard.
 </div>
 </td></tr>
 </table>
-<div style="font-family:{{Font}};font-size:11px;color:#94a3b8;padding-top:12px;">HVTradingBot · {{E(LocalTime(n.DecidedAtUtc, "yyyy-MM-dd HH:mm"))}}</div>
+<div style="font-family:{{Font}};font-size:11px;color:#94a3b8;padding-top:12px;">Ospreya · {{E(LocalTime(n.DecidedAtUtc, "yyyy-MM-dd HH:mm"))}}</div>
 </td></tr>
 </table>
 </body>
@@ -166,7 +166,7 @@ Choose which emails you receive under <b>Settings › Notifications</b> in the H
                     ? "The kill switch was turned off; the engine may place new trades again."
                     : "The kill switch is on. No new trades will be placed until it is turned off; open positions keep their stop loss and take profit.";
             case NotificationKind.Test:
-                return "HVTradingBot can send you email. Trade notifications will look like this.";
+                return "Ospreya can send you email. Trade notifications will look like this.";
         }
 
         if (!string.IsNullOrWhiteSpace(n.Strategy)) parts.Add(Humanize(n.Strategy));

@@ -38,7 +38,7 @@ export function Login({ setupRequired, onSignedIn }: { setupRequired: boolean; o
       <form className="login-card" onSubmit={submit}>
         <div className="brand">
           <span className="logo">HV</span>
-          <span className="brand-name">HVTradingBot</span>
+          <span className="brand-name">Ospreya</span>
         </div>
         <h1>{setupRequired ? "Create your login" : "Sign in"}</h1>
         {setupRequired && (

@@ -141,7 +141,7 @@ public sealed class TradeDecisionNotificationTests
         await dispatcher.SendAsync(CreateNotification(DecisionState.Executed), CancellationToken.None);
 
         var (message, settings) = Assert.Single(sender.Sent);
-        Assert.StartsWith("[HVTradingBot] Trade opened:", message.Subject);
+        Assert.StartsWith("[Ospreya] Trade opened:", message.Subject);
         Assert.Equal(["trader@example.com"], settings.ToAddresses);
         Assert.Equal([true], attempts);
     }
