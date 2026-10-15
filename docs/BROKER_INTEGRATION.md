@@ -23,7 +23,7 @@ Responsibilities:
 
 ### Deriv (implemented, demo only)
 
-See ADR-008. Implementation: `src/HVTradingBot.Infrastructure/Brokers/Deriv`.
+See ADR-008. Implementation: `src/Ospreya.Infrastructure/Brokers/Deriv`.
 
 - Authentication: Personal Access Token + App ID (`Authorization: Bearer`, `Deriv-App-ID`) against
   `https://api.derivws.com`; `GET /trading/v1/options/accounts`, then `POST .../accounts/{id}/otp` for a single-use
@@ -69,7 +69,7 @@ The free alternative to MetaApi when the bot runs on a computer that also runs M
 **Set up:** Settings › Broker account › MetaTrader 5: Connection **MT5 on this computer**, tick **Trade Forex on MT5**
 and save. The card then shows a **bridge key** and the steps:
 
-1. Download `HVTradingBotBridge.mq5` from the card (served at `/mt5/HVTradingBotBridge.mq5`) into MetaTrader's
+1. Download `OspreyaBridge.mq5` from the card (served at `/mt5/OspreyaBridge.mq5`) into MetaTrader's
    `MQL5/Experts` folder (File › Open Data Folder) and compile it in MetaEditor.
 2. Tools › Options › Expert Advisors: tick **Allow WebRequest for listed URL** and add `http://127.0.0.1:5080`.
 3. Attach the Expert Advisor to one chart, paste the bridge key in its inputs, and switch **Algo Trading** on.

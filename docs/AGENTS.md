@@ -4,7 +4,7 @@ This file is intended for Codex and other coding agents working in this reposito
 
 ## Mission
 
-Build HVTradingBot as a production-quality trading research and automation platform.
+Build Ospreya as a production-quality trading research and automation platform.
 
 Do not optimize for fastest code generation.
 

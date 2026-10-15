@@ -2,7 +2,7 @@
 **/obj/
 **/node_modules/
 **/logs/
-src/HVTradingBot.Api/wwwroot/
+src/Ospreya.Api/wwwroot/
 .env
 .git
 .run

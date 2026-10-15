@@ -23,18 +23,18 @@ until the project moves to an external server with a domain.
 ## How it works
 
 ```
-HVTradingBot.app (MAUI)
+Ospreya.app (MAUI)
  ├─ Startup screen: checks + `docker compose up -d --build` with live progress
  ├─ WebView → http://localhost:5080   (dashboard served by the api container)
  └─ Status bar: polls /health/ready (worker running / data stale / offline)
 
-Docker (project "hvtradingbot", compose file in the repository checkout)
+Docker (project "ospreya", compose file in the repository checkout)
  ├─ postgres  (volume pgdata: all trading data, settings, login)
  ├─ api       (dashboard + REST + SignalR, 127.0.0.1:5080)
  └─ worker    (Deriv market data + trading; restart: unless-stopped also covers the exit-code-3 settings restart)
 ```
 
-For the MVP the app builds the images from a repository checkout (setting, default `~/HVTradingBot`). A later step
+For the MVP the app builds the images from a repository checkout (setting, default `~/Ospreya`). A later step
 publishes images to a registry so the app only needs a compose file (see [Later](#later-not-in-the-mvp)).
 
 ### Startup sequence (each step shown with its state on the startup screen)
@@ -46,7 +46,7 @@ publishes images to a registry so the app only needs a compose file (see [Later]
 2. **Docker running.** `docker info`; if it fails, `open -a Docker` and wait up to 120 s.
 3. **Repository and `.env`.** The configured folder must contain `docker-compose.yml`. If `.env` is missing, create it
    from `.env.example` with a random `POSTGRES_PASSWORD` (same as `ensure_env` in `run.sh`), permissions `600`.
-4. **No conflicting native run.** If a native `HVTradingBot.Worker` or `HVTradingBot.Api` process is running, or
+4. **No conflicting native run.** If a native `Ospreya.Worker` or `Ospreya.Api` process is running, or
    port `API_PORT` is held by something that is not the `api` container, stop with a clear message. Two workers would
    trade the same Deriv account.
 5. **Start.** `docker compose --project-directory <repo> up -d --build`, output streamed to an expandable log view.
@@ -66,22 +66,22 @@ publishes images to a registry so the app only needs a compose file (see [Later]
 
 Deriv and email credentials are stored encrypted in PostgreSQL; the Data Protection keys that decrypt them live on
 disk, outside the database (`DataProtectionSetup.cs`). Native runs use
-`~/Library/Application Support/HVTradingBot/keys`; Docker currently uses the `dpkeys` volume. The containers would
+`~/Library/Application Support/Ospreya/keys`; Docker currently uses the `dpkeys` volume. The containers would
 find the encrypted token but could not decrypt it.
 
 Change: mount the host folder into `api` and `worker` instead of the `dpkeys` volume:
 
 ```yaml
     volumes:
-      - "${HOME}/Library/Application Support/HVTradingBot/keys:/keys"
+      - "${HOME}/Library/Application Support/Ospreya/keys:/keys"
 ```
 
-Both setups use the application name `HVTradingBot`, so native and Docker runs can then read each other's
+Both setups use the application name `Ospreya`, so native and Docker runs can then read each other's
 encrypted values. Before switching, copy any keys already in the `dpkeys` volume into the host folder (key files are
 additive; a key ring holding both sets decrypts everything):
 
 ```bash
-docker run --rm -v hvtradingbot_dpkeys:/from -v "$HOME/Library/Application Support/HVTradingBot/keys:/to" \
+docker run --rm -v ospreya_dpkeys:/from -v "$HOME/Library/Application Support/Ospreya/keys:/to" \
   alpine sh -c 'cp -n /from/*.xml /to/ 2>/dev/null || true'
 ```
 
@@ -103,8 +103,8 @@ Two workers on the same database and Deriv account would place duplicate orders.
 | Scenario | How | Safe? |
 |---|---|---|
 | Browser and app both viewing the Docker stack | Open `http://localhost:5080` in a browser while the app runs. Each signs in separately (the app's WebView has its own cookies). | Yes, one worker |
-| Changing the dashboard (React) | `cd web/HVTradingBot.Web && npm run dev` → `http://localhost:5173`; Vite proxies `/api`, `/hubs`, `/health` to the Docker API on 5080. | Yes, one worker |
-| Changing .NET code while the app runs | New `./run.sh dev`: native API on **5081**, native worker with `MARKET_DATA_PROVIDER=Simulated`, `BROKER_PROVIDER=Paper` and a separate database `hvtradingbot_dev` (created in the same Postgres container if missing). | Yes, separate data and no Deriv orders |
+| Changing the dashboard (React) | `cd web/Ospreya.Web && npm run dev` → `http://localhost:5173`; Vite proxies `/api`, `/hubs`, `/health` to the Docker API on 5080. | Yes, one worker |
+| Changing .NET code while the app runs | New `./run.sh dev`: native API on **5081**, native worker with `MARKET_DATA_PROVIDER=Simulated`, `BROKER_PROVIDER=Paper` and a separate database `ospreya_dev` (created in the same Postgres container if missing). | Yes, separate data and no Deriv orders |
 
 `./run.sh local` (native, real database, Deriv) stays for when the app is not running.
 
@@ -112,28 +112,28 @@ Two workers on the same database and Deriv account would place duplicate orders.
 
 MetaTrader 5 for Mac runs Expert Advisors, so Forex can go to an MT5 demo account without MetaApi: in Settings ›
 Broker account › MetaTrader 5 choose **MT5 on this computer**, save, and follow the steps on the card (download
-`HVTradingBotBridge.mq5`, allow WebRequest for `http://127.0.0.1:5080`, attach it to one chart with the bridge key).
+`OspreyaBridge.mq5`, allow WebRequest for `http://127.0.0.1:5080`, attach it to one chart with the bridge key).
 MetaTrader 5 must stay open while the bot trades; when it is closed, new Forex orders are refused and open positions
 keep their broker-side stop loss and take profit. Details: [BROKER_INTEGRATION.md](BROKER_INTEGRATION.md).
 
 ## Project layout
 
 ```
-apps/HVTradingBot.App/            MAUI head project, net10.0-maccatalyst (not in HVTradingBot.sln)
-src/HVTradingBot.App.Core/        net10.0 class library: all logic, no MAUI dependency (in HVTradingBot.sln)
-tests/HVTradingBot.App.Tests/     xUnit tests for App.Core (in HVTradingBot.sln)
+apps/Ospreya.App/            MAUI head project, net10.0-maccatalyst (not in Ospreya.sln)
+src/Ospreya.App.Core/        net10.0 class library: all logic, no MAUI dependency (in Ospreya.sln)
+tests/Ospreya.App.Tests/     xUnit tests for App.Core (in Ospreya.sln)
 ```
 
 - `App.Core` holds the testable logic: Docker/compose command building, locating Docker, the startup pipeline as a
   sequence of steps with states, `.env` creation, conflict detection, health response parsing. Child processes go
   through an `IProcessRunner` interface so tests use a fake.
 - The MAUI project is thin: pages, bindings, WebView, `Preferences` for settings. It stays out of
-  `HVTradingBot.sln` so `dotnet build`/`dotnet test` of the solution keep working on Linux and inside the Docker
+  `Ospreya.sln` so `dotnet build`/`dotnet test` of the solution keep working on Linux and inside the Docker
   images.
 - Mac Catalyst specifics: App Sandbox **off** (the app runs `docker`; not distributed through the App Store);
   `NSAppTransportSecurity` → `NSAllowsLocalNetworking = true` for `http://localhost`. `System.Diagnostics.Process`
   is supported on Mac Catalyst.
-- Packaging: `apps/HVTradingBot.App/build-app.sh` runs `dotnet publish -f net10.0-maccatalyst -c Release`, ad-hoc
+- Packaging: `apps/Ospreya.App/build-app.sh` runs `dotnet publish -f net10.0-maccatalyst -c Release`, ad-hoc
   signs the `.app` and copies it to `/Applications`. Unsigned by Apple for now: first launch via right-click → Open.
 
 Follow `docs/AGENTS.md` and the existing code style (file-scoped namespaces, primary constructors,
@@ -141,8 +141,8 @@ Follow `docs/AGENTS.md` and the existing code style (file-scoped namespaces, pri
 
 ## Implementation tasks
 
-Each task is one commit (or a few) on `feature/macos-app`. Keep `dotnet build HVTradingBot.sln` and
-`dotnet test HVTradingBot.sln` green after every task.
+Each task is one commit (or a few) on `feature/macos-app`. Keep `dotnet build Ospreya.sln` and
+`dotnet test Ospreya.sln` green after every task.
 
 1. **Shared keys.** Replace the `dpkeys` volume with the host bind mount in `docker-compose.yml`; add
    `./run.sh migrate-keys` (the copy command above) and call it from `run_docker` before `docker compose up`.
@@ -152,13 +152,13 @@ Each task is one commit (or a few) on `feature/macos-app`. Keep `dotnet build HV
    succeeds after it is released.
 3. **`run.sh` guards and `dev` mode.** Conflict checks between native and Docker runs; `./run.sh dev` as described
    above; document in the `run.sh` header comment and `README.md`.
-4. **`HVTradingBot.App.Core` + tests.** Docker locator, `IProcessRunner`, startup pipeline with step states,
+4. **`Ospreya.App.Core` + tests.** Docker locator, `IProcessRunner`, startup pipeline with step states,
    `.env` creation, conflict detection, `/health/ready` parsing. Unit tests for each, using fakes.
-5. **MAUI app.** `apps/HVTradingBot.App`: startup screen bound to the pipeline, WebView page, status bar,
+5. **MAUI app.** `apps/Ospreya.App`: startup screen bound to the pipeline, WebView page, status bar,
    controls, settings (repository folder, stop-on-quit), entitlements and Info.plist, `build-app.sh`.
-6. **CI.** `.github/workflows/ci.yml`: an `ubuntu-latest` job (build + `dotnet test HVTradingBot.sln`; integration
+6. **CI.** `.github/workflows/ci.yml`: an `ubuntu-latest` job (build + `dotnet test Ospreya.sln`; integration
    tests use Docker, which the runner has) and a `macos-latest` job (`dotnet workload install maui`, build
-   `apps/HVTradingBot.App` for `net10.0-maccatalyst`). This lets agents without a Mac see whether the app builds.
+   `apps/Ospreya.App` for `net10.0-maccatalyst`). This lets agents without a Mac see whether the app builds.
 7. **Docs.** `README.md` "Mac app" section (install, first run, where logs are), update `docs/ROADMAP.md` status.
    Also fix the stale README line "No user authentication yet"; the dashboard login exists.
 
@@ -179,7 +179,7 @@ Each task is one commit (or a few) on `feature/macos-app`. Keep `dotnet build HV
 - **Stop on quit** starts `docker compose stop` in the background; the app exits before the containers have stopped.
 - **Lock loss.** Besides taking the advisory lock at startup, the worker checks it every 5 s; if the lock connection
   was lost (e.g. PostgreSQL restarted), the worker exits with the restart code and waits for the lock again.
-- **Dev processes.** `./run.sh dev` starts its API and worker with `--HVTradingBot:Instance=dev`; the Docker guard in
+- **Dev processes.** `./run.sh dev` starts its API and worker with `--Ospreya:Instance=dev`; the Docker guard in
   `run.sh` and the app's conflict check ignore those processes (they use a separate database).
 - **Kill switch in the status bar** is recognised from the text of the worker health message ("Kill switch active…");
   keep `WorkerHealthCheck` and `ReadyResponseParser` in step when changing it.

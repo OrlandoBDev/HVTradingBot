@@ -7,7 +7,7 @@ dashboard in a WebView; it replaces `./run.sh` for everyday use until the bot mo
 Design and implementation tasks: [MACOS_APP.md](MACOS_APP.md).
 
 Status: implemented on `feature/macos-app` (shared encryption keys, single-worker database lock, `run.sh` guards and
-`./run.sh dev`, `HVTradingBot.App.Core` with tests, the Mac Catalyst app, CI). Remaining: the manual acceptance test
+`./run.sh dev`, `Ospreya.App.Core` with tests, the Mac Catalyst app, CI). Remaining: the manual acceptance test
 on a Mac.
 
 ## Next: learn Kubernetes with this application
@@ -17,7 +17,7 @@ the same Docker stack onto Kubernetes, one concept at a time:
 
 1. Local cluster: Docker Desktop's built-in Kubernetes (kind as an alternative); `kubectl` basics.
 2. Images: build the `api` and `worker` images locally and use them from the cluster.
-3. Namespace `hvtradingbot`; a Secret created from `.env`; a ConfigMap for non-secret settings.
+3. Namespace `ospreya`; a Secret created from `.env`; a ConfigMap for non-secret settings.
 4. PostgreSQL as a StatefulSet with a PersistentVolumeClaim and a headless Service; move the data over with
    `pg_dump`/`pg_restore`.
 5. Data Protection keys on a PersistentVolumeClaim mounted by the API and worker (single node; multi-node needs a
@@ -26,7 +26,7 @@ the same Docker stack onto Kubernetes, one concept at a time:
    health, so the API's readiness probe needs its own check.
 7. Worker Deployment: `replicas: 1`, `strategy: Recreate`, backed by the worker's database lock, so a rollout
    never runs two workers.
-8. Access: `kubectl port-forward` first, then an Ingress (ingress-nginx) on `hvtradingbot.localhost`.
+8. Access: `kubectl port-forward` first, then an Ingress (ingress-nginx) on `ospreya.localhost`.
 9. Kustomize base and overlays (local vs server); optionally Helm.
 10. Operating it: logs, events, rollouts and rollbacks, resource requests/limits.
 11. When a domain and server exist: k3s on a VPS or a managed cluster, TLS with cert-manager.

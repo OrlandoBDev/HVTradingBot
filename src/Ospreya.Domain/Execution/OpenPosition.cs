@@ -1,0 +1,38 @@
+using Ospreya.Domain.Common;
+using Ospreya.Domain.MarketData;
+
+namespace Ospreya.Domain.Execution;
+
+public enum ExitReason
+{
+    StopLoss,
+    TakeProfit,
+    Manual,
+    KillSwitch,
+    /// <summary>Closed by the app before its stop because the trade stopped going as planned (see EarlyExitRules).</summary>
+    EarlyExit
+}
+
+public sealed record OpenPosition(
+    Guid Id,
+    string ClientOrderId,
+    Instrument Instrument,
+    Direction Direction,
+    decimal Units,
+    decimal EntryPrice,
+    decimal StopLoss,
+    decimal TakeProfit,
+    decimal InitialRiskAmount,
+    DateTime OpenedAtUtc,
+    string Strategy,
+    int Score,
+    decimal MaxFavorableExcursion,
+    decimal MaxAdverseExcursion);
+
+public sealed record ClosedPosition(
+    OpenPosition Position,
+    DateTime ClosedAtUtc,
+    decimal ExitPrice,
+    ExitReason Reason,
+    decimal RealizedPnl,
+    decimal RMultiple);

@@ -1,7 +1,7 @@
 # Android App (self-contained)
 
-Status: **implemented**. The code under `src/HVTradingBot.Mobile.Core` is covered by tests on Linux. The Android
-project (`apps/HVTradingBot.Android`) is built by the **Android app** CI workflow, and its behaviour on a phone still
+Status: **implemented**. The code under `src/Ospreya.Mobile.Core` is covered by tests on Linux. The Android
+project (`apps/Ospreya.Android`) is built by the **Android app** CI workflow, and its behaviour on a phone still
 needs the [manual acceptance test](#manual-acceptance-test).
 
 ## Goal
@@ -13,9 +13,9 @@ Deriv (prices and demo orders) and, optionally, the SMTP server for email notifi
 ## How it works
 
 ```
-HVTradingBot app (one Android process)
- ├─ TradingService (foreground service, "HVTradingBot is trading" notification, partial wake lock)
- │    └─ MobileRuntime (src/HVTradingBot.Mobile.Core)
+Ospreya app (one Android process)
+ ├─ TradingService (foreground service, "Ospreya is trading" notification, partial wake lock)
+ │    └─ MobileRuntime (src/Ospreya.Mobile.Core)
  │         ├─ Trading side: the worker's hosted services (TradingWorker, BrokerSettingsWatcher, test trades,
  │         │   close requests) in their own host, restarted by EngineSupervisor when they stop
  │         ├─ Dashboard side: DashboardQueries + DashboardActions (the API's logic, no HTTP)
@@ -43,17 +43,17 @@ HVTradingBot app (one Android process)
   2 s, and pages (including **Learning**) reload whenever a bar is processed or a learning setup is added or resolved.
 - **No login.** The phone's lock screen protects the app; the dashboard's login, sign-out and password settings are
   hidden. **Settings → Engine & log** shows the engine's state and recent log lines instead (there is no terminal).
-- **Database.** SQLite (`Database:Provider=Sqlite`, migrations in `src/HVTradingBot.Infrastructure.Sqlite`). Decimals
+- **Database.** SQLite (`Database:Provider=Sqlite`, migrations in `src/Ospreya.Infrastructure.Sqlite`). Decimals
   are stored as REAL (15 significant digits) and the system-state row is serialized with a process-wide lock instead
   of `SELECT … FOR UPDATE`. The persistence integration tests run against both PostgreSQL and SQLite.
 
 ## Install
 
-1. Open the latest **Android app** workflow run on GitHub (Actions tab) and download the **HVTradingBot-android**
-   artifact (a zip containing `HVTradingBot.apk`).
+1. Open the latest **Android app** workflow run on GitHub (Actions tab) and download the **Ospreya-android**
+   artifact (a zip containing `Ospreya.apk`).
 2. Copy the APK to the phone and open it. Android asks to allow installing apps from that source (browser or file
    manager) the first time.
-3. Open **HVTradingBot**. Allow notifications and "unrestricted" battery use when asked.
+3. Open **Ospreya**. Allow notifications and "unrestricted" battery use when asked.
 4. In the dashboard go to **Settings → Broker account** and enter your Deriv App ID and **demo** account token (from
    [developers.deriv.com](https://developers.deriv.com)). Pick markets under **Settings → Markets**.
 
@@ -68,12 +68,12 @@ signed with a new throwaway debug key: fine for trying the app, but updating the
 Create a key once and store it as repository secrets:
 
 ```bash
-keytool -genkeypair -v -keystore hvtradingbot.keystore -alias hvtradingbot -keyalg RSA -keysize 4096 -validity 10000
-base64 -w0 hvtradingbot.keystore   # macOS: base64 -i hvtradingbot.keystore
+keytool -genkeypair -v -keystore ospreya.keystore -alias ospreya -keyalg RSA -keysize 4096 -validity 10000
+base64 -w0 ospreya.keystore   # macOS: base64 -i ospreya.keystore
 ```
 
 **The key of the app already on your phone.** The builds sent during development are signed with the key in
-`hvtradingbot-signing.keystore` (alias `androiddebugkey`, password `android`, SHA-256 fingerprint
+`ospreya-signing.keystore` (alias `androiddebugkey`, password `android`, SHA-256 fingerprint
 `54:01:04:53:9B:FB:B5:1B:7F:01:1A:E8:39:88:87:D3:EB:59:A9:BF:47:C8:1C:12:2A:CE:7A:1F:BF:D8:EA:8C`). Use that key, not a new
 one, so updates install over that app and keep its database: `ANDROID_KEYSTORE_BASE64` = the file's base64 text,
 `ANDROID_KEYSTORE_PASSWORD` = `android`, `ANDROID_KEY_ALIAS` = `androiddebugkey`. A new key only makes sense for a fresh
@@ -81,7 +81,7 @@ install.
 
 GitHub → Settings → Secrets and variables → Actions:
 `ANDROID_KEYSTORE_BASE64` (the base64 text), `ANDROID_KEYSTORE_PASSWORD` (store and key password), optionally
-`ANDROID_KEY_ALIAS` (default `hvtradingbot`). Keep the keystore file somewhere safe: without it no later build can update
+`ANDROID_KEY_ALIAS` (default `ospreya`). Keep the keystore file somewhere safe: without it no later build can update
 the installed app.
 
 ### Your data across updates
@@ -101,7 +101,7 @@ Everything the app knows (trades, decisions, learning, signals, settings) is in 
 Engine & backup › **Save backup…** writes a zip to a place you choose (Google Drive, Downloads); the Overview reminds you
 when there is no backup from the last 7 days. The copy is made while the engine keeps running.
 
-**Restore from backup…** checks the file first (it must be an HVTradingBot backup, intact, and not from a newer app
+**Restore from backup…** checks the file first (it must be an Ospreya backup, intact, and not from a newer app
 version) and shows what it holds before replacing anything. The current data is first saved inside the app
 (`backups/before-restore-*.zip`, never deleted by the app), then trading restarts on the restored data.
 
@@ -116,13 +116,13 @@ Needs .NET 10, Node.js 22, JDK 17+, the `android` workload and Android SDK platf
 
 ```bash
 dotnet workload install android
-dotnet build apps/HVTradingBot.Android -t:InstallAndroidDependencies -p:AndroidSdkDirectory="$HOME/Android/Sdk" -p:AcceptAndroidSDKLicenses=True
-apps/HVTradingBot.Android/build-apk.sh -p:AndroidSdkDirectory="$HOME/Android/Sdk"   # → apps/HVTradingBot.Android/bin/apk/HVTradingBot.apk
-adb install -r apps/HVTradingBot.Android/bin/apk/HVTradingBot.apk
+dotnet build apps/Ospreya.Android -t:InstallAndroidDependencies -p:AndroidSdkDirectory="$HOME/Android/Sdk" -p:AcceptAndroidSDKLicenses=True
+apps/Ospreya.Android/build-apk.sh -p:AndroidSdkDirectory="$HOME/Android/Sdk"   # → apps/Ospreya.Android/bin/apk/Ospreya.apk
+adb install -r apps/Ospreya.Android/bin/apk/Ospreya.apk
 ```
 
 `ANDROID_KEYSTORE`, `ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_ALIAS` sign with your key (see above). Engine log:
-`adb logcat -s HVTradingBot`.
+`adb logcat -s Ospreya`.
 
 ## Limits
 
@@ -138,7 +138,7 @@ adb install -r apps/HVTradingBot.Android/bin/apk/HVTradingBot.apk
 
 ## Manual acceptance test
 
-1. Install, open, allow notifications and battery exemption. The "HVTradingBot is starting" notification appears and
+1. Install, open, allow notifications and battery exemption. The "Ospreya is starting" notification appears and
    turns into "Trading on Deriv demo" once Deriv settings are saved and history is loaded.
 2. Dashboard: overview, markets, decisions, trades, learning, performance, backtest (simulated, 20 days), risk, audit,
    all settings pages load; saving invalid risk limits shows the field errors.

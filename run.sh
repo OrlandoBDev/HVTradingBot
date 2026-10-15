@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# HVTradingBot launcher for macOS (Apple Silicon and Intel). Compatible with the stock Bash 3.2.
+# Ospreya launcher for macOS (Apple Silicon and Intel). Compatible with the stock Bash 3.2.
 #
 #   ./run.sh          Start PostgreSQL in Docker, then run the API + worker natively. Dashboard: http://localhost:5080
 #                     (same as ./run.sh local; refuses while the api/worker containers run)
@@ -7,7 +7,7 @@
 #                     from ./run.sh local or an IDE runs)
 #   ./run.sh dev      Develop .NET code next to the Docker stack / Mac app: native API on http://localhost:5081 and a
 #                     native worker with simulated market data and the paper broker, on the separate database
-#                     hvtradingbot_dev (created in the same PostgreSQL container). No Deriv orders, no emails.
+#                     ospreya_dev (created in the same PostgreSQL container). No Deriv orders, no emails.
 #   ./run.sh test     Run all automated tests (integration tests need Docker)
 #   ./run.sh stop     Stop Docker services
 #   ./run.sh reset    Stop services and DELETE the database volume (all paper-trading history)
@@ -26,11 +26,11 @@ cd "$ROOT"
 RUN_DIR="$ROOT/.run"
 # Data Protection key ring (decrypts credentials stored in PostgreSQL). Native runs use it directly; docker-compose.yml
 # bind-mounts it into the api and worker containers, so both setups share one key ring.
-KEYS_DIR="$HOME/Library/Application Support/HVTradingBot/keys"
+KEYS_DIR="$HOME/Library/Application Support/Ospreya/keys"
 DEV_API_PORT=5081
-DEV_DB=hvtradingbot_dev
+DEV_DB=ospreya_dev
 # Passed as a (harmless) configuration argument to ./run.sh dev processes so the conflict checks can tell them apart.
-DEV_MARKER="--HVTradingBot:Instance=dev"
+DEV_MARKER="--Ospreya:Instance=dev"
 
 info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 fail() { printf '\033[1;31mError:\033[0m %s\n' "$*" >&2; exit 1; }
@@ -120,11 +120,11 @@ wait_for_api() {
 }
 
 # Command lines of native API/worker processes (./run.sh local, dotnet run, IDE). A path separator must precede the
-# name: this skips editors showing src/HVTradingBot.Worker/... and the containers' `dotnet HVTradingBot.Worker.dll`
+# name: this skips editors showing src/Ospreya.Worker/... and the containers' `dotnet Ospreya.Worker.dll`
 # (visible to ps on Linux hosts). ./run.sh dev processes carry DEV_MARKER and are skipped (own database and port).
 native_processes() {
   # shellcheck disable=SC2009 # pgrep cannot exclude the dev marker, and the full command lines are shown to the user
-  ps -Ao args= | grep -E '(^|/)HVTradingBot\.(Api|Worker)(\.dll)?( |$)' | grep -vF -e "$DEV_MARKER" || true
+  ps -Ao args= | grep -E '(^|/)Ospreya\.(Api|Worker)(\.dll)?( |$)' | grep -vF -e "$DEV_MARKER" || true
 }
 
 # Names of the api/worker containers of this Compose project that are running.
@@ -143,7 +143,7 @@ refuse_if_native_running() {
   procs="$(native_processes)"
   if [ -n "$procs" ]; then
     printf '%s\n' "$procs" >&2
-    fail "A native HVTradingBot API/worker is running (above: ./run.sh local, dotnet run or an IDE). Two workers would trade the same account. Stop it first (Ctrl+C in its terminal or stop the IDE run)."
+    fail "A native Ospreya API/worker is running (above: ./run.sh local, dotnet run or an IDE). Two workers would trade the same account. Stop it first (Ctrl+C in its terminal or stop the IDE run)."
   fi
 }
 
@@ -159,14 +159,14 @@ ensure_dev_database() {
 
 build_web() {
   info "Building dashboard"
-  (cd web/HVTradingBot.Web && { [ -d node_modules ] || npm ci --no-audit --no-fund; } && npm run build >/dev/null)
+  (cd web/Ospreya.Web && { [ -d node_modules ] || npm ci --no-audit --no-fund; } && npm run build >/dev/null)
 }
 
 # Builds the .NET solution in configuration $1, output in $2.
 build_dotnet() {
   local config="$1" log="$2"
   info "Building .NET solution ($config)"
-  if ! dotnet build HVTradingBot.sln -c "$config" -v quiet -nologo >"$log" 2>&1; then
+  if ! dotnet build Ospreya.sln -c "$config" -v quiet -nologo >"$log" 2>&1; then
     grep -E " error " "$log" | sort -u >&2 || true
     fail ".NET build failed. Full output: ${log#"$ROOT"/}"
   fi
@@ -177,7 +177,7 @@ start_api() {
   local config="$1" port="$2" log="$3"
   shift 3
   info "Starting API on port ${port} (logs: ${log#"$ROOT"/})"
-  (cd src/HVTradingBot.Api && exec dotnet run -c "$config" --no-build --no-launch-profile -- --urls "http://127.0.0.1:${port}" "$@") >"$log" 2>&1 &
+  (cd src/Ospreya.Api && exec dotnet run -c "$config" --no-build --no-launch-profile -- --urls "http://127.0.0.1:${port}" "$@") >"$log" 2>&1 &
   API_PID=$!
 }
 
@@ -191,7 +191,7 @@ start_worker() {
   : >"$log"
   (
     export_app_settings
-    cd src/HVTradingBot.Worker
+    cd src/Ospreya.Worker
     while true; do
       code=0
       dotnet run -c "$config" --no-build --no-launch-profile -- "$@" || code=$?
@@ -279,12 +279,12 @@ run_dev() {
 migrate_keys() {
   require_docker
   mkdir -p "$KEYS_DIR"
-  docker volume inspect hvtradingbot_dpkeys >/dev/null 2>&1 || return 0
-  info "Copying encryption keys from the old Docker volume hvtradingbot_dpkeys to $KEYS_DIR"
-  docker run --rm -v hvtradingbot_dpkeys:/from:ro -v "$KEYS_DIR:/to" \
+  docker volume inspect ospreya_dpkeys >/dev/null 2>&1 || return 0
+  info "Copying encryption keys from the old Docker volume ospreya_dpkeys to $KEYS_DIR"
+  docker run --rm -v ospreya_dpkeys:/from:ro -v "$KEYS_DIR:/to" \
     alpine sh -c 'cp -n /from/*.xml /to/ 2>/dev/null || true' \
     || fail "Copying the encryption keys failed. The old volume is untouched; see the Docker output above."
-  info "Done. Once the dashboard shows your Deriv settings, the old volume can go: docker volume rm hvtradingbot_dpkeys"
+  info "Done. Once the dashboard shows your Deriv settings, the old volume can go: docker volume rm ospreya_dpkeys"
 }
 
 run_docker() {
@@ -328,9 +328,9 @@ reset_login() {
 run_tests() {
   require_dotnet
   require_docker
-  dotnet test HVTradingBot.sln -nologo
+  dotnet test Ospreya.sln -nologo
   require_node
-  (cd web/HVTradingBot.Web && { [ -d node_modules ] || npm ci --no-audit --no-fund; } && npm run typecheck)
+  (cd web/Ospreya.Web && { [ -d node_modules ] || npm ci --no-audit --no-fund; } && npm run typecheck)
 }
 
 case "${1:-local}" in

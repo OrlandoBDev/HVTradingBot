@@ -9,23 +9,23 @@ Do not create microservices unless independent scaling, deployment, fault isolat
 ## Proposed Solution Structure
 
 ```
-HVTradingBot.sln
+Ospreya.sln
 
 src/
-  HVTradingBot.Api/
-  HVTradingBot.Worker/
-  HVTradingBot.Domain/
-  HVTradingBot.Application/
-  HVTradingBot.Infrastructure/
-  HVTradingBot.Contracts/
+  Ospreya.Api/
+  Ospreya.Worker/
+  Ospreya.Domain/
+  Ospreya.Application/
+  Ospreya.Infrastructure/
+  Ospreya.Contracts/
 
 web/
-  HVTradingBot.Web/
+  Ospreya.Web/
 
 tests/
-  HVTradingBot.UnitTests/
-  HVTradingBot.IntegrationTests/
-  HVTradingBot.ArchitectureTests/
+  Ospreya.UnitTests/
+  Ospreya.IntegrationTests/
+  Ospreya.ArchitectureTests/
 
 docs/
 ```

@@ -1,10 +1,8 @@
 # Ospreya
 
-Ospreya (formerly HVTradingBot) is a research-driven, risk-first automated trading platform designed to analyze financial markets, identify high-quality trade opportunities, and support paper, approval-based, and eventually guarded automated execution.
+Ospreya is a research-driven, risk-first automated trading platform designed to analyze financial markets, identify high-quality trade opportunities, and support paper, approval-based, and eventually guarded automated execution.
 
-> **Name:** like the osprey, it circles until it is sure, then takes one clean catch. The product is called Ospreya;
-> code, folders, Docker/database names and the MT5 Expert Advisor keep the `HVTradingBot` name so existing installs,
-> saved credentials and backups keep working.
+> **Name:** like the osprey, it circles until it is sure, then takes one clean catch.
 
 ## Core Principle
 
@@ -47,42 +45,42 @@ Set `BROKER_PROVIDER=Paper` in `.env` to trade on real Deriv prices with local s
 ### Docker and native runs
 
 - **Never two workers on one account.** `./run.sh` (native) refuses to start while the `api` or `worker` container
-  runs, and `./run.sh docker` refuses while a native `HVTradingBot.Api`/`HVTradingBot.Worker` process runs
+  runs, and `./run.sh docker` refuses while a native `Ospreya.Api`/`Ospreya.Worker` process runs
   (`./run.sh local`, `dotnet run`, an IDE). The worker also holds a PostgreSQL advisory lock: a second worker on the
   same database logs a warning and waits until the first one stops.
 - **`./run.sh dev`** is for changing .NET code while the Docker stack (or the Mac app) keeps trading: a native API on
   port **5081** and a native worker with `MARKET_DATA_PROVIDER=Simulated` and `BROKER_PROVIDER=Paper`, on a separate
-  database `hvtradingbot_dev` that is created in the same PostgreSQL container if missing. No Deriv orders and no
+  database `ospreya_dev` that is created in the same PostgreSQL container if missing. No Deriv orders and no
   emails; it has its own dashboard login (setup code printed on start). Logs: `.run/dev-api.log`,
   `.run/dev-worker.log`. It uses a Debug build, so it never overwrites the binaries of a running `./run.sh local`.
-- `./run.sh docker` runs PostgreSQL, the API and the worker as the Compose project `hvtradingbot`
+- `./run.sh docker` runs PostgreSQL, the API and the worker as the Compose project `ospreya`
   (`docker-compose.yml`); `./run.sh stop` stops it. Worker logs: `docker compose logs -f worker`.
 - **Encryption keys are shared with native runs.** Deriv and email credentials are stored encrypted in PostgreSQL;
-  the keys that decrypt them live in `~/Library/Application Support/HVTradingBot/keys`, which is bind-mounted into
+  the keys that decrypt them live in `~/Library/Application Support/Ospreya/keys`, which is bind-mounted into
   the `api` and `worker` containers at `/keys`. Credentials entered in a native run therefore also work in Docker and
   the other way round. `./run.sh docker` creates the folder before `docker compose up` (otherwise Docker would create
-  it owned by root) and copies keys from the old `hvtradingbot_dpkeys` volume, if present, via
+  it owned by root) and copies keys from the old `ospreya_dpkeys` volume, if present, via
   `./run.sh migrate-keys` (existing files are never overwritten). After checking that the dashboard still shows your
-  Deriv settings, the old volume can be removed: `docker volume rm hvtradingbot_dpkeys`.
+  Deriv settings, the old volume can be removed: `docker volume rm ospreya_dpkeys`.
 - The containers run as a non-root user. Docker Desktop on macOS maps file ownership of bind mounts, so that user can
   read and write the key folder. On a Linux Docker host, make the folder writable for the container user (UID 1654,
-  `APP_UID` of the .NET images), e.g. `sudo chown 1654 "$HOME/Library/Application Support/HVTradingBot/keys"`.
+  `APP_UID` of the .NET images), e.g. `sudo chown 1654 "$HOME/Library/Application Support/Ospreya/keys"`.
 
 ## Mac app
 
-A native macOS app (`apps/HVTradingBot.App`, .NET MAUI / Mac Catalyst) that starts PostgreSQL, the API and the worker
+A native macOS app (`apps/Ospreya.App`, .NET MAUI / Mac Catalyst) that starts PostgreSQL, the API and the worker
 in Docker and shows the dashboard in its own window, so everyday use needs no terminal. Design: [docs/MACOS_APP.md](docs/MACOS_APP.md).
 
 **Install** (needs Xcode and the MAUI workload: `sudo dotnet workload install maui`):
 
 ```bash
-apps/HVTradingBot.App/build-app.sh               # builds, ad-hoc signs and copies HVTradingBot.app to /Applications
-apps/HVTradingBot.App/build-app.sh --no-install  # build only
+apps/Ospreya.App/build-app.sh               # builds, ad-hoc signs and copies Ospreya.app to /Applications
+apps/Ospreya.App/build-app.sh --no-install  # build only
 ```
 
 The app is not signed by Apple; a copy built on another Mac needs right-click → **Open** the first time.
 
-**First run.** The app expects the repository checkout in `~/HVTradingBot` (change it under **Settings** in the app).
+**First run.** The app expects the repository checkout in `~/Ospreya` (change it under **Settings** in the app).
 It finds Docker (starting Docker Desktop if needed), creates `.env` with a random database password if missing,
 creates the encryption key folder, refuses to start while a native API/worker runs (`./run.sh local`, `dotnet run`,
 an IDE; `./run.sh dev` is allowed), then runs `docker compose up -d --build` with live output. The first build takes
@@ -99,14 +97,14 @@ lines of the `worker` or `api` container, the same as `docker compose logs --tai
 
 ## Android app
 
-A self-contained Android app (`apps/HVTradingBot.Android`): the engine, the dashboard and a SQLite database run on the
+A self-contained Android app (`apps/Ospreya.Android`): the engine, the dashboard and a SQLite database run on the
 phone, with no server or Docker. The phone only connects to Deriv (and SMTP for optional emails). A foreground service
 keeps it trading in the background with the screen off, restarts it after errors and phone restarts, and shows live
 status and trade notifications. The dashboard is the same React app, updating live, Learning page included.
 Design, install and signing: [docs/ANDROID_APP.md](docs/ANDROID_APP.md).
 
-**Install:** download the **HVTradingBot-android** artifact from the latest *Android app* workflow run, open
-`HVTradingBot.apk` on the phone, then enter the Deriv demo settings under **Settings → Broker account**.
+**Install:** download the **Ospreya-android** artifact from the latest *Android app* workflow run, open
+`Ospreya.apk` on the phone, then enter the Deriv demo settings under **Settings → Broker account**.
 
 ## What Is Implemented
 

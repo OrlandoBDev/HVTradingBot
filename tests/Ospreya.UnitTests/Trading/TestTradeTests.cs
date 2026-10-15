@@ -1,0 +1,183 @@
+using Ospreya.Application.Abstractions;
+using Ospreya.Application.Backtesting;
+using Ospreya.Application.Learning;
+using Ospreya.Application.News;
+using Ospreya.Application.Trading;
+using Ospreya.Domain.Analysis;
+using Ospreya.Domain.Common;
+using Ospreya.Domain.Decisions;
+using Ospreya.Domain.Execution;
+using Ospreya.Domain.Learning;
+using Ospreya.Domain.MarketData;
+using Ospreya.Domain.News;
+using Ospreya.Domain.Risk;
+using Ospreya.Domain.Scoring;
+using Ospreya.Domain.Strategies;
+using Ospreya.Infrastructure.MarketData;
+using Microsoft.Extensions.Logging.Abstractions;
+
+namespace Ospreya.UnitTests.Trading;
+
+public class TestTradeTests
+{
+    private static readonly DateTime End = new(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+
+    private static async Task<(TradingEngine Engine, InMemoryJournal Journal, InMemorySimulatedBroker Broker, InMemoryStateStore State, MarketDataStatus Status)> Ready(
+        bool processFirstBar = true, decimal minRewardToRisk = 2m, INewsSource? newsSource = null)
+    {
+        var costs = new ExecutionCostOptions();
+        var broker = new InMemorySimulatedBroker("USD", 10_000m, costs);
+        var journal = new InMemoryJournal { KeepDecisions = true };
+        var state = new InMemoryStateStore();
+        var clock = new ReplayClock();
+        var risk = new RiskManager(new RiskOptions { MinUnits = 1, UnitStep = 1, MinRewardToRisk = minRewardToRisk }, costs);
+        var learning = new LearningService(new InMemoryVirtualTradeStore(), new LearningOptions(), costs, NullLogger<LearningService>.Instance);
+        var engine = new TradingEngine(new SignalEvaluator(StrategyCatalog.CreateDefault(), new ScoringOptions(), learning), risk, broker,
+            new ExecutionService(broker, risk, NullLogger<ExecutionService>.Instance), state, journal, journal, clock, learning,
+            TradingUniverse.From([Instruments.EurUsd], "USD"), new TradingEngineOptions(), new FixedRiskOptions(new RiskOptions { MinRewardToRisk = minRewardToRisk }), new RegimeOptions(),
+            NullLogger<TradingEngine>.Instance,
+            news: newsSource is null ? null : new NewsService(newsSource, new NewsOptions { Provider = NewsProvider.Simulated }, NullLogger<NewsService>.Instance));
+
+        var bars = MarketSeriesGenerator.Generate(Instruments.EurUsd, 4, End, 20);
+        await engine.InitializeAsync(new Dictionary<Instrument, IReadOnlyList<Candle>> { [Instruments.EurUsd] = bars.Take(bars.Count - 1).ToList() }, CancellationToken.None);
+        var last = bars[^1];
+        clock.UtcNow = last.CloseTimeUtc;
+        var status = new MarketDataStatus(last.CloseTimeUtc, last.CloseTimeUtc);
+        if (processFirstBar)
+        {
+            await engine.ProcessBarsAsync([new InstrumentBar(Instruments.EurUsd, last)], status, "t", CancellationToken.None);
+        }
+
+        return (engine, journal, broker, state, status);
+    }
+
+    [Fact]
+    public async Task Test_trade_goes_through_risk_execution_and_the_journal()
+    {
+        var (engine, journal, broker, _, status) = await Ready();
+
+        var outcome = await engine.PlaceTestTradeAsync(Instruments.EurUsd, status, "tester", "c1", CancellationToken.None);
+
+        Assert.True(outcome.Filled, outcome.Message);
+        var position = Assert.Single(await broker.GetPositionsAsync(CancellationToken.None));
+        Assert.Equal(TradingEngine.TestTradeStrategy, position.Strategy);
+        var decision = journal.Decisions.Single(d => d.Strategy == TradingEngine.TestTradeStrategy);
+        Assert.Equal(DecisionState.Executed, decision.State);
+        Assert.True(decision.Risk!.IsApproved);
+        Assert.True(decision.Setup!.RewardToRisk >= 2m);
+    }
+
+    [Fact]
+    public async Task Closing_a_losing_test_trade_counts_toward_daily_loss_but_not_the_bots_losing_streak()
+    {
+        var (engine, _, broker, state, status) = await Ready();
+        await state.UpdateAsync(s => s with { ConsecutiveLosses = 2 }, CancellationToken.None);
+        var outcome = await engine.PlaceTestTradeAsync(Instruments.EurUsd, status, "tester", "c1", CancellationToken.None);
+        Assert.True(outcome.Filled, outcome.Message);
+
+        var (result, closed) = await engine.ClosePositionAsync(outcome.PositionId!.Value, "c1", CancellationToken.None);
+
+        Assert.Equal(OrderStatus.Filled, result.Status);
+        Assert.NotNull(closed);
+        Assert.True(closed.RealizedPnl < 0, $"Closing at once should lose the spread, got {closed.RealizedPnl}");
+        Assert.Empty(await broker.GetPositionsAsync(CancellationToken.None));
+        var after = await state.GetAsync(CancellationToken.None);
+        Assert.Equal(2, after.ConsecutiveLosses);
+        Assert.Null(after.CooldownUntilUtc);
+        Assert.Equal(closed.RealizedPnl, after.DailyRealizedPnl);
+    }
+
+    [Fact]
+    public async Task Test_trade_is_blocked_around_a_high_impact_release()
+    {
+        var (engine, journal, broker, _, status) = await Ready(newsSource: new FixedNews("USD", EventImpact.High));
+
+        var outcome = await engine.PlaceTestTradeAsync(Instruments.EurUsd, status, "tester", "c1", CancellationToken.None);
+
+        Assert.False(outcome.Filled);
+        Assert.Empty(await broker.GetPositionsAsync(CancellationToken.None));
+        var decision = journal.Decisions.Single(d => d.Strategy == TradingEngine.TestTradeStrategy);
+        Assert.Contains(decision.Risk!.Checks, c => c is { Rule: "NewsEvents", Passed: false });
+    }
+
+    [Fact]
+    public async Task Test_trade_is_smaller_near_a_medium_impact_release()
+    {
+        var (plainEngine, _, _, _, plainStatus) = await Ready();
+        var (engine, _, _, _, status) = await Ready(newsSource: new FixedNews("USD", EventImpact.Medium));
+
+        var normal = await plainEngine.PlaceTestTradeAsync(Instruments.EurUsd, plainStatus, "tester", "c1", CancellationToken.None);
+        var reduced = await engine.PlaceTestTradeAsync(Instruments.EurUsd, status, "tester", "c1", CancellationToken.None);
+
+        Assert.True(normal.Filled, normal.Message);
+        Assert.True(reduced.Filled, reduced.Message);
+        var normalRisk = decimal.Parse(normal.Message.Split("risk ")[1].Split(' ')[0], System.Globalization.CultureInfo.InvariantCulture);
+        var reducedRisk = decimal.Parse(reduced.Message.Split("risk ")[1].Split(' ')[0], System.Globalization.CultureInfo.InvariantCulture);
+        Assert.True(reducedRisk <= normalRisk / 2m + 0.01m, $"{reducedRisk} vs {normalRisk}");
+    }
+
+    /// <summary>One release on <paramref name="currency"/> 10 minutes after whatever time is asked about.</summary>
+    private sealed class FixedNews(string currency, EventImpact impact) : INewsSource
+    {
+        public string Name => "fixed";
+
+        public bool FollowsMarketTime => true;
+
+        public Task<NewsSnapshot> FetchAsync(DateTime nowUtc, CancellationToken cancellationToken) =>
+            Task.FromResult(new NewsSnapshot([new EconomicEvent("e1", currency, "Release", nowUtc.AddMinutes(10), impact)], [], nowUtc, true, Name));
+    }
+
+    [Fact]
+    public async Task Test_trade_works_right_after_startup_before_any_new_bar()
+    {
+        var (engine, _, broker, _, status) = await Ready(processFirstBar: false);
+        var live = new Quote(Instruments.EurUsd, End, 1.10000m, 1.10008m);
+
+        var outcome = await engine.PlaceTestTradeAsync(Instruments.EurUsd, status, "tester", "c1", CancellationToken.None, [live]);
+
+        Assert.True(outcome.Filled, outcome.Message);
+        Assert.Single(await broker.GetPositionsAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Test_trade_is_refused_while_the_kill_switch_is_on()
+    {
+        var (engine, journal, broker, state, status) = await Ready();
+        await state.UpdateAsync(s => s.WithKillSwitch(true, "manual", End), CancellationToken.None);
+
+        var outcome = await engine.PlaceTestTradeAsync(Instruments.EurUsd, status, "tester", "c1", CancellationToken.None);
+
+        Assert.False(outcome.Filled);
+        Assert.Contains("KillSwitch", outcome.Message);
+        Assert.Empty(await broker.GetPositionsAsync(CancellationToken.None));
+    }
+
+    /// <summary>
+    /// Stop and target are rounded to the market's price precision; the target must still give at least the minimum
+    /// R:R, or the risk engine refuses the test trade ("R:R 2.00 below minimum 2.00").
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(LivePrices))]
+    public async Task Rounded_stop_and_target_never_fall_below_the_minimum_reward_to_risk(decimal ask, decimal minRewardToRisk)
+    {
+        var (engine, journal, _, _, status) = await Ready(processFirstBar: false, minRewardToRisk: minRewardToRisk);
+        var live = new Quote(Instruments.EurUsd, End, ask - 0.00008m, ask);
+
+        var outcome = await engine.PlaceTestTradeAsync(Instruments.EurUsd, status, "tester", "c1", CancellationToken.None, [live]);
+
+        Assert.True(outcome.Filled, outcome.Message);
+        Assert.True(journal.Decisions.Single().Setup!.RewardToRisk >= minRewardToRisk);
+    }
+
+    public static TheoryData<decimal, decimal> LivePrices()
+    {
+        var data = new TheoryData<decimal, decimal>();
+        for (var i = 0; i < 12; i++)
+        {
+            data.Add(1.10000m + i * 0.00007m, 2m);
+        }
+
+        data.Add(1.10013m, 2.5m); // a stricter limit set on the Settings page
+        return data;
+    }
+}

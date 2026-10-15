@@ -1,7 +1,7 @@
 # Full stack: PostgreSQL (all app data, incl. Settings) + API (serves the dashboard) + trading worker.
 #   ./run.sh docker     (creates .env with a random DB password and the host key folder, then `docker compose up --build`)
 # For local development, ./run.sh starts only the `postgres` service and runs .NET natively.
-name: hvtradingbot
+name: ospreya
 
 services:
   postgres:
@@ -24,7 +24,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: src/HVTradingBot.Api/Dockerfile
+      dockerfile: src/Ospreya.Api/Dockerfile
     environment:
       ConnectionStrings__TradingDb: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       Urls: http://0.0.0.0:8080
@@ -36,7 +36,7 @@ services:
     volumes:
       # Data Protection keys (decrypt the Deriv/email credentials stored in PostgreSQL). Same host folder as native
       # runs (./run.sh local, IDE), so both can read each other's encrypted values. ./run.sh creates it before `up`.
-      - "${HOME}/Library/Application Support/HVTradingBot/keys:/keys"
+      - "${HOME}/Library/Application Support/Ospreya/keys:/keys"
     ports:
       - "127.0.0.1:${API_PORT:-5080}:8080"
     depends_on:
@@ -47,7 +47,7 @@ services:
   worker:
     build:
       context: .
-      dockerfile: src/HVTradingBot.Worker/Dockerfile
+      dockerfile: src/Ospreya.Worker/Dockerfile
     environment:
       ConnectionStrings__TradingDb: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       Broker__Provider: ${BROKER_PROVIDER:-Deriv}
@@ -65,7 +65,7 @@ services:
     volumes:
       # Encryption keys for the credentials stored in PostgreSQL; shared with the API and native runs, kept outside
       # the database.
-      - "${HOME}/Library/Application Support/HVTradingBot/keys:/keys"
+      - "${HOME}/Library/Application Support/Ospreya/keys:/keys"
     depends_on:
       postgres:
         condition: service_healthy

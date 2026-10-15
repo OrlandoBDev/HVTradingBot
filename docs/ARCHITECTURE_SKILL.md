@@ -1,4 +1,4 @@
-# HVTradingBot .NET 10 Architecture Skill
+# Ospreya .NET 10 Architecture Skill
 
 ## Role
 
@@ -28,12 +28,12 @@ Use a modular monolith with Clean Architecture boundaries.
 Projects:
 
 ```
-HVTradingBot.Domain
-HVTradingBot.Application
-HVTradingBot.Infrastructure
-HVTradingBot.Api
-HVTradingBot.Worker
-HVTradingBot.Contracts
+Ospreya.Domain
+Ospreya.Application
+Ospreya.Infrastructure
+Ospreya.Api
+Ospreya.Worker
+Ospreya.Contracts
 ```
 
 Dependencies:
