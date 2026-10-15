@@ -79,6 +79,10 @@ After N losses:
 - activate cooldown
 - optionally require manual review
 
+Only the bot's own trades count toward the streak. Signal trades have their own budget, and test trades (held for a
+minute, so they nearly always lose the spread) count toward the daily and weekly loss limits but never start, extend
+or reset the streak.
+
 ### Market Data Freshness
 
 If data is stale:

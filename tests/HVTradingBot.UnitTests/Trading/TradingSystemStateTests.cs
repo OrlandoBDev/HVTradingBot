@@ -52,6 +52,22 @@ public class TradingSystemStateTests
     }
 
     [Fact]
+    public void Test_trades_count_toward_loss_limits_but_never_touch_the_losing_streak()
+    {
+        var t = Bars.Start;
+        var state = new TradingSystemState().WithClosedTrade(-1, t, _risk).WithClosedTrade(-1, t, _risk)
+            .WithClosedTestTrade(-2, t).WithClosedTestTrade(-2, t, isDerived: true);
+
+        Assert.Equal(2, state.ConsecutiveLosses);
+        Assert.Null(state.CooldownUntilUtc);
+        Assert.Equal(-6, state.DailyRealizedPnl);
+        Assert.Equal(-2, state.DerivedDailyRealizedPnl);
+        Assert.Equal(-6, state.WeeklyRealizedPnl);
+
+        Assert.Equal(2, state.WithClosedTestTrade(5, t).ConsecutiveLosses);
+    }
+
+    [Fact]
     public void Stale_detection_uses_wall_clock_age()
     {
         var status = new MarketDataStatus(Bars.Start, Bars.Start);

@@ -68,6 +68,26 @@ public class TestTradeTests
     }
 
     [Fact]
+    public async Task Closing_a_losing_test_trade_counts_toward_daily_loss_but_not_the_bots_losing_streak()
+    {
+        var (engine, _, broker, state, status) = await Ready();
+        await state.UpdateAsync(s => s with { ConsecutiveLosses = 2 }, CancellationToken.None);
+        var outcome = await engine.PlaceTestTradeAsync(Instruments.EurUsd, status, "tester", "c1", CancellationToken.None);
+        Assert.True(outcome.Filled, outcome.Message);
+
+        var (result, closed) = await engine.ClosePositionAsync(outcome.PositionId!.Value, "c1", CancellationToken.None);
+
+        Assert.Equal(OrderStatus.Filled, result.Status);
+        Assert.NotNull(closed);
+        Assert.True(closed.RealizedPnl < 0, $"Closing at once should lose the spread, got {closed.RealizedPnl}");
+        Assert.Empty(await broker.GetPositionsAsync(CancellationToken.None));
+        var after = await state.GetAsync(CancellationToken.None);
+        Assert.Equal(2, after.ConsecutiveLosses);
+        Assert.Null(after.CooldownUntilUtc);
+        Assert.Equal(closed.RealizedPnl, after.DailyRealizedPnl);
+    }
+
+    [Fact]
     public async Task Test_trade_is_blocked_around_a_high_impact_release()
     {
         var (engine, journal, broker, _, status) = await Ready(newsSource: new FixedNews("USD", EventImpact.High));

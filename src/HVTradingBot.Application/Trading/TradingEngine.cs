@@ -347,7 +347,9 @@ public sealed class TradingEngine
 
                 await _state.UpdateAsync(s => SignalOrders.IsSignal(closed.Position.ClientOrderId)
                         ? s.WithClosedSignalTrade(closed.RealizedPnl, marketTime)
-                        : s.WithClosedTrade(closed.RealizedPnl, marketTime, _risk.Current, RiskOptions.IsDerived(instrument)),
+                        : closed.Position.Strategy == TestTradeStrategy
+                            ? s.WithClosedTestTrade(closed.RealizedPnl, marketTime, RiskOptions.IsDerived(instrument))
+                            : s.WithClosedTrade(closed.RealizedPnl, marketTime, _risk.Current, RiskOptions.IsDerived(instrument)),
                     cancellationToken);
                 if (_notifier is not null)
                 {

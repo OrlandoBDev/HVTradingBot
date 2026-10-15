@@ -73,6 +73,23 @@ public sealed record TradingSystemState
         };
     }
 
+    /// <summary>
+    /// A closed test trade counts toward the loss limits (it is real money on the account) but not toward the losing
+    /// streak: it is held for a minute and nearly always loses the spread, so a few tests would otherwise put the bot in
+    /// cooldown. It does not reset the streak either.
+    /// </summary>
+    public TradingSystemState WithClosedTestTrade(decimal realizedPnl, DateTime marketTimeUtc, bool isDerived = false)
+    {
+        var rolled = RollPeriods(marketTimeUtc);
+        return rolled with
+        {
+            DailyRealizedPnl = rolled.DailyRealizedPnl + realizedPnl,
+            DerivedDailyRealizedPnl = rolled.DerivedDailyRealizedPnl + (isDerived ? realizedPnl : 0),
+            WeeklyRealizedPnl = rolled.WeeklyRealizedPnl + realizedPnl,
+            CapitalPnl = rolled.CapitalPnl + realizedPnl
+        };
+    }
+
     /// <summary>A closed signal trade counts only against the signal budget: the bot's limits, streak and cooldown are untouched.</summary>
     public TradingSystemState WithClosedSignalTrade(decimal realizedPnl, DateTime marketTimeUtc)
     {
